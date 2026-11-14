@@ -286,9 +286,9 @@ public sealed class ActionResolver : MonoBehaviour
         }
         if (activity == ActivityKind.Gamble)
         {
-            if (resources == null || resources.Coins < gambleStake)
+            if (resources == null || (long)resources.Coins - gambleStake < int.MinValue)
             {
-                feedback.ShowMessage("Faltam moedas para a aposta.");
+                feedback.ShowMessage("Aposta acima do limite de moedas.");
                 return;
             }
             CommitAction(worker, activity, activityName, card);
@@ -689,6 +689,8 @@ public sealed class ActionResolver : MonoBehaviour
                     AudioManager.Play(SoundCue.Water);
                     target.AdvanceGrowth(1);
                     target.RefreshGrowth(dayCycle.CurrentDay, seedCatalog);
+                    if (MandalaSynergy.Instance != null)
+                        MandalaSynergy.Instance.ApplyGrowthBonuses(dayCycle.CurrentDay, seedCatalog);
                 }
                 ImproveNext(index + 1);
             });
@@ -771,11 +773,11 @@ public sealed class ActionResolver : MonoBehaviour
             MoveAndWork(worker, target.WorkPosition, plowWorkDuration, () =>
             {
                 int harvestYield = target.HarvestYield(dayCycle.CurrentDay, seedCatalog);
+                int pestLoss = dayEvents != null ? dayEvents.HarvestReductionFor(target) : 0;
                 CropType crop = target.Harvest();
                 AudioManager.Play(SoundCue.Harvest);
                 CropSettings settings = seedCatalog.Get(crop);
-                int gained = Mathf.Max(0, harvestYield - worker.ProductionReduction -
-                    (dayEvents != null ? dayEvents.HarvestReductionFor(crop) : 0));
+                int gained = Mathf.Max(0, harvestYield - worker.ProductionReduction - pestLoss);
                 resources.AddCrop(crop, gained);
                 if (resourceHud != null)
                 {

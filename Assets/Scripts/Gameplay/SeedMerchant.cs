@@ -76,11 +76,12 @@ public sealed class SeedMerchant : MonoBehaviour
             catalog == null ||
             cornSeeds != 0 || pumpkinSeeds != 0 || jerimumSeeds != 0 || food < 0 || fences < 0 ||
             fences > FenceSlotsAvailable ||
-            resources.Wood < fences * fenceWoodCost) return false;
+            resources.Wood < (long)fences * fenceWoodCost ||
+            (long)resources.Food + food > int.MaxValue) return false;
         long total = (long)food * GetUnitPrice(SaleItem.Food) + (long)fences * fenceCoinCost;
         if (total <= 0 || total > int.MaxValue || !resources.TrySpendCoins((int)total))
         {
-            if (feedback != null) feedback.ShowMessage("Moedas insuficientes para a compra.");
+            if (feedback != null) feedback.ShowMessage("Compra acima do limite de moedas.");
             return false;
         }
         if (food > 0)

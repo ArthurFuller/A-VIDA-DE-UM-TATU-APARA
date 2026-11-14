@@ -55,21 +55,33 @@ public sealed class InventoryTrading : MonoBehaviour
         _ => 0
     };
 
-    public int GetPrice(SaleItem item) => item switch
+    public int GetPrice(SaleItem item)
     {
-        SaleItem.Wood => woodPrice,
-        SaleItem.Fish => fishPrice,
-        SaleItem.Corn => cornPrice,
-        SaleItem.Pumpkin => pumpkinPrice,
-        SaleItem.Jerimum => jerimumPrice,
-        SaleItem.Food => foodPrice,
-        SaleItem.CornSeeds => cornSeedPrice,
-        SaleItem.PumpkinSeeds => pumpkinSeedPrice,
-        SaleItem.JerimumSeeds => jerimumSeedPrice,
-        SaleItem.Milk => milkPrice,
-        SaleItem.Eggs => eggPrice,
-        _ => 0
-    };
+        int price = item switch
+        {
+            SaleItem.Wood => woodPrice,
+            SaleItem.Fish => fishPrice,
+            SaleItem.Corn => cornPrice,
+            SaleItem.Pumpkin => pumpkinPrice,
+            SaleItem.Jerimum => jerimumPrice,
+            SaleItem.Food => foodPrice,
+            SaleItem.CornSeeds => cornSeedPrice,
+            SaleItem.PumpkinSeeds => pumpkinSeedPrice,
+            SaleItem.JerimumSeeds => jerimumSeedPrice,
+            SaleItem.Milk => milkPrice,
+            SaleItem.Eggs => eggPrice,
+            _ => 0
+        };
+        if (item == SaleItem.Corn || item == SaleItem.Pumpkin || item == SaleItem.Jerimum)
+        {
+            CropType crop = item == SaleItem.Corn ? CropType.Corn :
+                item == SaleItem.Pumpkin ? CropType.Pumpkin : CropType.Jerimum;
+            price = (int)System.Math.Min(int.MaxValue, (long)price +
+                (MandalaSynergy.Instance != null ?
+                    MandalaSynergy.Instance.CropSalePriceBonus(crop) : 0));
+        }
+        return price;
+    }
 
     public bool TrySellBatch(int[] quantities)
     {

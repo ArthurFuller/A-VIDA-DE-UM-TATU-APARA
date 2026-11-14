@@ -59,6 +59,7 @@ public sealed class ResourceHud : MonoBehaviour
     private readonly Material[] originalIconMaterials = new Material[9];
     private static readonly int FlashId = Shader.PropertyToID("_Flash");
     private static readonly int FlashColorId = Shader.PropertyToID("_FlashColor");
+    private static readonly Color DebtColor = new Color(0.95f, 0.14f, 0.14f);
     private ResourceCounterHover counterHover;
     private TopBarAutoHide topBar;
 
@@ -348,19 +349,24 @@ public sealed class ResourceHud : MonoBehaviour
             .OnKill(() => { if (icon != null) Destroy(icon); });
     }
 
-    private Sprite SpriteFor(ResourceKind kind) => kind switch
+    private Sprite SpriteFor(ResourceKind kind)
     {
-        ResourceKind.Wood => woodSprite,
-        ResourceKind.Fish => fishSprite,
-        ResourceKind.Corn => cornSprite,
-        ResourceKind.Pumpkin => pumpkinSprite,
-        ResourceKind.Jerimum => jerimumSprite,
-        ResourceKind.Food => foodSprite,
-        ResourceKind.Coins => coinSprite,
-        ResourceKind.Milk => milkSprite,
-        ResourceKind.Eggs => eggSprite,
-        _ => null
-    };
+        Sprite selected = kind switch
+        {
+            ResourceKind.Wood => woodSprite,
+            ResourceKind.Fish => fishSprite,
+            ResourceKind.Corn => cornSprite,
+            ResourceKind.Pumpkin => pumpkinSprite,
+            ResourceKind.Jerimum => jerimumSprite,
+            ResourceKind.Food => foodSprite,
+            ResourceKind.Coins => coinSprite,
+            ResourceKind.Milk => milkSprite,
+            ResourceKind.Eggs => eggSprite,
+            _ => null
+        };
+        if (selected != null) return selected;
+        return (counterHover?.IconFor(kind) as Image)?.sprite;
+    }
 
     private Sprite CircleSprite()
     {
@@ -408,14 +414,19 @@ public sealed class ResourceHud : MonoBehaviour
         _ => 0
     };
 
-    private int Shown(ResourceKind kind) => Mathf.Max(0, Stored(kind) - inFlight[(int)kind]);
+    private int Shown(ResourceKind kind)
+    {
+        long value = (long)Stored(kind) - inFlight[(int)kind];
+        return kind == ResourceKind.Coins ? (int)System.Math.Max(int.MinValue, value) :
+            (int)System.Math.Max(0, value);
+    }
 
     // The bank already owns the resource. Reveal each portion exactly when its icon lands.
     private void CreditArrival(ResourceKind kind, int amount)
     {
         int index = (int)kind;
         inFlight[index] = Mathf.Max(0, inFlight[index] - amount);
-        int next = Mathf.Min(Shown(kind), displayed[index] + amount);
+        int next = (int)System.Math.Min(Shown(kind), (long)displayed[index] + amount);
         if (next > displayed[index])
         {
             displayed[index] = next;
@@ -441,7 +452,9 @@ public sealed class ResourceHud : MonoBehaviour
     private void FlashCounter(ResourceKind kind, int direction)
     {
         int index = (int)kind;
-        Color flash = direction < 0 ? new Color(0.95f, 0.14f, 0.14f) : Color.white;
+        Color flash = direction < 0 ? DebtColor : Color.white;
+        Color resting = kind == ResourceKind.Coins && displayed[index] < 0 ?
+            DebtColor : textColors[index];
         Text label = TargetFor(kind);
         Graphic icon = counterHover != null ? counterHover.IconFor(kind) : null;
         float flashIn = counterFlashDuration * 0.32f;
@@ -460,9 +473,9 @@ public sealed class ResourceHud : MonoBehaviour
         if (label != null)
         {
             label.DOKill();
-            label.color = textColors[index];
+            label.color = resting;
             pulse.Insert(0f, label.DOColor(flash, flashIn));
-            pulse.Insert(flashIn, label.DOColor(textColors[index], flashOut));
+            pulse.Insert(flashIn, label.DOColor(resting, flashOut));
         }
         if (icon != null)
         {
@@ -495,6 +508,9 @@ public sealed class ResourceHud : MonoBehaviour
             label.text = displayed[(int)ResourceKind.Milk] + "  Ovos: " +
                 displayed[(int)ResourceKind.Eggs];
         else label.text = displayed[(int)kind].ToString();
+        if (kind == ResourceKind.Coins && (counterPulses[(int)kind] == null ||
+            !counterPulses[(int)kind].IsActive()))
+            label.color = displayed[(int)kind] < 0 ? DebtColor : textColors[(int)kind];
     }
 
     private void Refresh()

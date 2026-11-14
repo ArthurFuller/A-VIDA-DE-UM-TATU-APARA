@@ -6,14 +6,13 @@ using UnityEngine;
 public enum MandalaCombo
 {
     None = 0,
-    CassavaCow = 1,
-    CassavaWater = 2,
-    CornCow = 4,
-    CassavaJerimum = 8,
-    CassavaJerimumCow = 16
+    CornCrop = 1,
+    CornAnimal = 2,
+    ChickenCrop = 4,
+    WaterCrop = 8,
+    CowWater = 16
 }
 
-// Identifica somente as cinco relações propostas. Não cria valores de balanceamento.
 public sealed class MandalaSynergy : MonoBehaviour
 {
     [Serializable]
@@ -24,18 +23,19 @@ public sealed class MandalaSynergy : MonoBehaviour
     }
 
     [SerializeField] private Plot[] plots;
-    [Tooltip("Arraste o poço/lago central; deixe vazio para desativar a sinergia de água.")]
+    [Tooltip("Slot do poço central.")]
     [SerializeField] private Transform centralWater;
-    [SerializeField, Min(0.1f)] private float centralWaterReach = 2.5f;
-    [Header("Balanceamento - zero mantém a economia atual")]
-    [SerializeField, Min(0)] private int cassavaYieldBonusNearCow;
-    [SerializeField, Min(0)] private int cassavaGrowthBonusNearCow;
-    [SerializeField, Min(0)] private int cassavaGrowthBonusNearWater;
-    [SerializeField, Min(0)] private int milkBonusNearCorn;
+    [Header("Bônus da mandala")]
+    [SerializeField, Min(0)] private int cropGrowthNearCorn = 1;
+    [SerializeField, Min(0)] private int cropYieldNearCorn = 2;
+    [SerializeField, Min(0)] private int animalProductionNearCorn = 1;
+    [SerializeField, Min(0)] private int cropSalePriceNearWaterCow = 2;
     [Header("Uma única emissão por slot; efeitos são editáveis na Hierarchy")]
     [SerializeField] private SlotEffect[] slotEffects;
 
     private readonly Dictionary<Plot, MandalaCombo> active = new();
+    private SeedCatalog growthCatalog;
+    private int evaluatedDay = 1;
     public static MandalaSynergy Instance { get; private set; }
     public event Action Changed;
 
@@ -65,24 +65,41 @@ public sealed class MandalaSynergy : MonoBehaviour
 
     public MandalaCombo For(Plot plot) => plot != null && active.TryGetValue(plot, out var combos)
         ? combos : MandalaCombo.None;
-    public int ExtraCassavaYield(Plot plot) => (For(plot) & MandalaCombo.CassavaCow) != 0
-        ? cassavaYieldBonusNearCow : 0;
-    public int ExtraMilk(Plot plot) => (For(plot) & MandalaCombo.CornCow) != 0
-        ? milkBonusNearCorn : 0;
+    public int ExtraCropYield(Plot plot) => plot != null &&
+        (plot.Crop == CropType.Pumpkin || plot.Crop == CropType.Jerimum) &&
+        (For(plot) & MandalaCombo.CornCrop) != 0
+        ? cropYieldNearCorn : 0;
+    public int ExtraAnimalProduction(Plot plot) => (For(plot) & MandalaCombo.CornAnimal) != 0
+        ? animalProductionNearCorn : 0;
+    public bool ProtectsFromPests(Plot plot) =>
+        (For(plot) & MandalaCombo.ChickenCrop) != 0;
+    public bool ProtectsFromDrought(Plot plot) =>
+        (For(plot) & MandalaCombo.WaterCrop) != 0;
+    public int CropSalePriceBonus(CropType crop)
+    {
+        if (crop == CropType.None || plots == null) return 0;
+        foreach (Plot cow in plots)
+        {
+            if (cow == null || cow.Animal != AnimalKind.Cow ||
+                (For(cow) & MandalaCombo.CowWater) == 0) continue;
+            foreach (Plot neighbor in plots)
+                if (neighbor != null && neighbor.Crop == crop && cow.IsAdjacentTo(neighbor))
+                    return cropSalePriceNearWaterCow;
+        }
+        return 0;
+    }
 
-    public void ApplyDailyGrowthBonuses(int currentDay, SeedCatalog catalog)
+    public void ApplyGrowthBonuses(int currentDay, SeedCatalog catalog)
     {
         if (plots == null) return;
+        evaluatedDay = currentDay;
+        growthCatalog = catalog;
+        Refresh();
         foreach (Plot plot in plots)
         {
-            if (plot == null || plot.Crop != CropType.Pumpkin) continue;
-            MandalaCombo combos = For(plot);
-            int growth = 0;
-            if ((combos & MandalaCombo.CassavaCow) != 0)
-                growth += cassavaGrowthBonusNearCow;
-            if ((combos & MandalaCombo.CassavaWater) != 0)
-                growth += cassavaGrowthBonusNearWater;
-            if (growth > 0) plot.AdvanceGrowthTowardMaturity(growth, currentDay, catalog);
+            if (plot != null && (plot.Crop == CropType.Pumpkin ||
+                plot.Crop == CropType.Jerimum) && (For(plot) & MandalaCombo.CornCrop) != 0)
+                plot.AdvanceGrowthTowardMaturity(cropGrowthNearCorn, currentDay, catalog);
         }
     }
 
@@ -97,32 +114,13 @@ public sealed class MandalaSynergy : MonoBehaviour
         {
             Plot a = plots[i];
             if (a == null) continue;
-            if (a.Crop == CropType.Pumpkin && centralWater != null &&
-                Vector3.Distance(a.transform.position, centralWater.position) <= centralWaterReach)
-            {
-                next[a] |= MandalaCombo.CassavaWater;
-                if (waterPlot != null && waterPlot.IsWater && next.ContainsKey(waterPlot))
-                    next[waterPlot] |= MandalaCombo.CassavaWater;
-            }
             for (int j = i + 1; j < plots.Length; j++)
             {
                 Plot b = plots[j];
                 if (b == null || !a.IsAdjacentTo(b)) continue;
-                AddPair(a, b, next);
-                AddPair(b, a, next);
+                AddPair(a, b, waterPlot, next);
+                AddPair(b, a, waterPlot, next);
             }
-        }
-        // Combinação tripla: a mesma macaxeira deve ser adjacente a jerimum e vaca.
-        foreach (Plot cassava in plots)
-        {
-            if (cassava == null || cassava.Crop != CropType.Pumpkin ||
-                (next[cassava] & (MandalaCombo.CassavaCow | MandalaCombo.CassavaJerimum)) !=
-                (MandalaCombo.CassavaCow | MandalaCombo.CassavaJerimum)) continue;
-            next[cassava] |= MandalaCombo.CassavaJerimumCow;
-            foreach (Plot other in plots)
-                if (other != null && cassava.IsAdjacentTo(other) &&
-                    (other.Animal == AnimalKind.Cow || other.Crop == CropType.Jerimum))
-                    next[other] |= MandalaCombo.CassavaJerimumCow;
         }
         bool changed = active.Count != next.Count;
         foreach (var item in next)
@@ -143,22 +141,35 @@ public sealed class MandalaSynergy : MonoBehaviour
         Changed?.Invoke();
     }
 
-    private static void AddPair(Plot source, Plot other, Dictionary<Plot, MandalaCombo> next)
+    private void AddPair(Plot source, Plot other, Plot water,
+        Dictionary<Plot, MandalaCombo> next)
     {
-        if (source.Crop == CropType.Pumpkin && other.Animal == AnimalKind.Cow)
+        if (source.Crop == CropType.Corn && growthCatalog != null &&
+            source.IsReady(evaluatedDay, growthCatalog) &&
+            (other.Crop == CropType.Pumpkin || other.Crop == CropType.Jerimum))
         {
-            next[source] |= MandalaCombo.CassavaCow;
-            next[other] |= MandalaCombo.CassavaCow;
+            next[source] |= MandalaCombo.CornCrop;
+            next[other] |= MandalaCombo.CornCrop;
         }
-        if (source.Crop == CropType.Corn && other.Animal == AnimalKind.Cow)
+        if (source.Crop == CropType.Corn && other.Animal != AnimalKind.None)
         {
-            next[source] |= MandalaCombo.CornCow;
-            next[other] |= MandalaCombo.CornCow;
+            next[source] |= MandalaCombo.CornAnimal;
+            next[other] |= MandalaCombo.CornAnimal;
         }
-        if (source.Crop == CropType.Pumpkin && other.Crop == CropType.Jerimum)
+        if (source.Animal == AnimalKind.Chicken && other.Crop != CropType.None)
         {
-            next[source] |= MandalaCombo.CassavaJerimum;
-            next[other] |= MandalaCombo.CassavaJerimum;
+            next[source] |= MandalaCombo.ChickenCrop;
+            next[other] |= MandalaCombo.ChickenCrop;
+        }
+        if (source == water && source.IsWater && other.Crop != CropType.None)
+        {
+            next[source] |= MandalaCombo.WaterCrop;
+            next[other] |= MandalaCombo.WaterCrop;
+        }
+        if (source == water && source.IsWater && other.Animal == AnimalKind.Cow)
+        {
+            next[source] |= MandalaCombo.CowWater;
+            next[other] |= MandalaCombo.CowWater;
         }
     }
 }

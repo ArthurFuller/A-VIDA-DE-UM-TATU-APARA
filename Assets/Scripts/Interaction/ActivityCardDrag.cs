@@ -58,10 +58,14 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
 
     public ActivityKind Kind => activity;
     public string DisplayName => activityName;
+    public string WrittenDescription => description;
     public string Description
     {
         get
         {
+            CardDescriptionCatalog.Entry entry = CardDescriptionCatalog.Instance != null ?
+                CardDescriptionCatalog.Instance.Find(CardDescriptionCatalog.ActivityKey(activity)) : null;
+            if (entry != null) return entry.text;
             CropType crop = activity switch
             {
                 ActivityKind.PlantCorn => CropType.Corn,
@@ -70,9 +74,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
                 _ => CropType.None
             };
             if (crop == CropType.None)
-                return activity == ActivityKind.PlaceCow
-                    ? description + " Vizinhança: ajuda a macaxeira e produz mais leite junto do milho."
-                    : description;
+                return description;
             if (seedCatalog == null) seedCatalog = FindFirstObjectByType<SeedCatalog>();
             if (trading == null) trading = FindFirstObjectByType<InventoryTrading>();
             CropSettings settings = seedCatalog != null ? seedCatalog.Get(crop) : null;
@@ -80,10 +82,8 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             SaleItem item = crop == CropType.Corn ? SaleItem.Corn :
                 crop == CropType.Pumpkin ? SaleItem.Pumpkin : SaleItem.Jerimum;
             string synergy = crop == CropType.Corn ?
-                " Vizinhança: vacas produzem mais leite." :
-                crop == CropType.Pumpkin ?
-                " Vizinhança: vacas aumentam a colheita; vacas e lago ajudam após atrasos; jerimum reduz perdas por pragas." :
-                " Vizinhança: protege a macaxeira de pragas; com vacas, a proteção aumenta.";
+                " Vizinhança: quando maduro, acelera macaxeira e jerimum em 1 etapa por dia e dá +2 à colheita; animais produzem +1." :
+                " Vizinhança: milho maduro acelera o crescimento e dá +2 à colheita; galinha protege de pragas e poço protege da seca.";
             return "Plante em terreno arado. Cresce em " + settings.growthDays +
                 (settings.growthDays == 1 ? " dia" : " dias") + ", rende " +
                 settings.foodYield + " por colheita e vende por " +

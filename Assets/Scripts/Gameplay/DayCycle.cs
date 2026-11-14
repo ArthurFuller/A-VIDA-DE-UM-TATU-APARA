@@ -66,8 +66,9 @@ public sealed class DayCycle : MonoBehaviour
         {
             if (plot == null) continue;
             if (plot.Animal == AnimalKind.Cow) todayMilk += milkPerCow +
-                (MandalaSynergy.Instance != null ? MandalaSynergy.Instance.ExtraMilk(plot) : 0);
-            if (plot.Animal == AnimalKind.Chicken) todayEggs += eggsPerChicken;
+                (MandalaSynergy.Instance != null ? MandalaSynergy.Instance.ExtraAnimalProduction(plot) : 0);
+            if (plot.Animal == AnimalKind.Chicken) todayEggs += eggsPerChicken +
+                (MandalaSynergy.Instance != null ? MandalaSynergy.Instance.ExtraAnimalProduction(plot) : 0);
         }
     }
 
@@ -88,9 +89,8 @@ public sealed class DayCycle : MonoBehaviour
             plot.PulseAnimal();
             if (resourceHud == null) continue;
             ResourceKind kind = plot.Animal == AnimalKind.Cow ? ResourceKind.Milk : ResourceKind.Eggs;
-            int amount = plot.Animal == AnimalKind.Cow ? milkPerCow +
-                (MandalaSynergy.Instance != null ? MandalaSynergy.Instance.ExtraMilk(plot) : 0)
-                : eggsPerChicken;
+            int amount = (plot.Animal == AnimalKind.Cow ? milkPerCow : eggsPerChicken) +
+                (MandalaSynergy.Instance != null ? MandalaSynergy.Instance.ExtraAnimalProduction(plot) : 0);
             resourceHud.FlyFromWorld(kind, amount, plot.transform.position + Vector3.up, 0.8f);
         }
     }
@@ -288,10 +288,9 @@ public sealed class DayCycle : MonoBehaviour
         summaryOpen = false;
         currentDay++;
         ProduceAnimalResources();
-        // O crescimento da mandala precede novos eventos para não anular uma praga recém-aplicada.
-        if (MandalaSynergy.Instance != null)
-            MandalaSynergy.Instance.ApplyDailyGrowthBonuses(currentDay, seedCatalog);
         if (dayEvents != null) dayEvents.StartDay(currentDay);
+        if (MandalaSynergy.Instance != null)
+            MandalaSynergy.Instance.ApplyGrowthBonuses(currentDay, seedCatalog);
         actions.BeginNextDay();
         if (houseSites != null)
         {

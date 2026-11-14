@@ -34,6 +34,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     public AnimalKind Animal { get; private set; }
     public int PlantedDay { get; private set; }
     private int growthAdjustment;
+    private int mandalaGrowthAdjustment;
+    private int lastMandalaGrowthDay = -1;
     private bool fertilized;
     private Bounds surfaceBounds;
     private float workClearance = 1.3f;
@@ -49,6 +51,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     private Renderer growthFillRenderer;
     private Color growingFillColor;
     private MaterialPropertyBlock growthFillBlock;
+    private Vector3 plowedVisualHome;
     private static readonly List<Plot> allPlots = new List<Plot>();
     private static readonly Dictionary<string, JoinedVisual> joinedVisuals =
         new Dictionary<string, JoinedVisual>();
@@ -90,7 +93,11 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
                 fenceBaseScales[i] = fenceParts[i].transform.localScale;
             }
         }
-        if (plowedVisual != null) plowedVisual.SetActive(false);
+        if (plowedVisual != null)
+        {
+            plowedVisualHome = plowedVisual.transform.localPosition;
+            plowedVisual.SetActive(false);
+        }
     }
 
     private void OnEnable() => allPlots.Add(this);
@@ -254,6 +261,13 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         if (surfaceRenderer != null && plowedMaterial != null)
             surfaceRenderer.sharedMaterial = plowedMaterial;
         RefreshSurfaceVisual();
+        if (plowedVisual != null && plowedVisual.activeSelf)
+        {
+            Transform visual = plowedVisual.transform;
+            visual.DOKill();
+            visual.localPosition = plowedVisualHome + Vector3.down * 0.18f;
+            visual.DOLocalMove(plowedVisualHome, 0.42f).SetEase(Ease.OutCubic);
+        }
         StateChanged?.Invoke();
     }
 
@@ -264,6 +278,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         Crop = crop;
         PlantedDay = currentDay;
         growthAdjustment = 0;
+        mandalaGrowthAdjustment = 0;
+        lastMandalaGrowthDay = -1;
         fertilized = false;
         if (cornVisual != null) cornVisual.SetActive(crop == CropType.Corn);
         if (pumpkinVisual != null) pumpkinVisual.SetActive(crop == CropType.Pumpkin || crop == CropType.Jerimum);
@@ -272,6 +288,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         RefreshGrowth(currentDay, catalog);
         RefreshJoinedPlots();
         StateChanged?.Invoke();
+        if (MandalaSynergy.Instance != null)
+            MandalaSynergy.Instance.ApplyGrowthBonuses(currentDay, catalog);
     }
 
     public bool IsReady(int currentDay, SeedCatalog catalog)
@@ -325,10 +343,11 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     {
         CropSettings settings = catalog != null ? catalog.Get(Crop) : null;
         return settings == null ? 0 : (settings.foodYield +
-            Mathf.Max(0, currentDay + growthAdjustment - PlantedDay - settings.growthDays) *
+            Mathf.Max(0, currentDay + growthAdjustment - mandalaGrowthAdjustment -
+                PlantedDay - settings.growthDays) *
             settings.bonusYieldPerExtraDay) * (fertilized ? 2 : 1) +
-            (Crop == CropType.Pumpkin && MandalaSynergy.Instance != null ?
-                MandalaSynergy.Instance.ExtraCassavaYield(this) : 0);
+            (MandalaSynergy.Instance != null ?
+                MandalaSynergy.Instance.ExtraCropYield(this) : 0);
     }
 
     public void RefreshGrowth(int currentDay, SeedCatalog catalog)
@@ -377,6 +396,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         CropType harvested = Crop;
         Crop = CropType.None;
         fertilized = false;
+        mandalaGrowthAdjustment = 0;
+        lastMandalaGrowthDay = -1;
         if (cornVisual != null) cornVisual.SetActive(false);
         if (pumpkinVisual != null) pumpkinVisual.SetActive(false);
         if (growthBar != null) growthBar.SetActive(false);
@@ -393,11 +414,19 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
 
     public void AdvanceGrowthTowardMaturity(int days, int currentDay, SeedCatalog catalog)
     {
-        if (isWater || Crop == CropType.None || days <= 0 || catalog == null) return;
+        if (isWater || Crop == CropType.None || days <= 0 || catalog == null ||
+            lastMandalaGrowthDay == currentDay) return;
         CropSettings settings = catalog.Get(Crop);
         if (settings == null) return;
         int remaining = settings.growthDays - (currentDay + growthAdjustment - PlantedDay);
-        if (remaining > 0) AdvanceGrowth(Mathf.Min(days, remaining));
+        if (remaining > 0)
+        {
+            int advance = Mathf.Min(days, remaining);
+            mandalaGrowthAdjustment += advance;
+            lastMandalaGrowthDay = currentDay;
+            AdvanceGrowth(advance);
+            RefreshGrowth(currentDay, catalog);
+        }
     }
 
     public void Fertilize()
@@ -717,6 +746,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         public IReadOnlyList<Plot> Members => members;
         private readonly GameObject root;
         private readonly Mesh surfaceMesh;
+        private readonly Mesh bridgeMesh;
         private readonly Mesh outlineMesh;
         private readonly Material outlineMaterial;
         private readonly Transform outline;
@@ -767,22 +797,20 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             root.GetComponent<MeshCollider>().sharedMesh = surfaceMesh;
             if (UsesDetailedPlowed)
             {
-                // A união continua recebendo cliques pelo collider existente, mas os FBX
-                // individuais permanecem visíveis. Esta malha fica sob o relevo e
-                // preenche as pequenas frestas causadas pelas bordas irregulares.
+                // Os modelos individuais mantêm o relevo. Só as faixas entre slots
+                // recebem uma superfície visível, animada junto da área unificada.
                 surface.enabled = false;
-                var underlay = new GameObject("Terra de união - preenchimento",
-                    typeof(MeshFilter), typeof(MeshRenderer));
-                underlay.transform.SetParent(root.transform, false);
-                underlay.GetComponent<MeshFilter>().sharedMesh = surfaceMesh;
-                underlay.GetComponent<MeshRenderer>().sharedMaterial = surface.sharedMaterial;
-
-                float lowest = surfaceTop;
-                foreach (Plot plot in connected)
-                    foreach (Renderer part in plot.plowedVisual.GetComponentsInChildren<Renderer>(true))
-                        lowest = Mathf.Min(lowest, part.bounds.min.y);
-                float depth = Mathf.Clamp(surfaceTop - lowest + 0.015f, 0.035f, 0.15f);
-                underlay.transform.localPosition = Vector3.down * depth;
+                var bridges = regions.GetRange(connected.Count, regions.Count - connected.Count);
+                if (bridges.Count > 0)
+                {
+                    bridgeMesh = BuildSurface(bridges, center, surfaceTop + 0.003f,
+                        surfaceBottom, out _);
+                    var bridge = new GameObject("Terra entre os terrenos",
+                        typeof(MeshFilter), typeof(MeshRenderer));
+                    bridge.transform.SetParent(root.transform, false);
+                    bridge.GetComponent<MeshFilter>().sharedMesh = bridgeMesh;
+                    bridge.GetComponent<MeshRenderer>().sharedMaterial = surface.sharedMaterial;
+                }
             }
             root.GetComponent<PlotJoinedSurface>().Configure(connected, SetHovered);
 
@@ -810,6 +838,10 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
                 .Append(root.transform.DOScale(Vector3.one, 0.35f).SetEase(Ease.OutCubic))
                 .Append(root.transform.DOPunchScale(new Vector3(0.055f, 0f, 0.055f),
                     0.26f, 4));
+            if (UsesDetailedPlowed)
+                foreach (Plot plot in members)
+                    plot.plowedVisual.transform.DOPunchScale(
+                        new Vector3(0.045f, 0f, 0.045f), 0.42f, 3);
         }
 
         public void SetHighlight(bool visible)
@@ -876,6 +908,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         {
             if (root != null) UnityEngine.Object.Destroy(root);
             if (surfaceMesh != null) UnityEngine.Object.Destroy(surfaceMesh);
+            if (bridgeMesh != null) UnityEngine.Object.Destroy(bridgeMesh);
             if (outlineMesh != null) UnityEngine.Object.Destroy(outlineMesh);
             if (outlineMaterial != null) UnityEngine.Object.Destroy(outlineMaterial);
         }

@@ -40,6 +40,7 @@ public sealed class DayTimeline : MonoBehaviour
     [SerializeField, Min(1f)] private float cardHoverScale = 1.2f;
     [SerializeField] private Sprite clothespinArt;
     [SerializeField, Min(0f)] private float cardStartX = 18f;
+    [SerializeField, Min(0f)] private float cardEndPadding = 24f;
     [SerializeField, Min(0f)] private float cardTopInset = 8f;
     [SerializeField] private float cardLineOffsetY;
     [Header("Animação")]
@@ -55,6 +56,7 @@ public sealed class DayTimeline : MonoBehaviour
         public string Name;
         public string Description;
         public Sprite Art;
+        public string Key;
     }
 
     private readonly Dictionary<int, List<PlayedCard>> history = new();
@@ -195,7 +197,8 @@ public sealed class DayTimeline : MonoBehaviour
         Image image = card.GetComponent<Image>();
         cards.Add(new PlayedCard { Name = card.DisplayName,
             Description = card.Description,
-            Art = image != null ? image.sprite : null });
+            Art = image != null ? image.sprite : null,
+            Key = CardDescriptionCatalog.ActivityKey(card.Kind) });
         if (open && viewedDay == day) RenderCards(day, false);
     }
 
@@ -686,12 +689,15 @@ public sealed class DayTimeline : MonoBehaviour
         if (dayEvents != null)
             foreach (DayEventController.TimelineEvent active in dayEvents.EventsForDay(day))
                 cards.Add(new PlayedCard { Name = active.Title,
-                    Description = active.Description, Art = active.Art });
+                    Description = active.Description, Art = active.Art,
+                    Key = CardDescriptionCatalog.EventKey(active.Kind) });
         if (history.TryGetValue(day, out List<PlayedCard> played)) cards.AddRange(played);
         int count = cards.Count;
         float stride = Mathf.Max(12f, cardWidth + cardGap - cardOverlap);
+        float hoverOverflow = cardWidth * (Mathf.Max(1f, cardHoverScale) - 1f) * 0.5f;
         float width = Mathf.Max(scroll.viewport.rect.width,
-            (count - 1) * stride + cardWidth + cardStartX * 2f);
+            (count - 1) * stride + cardWidth + cardStartX +
+            Mathf.Max(cardEndPadding, hoverOverflow + 8f));
         cardContent.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
         scroll.horizontalNormalizedPosition = 0f;
         if (count == 0)
@@ -757,7 +763,7 @@ public sealed class DayTimeline : MonoBehaviour
             }
             card.gameObject.AddComponent<TimelineCardHover>()
                 .Setup(angle, cardHoverScale, cardY,
-                    source => InspectCard(source, data.Name, data.Description, true));
+                    source => InspectCard(source, data.Name, data.Description, true, data.Key));
             if (animate)
                 card.DOAnchorPosY(cardY, slideDuration).SetDelay(i * waveDelay)
                     .SetEase(Ease.OutBack);
@@ -768,11 +774,11 @@ public sealed class DayTimeline : MonoBehaviour
     {
         if (card != null)
             InspectCard((RectTransform)card.transform, card.DisplayName,
-                card.Description, false);
+                card.Description, false, CardDescriptionCatalog.ActivityKey(card.Kind));
     }
 
     private void InspectCard(RectTransform source, string cardName,
-        string description, bool fromTimeline)
+        string description, bool fromTimeline, string key)
     {
         if ((fromTimeline && !open) || source == null || inspectionCard != null) return;
         if (hand == null) hand = FindFirstObjectByType<ActivityCardAvailability>();
@@ -807,8 +813,14 @@ public sealed class DayTimeline : MonoBehaviour
             Label(cardName, inspectionCard, 16, new Color(0.55f, 0.1f, 0.1f));
         float gap = Mathf.Max(32f,
             hand != null ? hand.InspectionDescriptionGap : 18f);
-        float panelWidth = Mathf.Clamp(root.rect.width * 0.24f, 240f, 390f);
-        float panelHeight = Mathf.Clamp(root.rect.height * 0.27f, 140f, 260f);
+        CardDescriptionCatalog.Entry saved = CardDescriptionCatalog.Instance != null ?
+            CardDescriptionCatalog.Instance.Find(key) : null;
+        if (saved != null) description = saved.text;
+        CardDescriptionCatalog.Entry entry = key.StartsWith("E:") ? null : saved;
+        float panelWidth = entry != null ? entry.boxSize.x :
+            Mathf.Clamp(root.rect.width * 0.24f, 240f, 390f);
+        float panelHeight = entry != null ? entry.boxSize.y :
+            Mathf.Clamp(root.rect.height * 0.27f, 140f, 260f);
         float scale = Mathf.Min(root.rect.width * 0.38f / source.rect.width,
             root.rect.height * 0.68f / source.rect.height);
         float rightRoom = root.rect.width * 0.5f - panelWidth - gap - 16f;
@@ -827,6 +839,8 @@ public sealed class DayTimeline : MonoBehaviour
             inspectionDescription.sizeDelta = new Vector2(panelWidth, panelHeight);
             float panelX = source.rect.width * scale * 0.5f + gap;
             inspectionDescription.anchoredPosition = new Vector2(panelX + 16f, 0f);
+            if (key.StartsWith("E:") && CardDescriptionCatalog.Instance != null)
+                inspectionDescription.anchoredPosition += CardDescriptionCatalog.Instance.eventOffset;
             Image descriptionBackground = inspectionDescription.GetComponent<Image>();
             if (descriptionBackground != null)
             {
@@ -857,6 +871,9 @@ public sealed class DayTimeline : MonoBehaviour
                 textRect.anchorMax = Vector2.one;
                 textRect.offsetMin = new Vector2(16f, 14f);
                 textRect.offsetMax = new Vector2(-16f, -14f);
+                if (entry != null) CardDescriptionCatalog.Apply(entry,
+                    inspectionDescription, text, inspectionDescription.anchoredPosition,
+                    description);
             }
         }
         inspectionSource = source.GetComponent<CanvasGroup>();

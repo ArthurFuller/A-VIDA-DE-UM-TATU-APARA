@@ -26,7 +26,7 @@ public static class DayTimelinePlaySave
         "dayButtonWidth", "dayButtonHeight", "dayLineHeight",
         "cardWidth", "cardHeight", "cardGap", "cardLineHeight",
         "cardOverlap", "pegSize", "hangingAngle", "cardHoverScale",
-        "cardStartX", "cardTopInset", "cardLineOffsetY",
+        "cardStartX", "cardEndPadding", "cardTopInset", "cardLineOffsetY",
         "slideDuration", "waveDelay",
         "inspectionTilt", "inspectionShift", "inspectionFollowSpeed"
     };

@@ -98,6 +98,8 @@ public sealed class EventCardView : MonoBehaviour
         if (descriptionRect != null) descriptionRect.DOKill();
         card.sizeDelta = art != null ? illustratedCardSize : originalCardSize;
         UpdatePositions();
+        if (CardDescriptionCatalog.Instance != null)
+            descriptionHomePosition += CardDescriptionCatalog.Instance.eventOffset;
         if (cardImage != null)
         {
             cardImage.sprite = art != null ? art : originalSprite;

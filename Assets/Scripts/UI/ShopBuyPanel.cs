@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -61,28 +62,32 @@ public sealed class ShopBuyPanel : MonoBehaviour
             merchant.GetUnitPrice(SaleItem.Food),
             merchant.FenceCoinCost
         };
-        int budget = resources.Coins;
+        long budget = Math.Min(int.MaxValue, (long)resources.Coins - int.MinValue);
+        long spendingLimit = budget;
         int woodBudget = resources.Wood;
         for (int i = 0; i < rows.Length; i++)
         {
             rows[i].SetPrice(prices[i]);
             rows[i].SetWoodPrice(i == 1 ? merchant.FenceWoodCost : 0);
-            int limit = prices[i] > 0 ? budget / prices[i] : 0;
+            int limit = prices[i] > 0 ? (int)Math.Min(int.MaxValue, budget / prices[i]) : 0;
+            if (i == 0) limit = Math.Min(limit, int.MaxValue - resources.Food);
             if (i == 1)
                 limit = Mathf.Min(limit, merchant.FenceWoodCost > 0 ?
                     woodBudget / merchant.FenceWoodCost : int.MaxValue, merchant.FenceSlotsAvailable);
             rows[i].SetLimit(limit);
-            budget -= rows[i].Quantity * prices[i];
+            budget -= (long)rows[i].Quantity * prices[i];
             woodBudget -= rows[i].Quantity * (i == 1 ? merchant.FenceWoodCost : 0);
         }
-        int total = resources.Coins - budget;
+        long total = spendingLimit - budget;
         for (int i = 0; i < rows.Length; i++)
         {
-            int limit = prices[i] > 0 ? rows[i].Quantity + budget / prices[i] : 0;
+            int limit = prices[i] > 0 ?
+                (int)Math.Min(int.MaxValue, rows[i].Quantity + budget / prices[i]) : 0;
+            if (i == 0) limit = Math.Min(limit, int.MaxValue - resources.Food);
             if (i == 1)
-                limit = Mathf.Min(limit, rows[i].Quantity +
-                    (merchant.FenceWoodCost > 0 ? woodBudget / merchant.FenceWoodCost : int.MaxValue),
-                    merchant.FenceSlotsAvailable);
+                limit = Math.Min(limit, Math.Min(merchant.FenceSlotsAvailable,
+                    (int)Math.Min(int.MaxValue, (long)rows[i].Quantity +
+                        (merchant.FenceWoodCost > 0 ? woodBudget / merchant.FenceWoodCost : int.MaxValue))));
             rows[i].SetLimit(limit);
         }
         if (totalText != null) totalText.text = "TOTAL: " + total + " moedas" +

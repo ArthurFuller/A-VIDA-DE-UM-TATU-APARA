@@ -102,10 +102,10 @@ Material:
     - _EnvironmentReflections: 1
     - _EscalaTremido: 0.1
     - _EscalaVariacao: 1
-    - _EspessuraLineArt: 0.8
+    - _EspessuraLineArt: 1.5
     - _EspessuraTraco: 0.05
     - _Falhas: 0
-    - _FecharQuinas: 0.5
+    - _FecharQuinas: 0.706
     - _ForcaSombraProjetada: 1
     - _GlossMapScale: 0
     - _Glossiness: 0
@@ -116,6 +116,7 @@ Material:
     - _LimiteSombra: 0.5
     - _LinhasPorMetro: 1
     - _Metallic: 0
+    - _NormalStrength: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QuantidadeTraco: 0
@@ -129,6 +130,7 @@ Material:
     - _SuavidadeSombra: 0.03
     - _Surface: 0
     - _TamanhoCurva: 1
+    - _TracoMinimo: 0
     - _TracoNoObjeto: 0
     - _Tremido: 0
     - _VariacaoLineArt: 0.4

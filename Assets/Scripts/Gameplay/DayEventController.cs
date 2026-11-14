@@ -11,13 +11,16 @@ public sealed class DayEventController : MonoBehaviour
         public readonly string Description;
         public readonly Sprite Art;
         public readonly int StartedOn;
+        public readonly SertaoEventKind Kind;
 
-        public TimelineEvent(string title, string description, Sprite art, int startedOn)
+        public TimelineEvent(string title, string description, Sprite art, int startedOn,
+            SertaoEventKind kind)
         {
             Title = title;
             Description = description;
             Art = art;
             StartedOn = startedOn;
+            Kind = kind;
         }
     }
 
@@ -52,10 +55,8 @@ public sealed class DayEventController : MonoBehaviour
     [SerializeField, Min(1)] private int eventDurationDays = 2;
     [SerializeField, Min(0)] private int droughtFishingReduction = 1;
     [SerializeField, Min(0)] private int pestHarvestReduction = 1;
-    [Header("Pragas na macaxeira - configurar apos definir balanceamento")]
+    [Header("Pragas na macaxeira")]
     [SerializeField, Min(0)] private int cassavaRegressionWithoutProtection;
-    [SerializeField, Min(0)] private int cassavaRegressionWithJerimum;
-    [SerializeField, Min(0)] private int cassavaRegressionWithJerimumAndCow;
     [SerializeField, Min(0)] private int droughtGrowthDelay = 1;
     [SerializeField, Min(0)] private int rainGrowthBonus = 1;
     [SerializeField, Min(1)] private int forestExploitationThreshold = 6;
@@ -82,8 +83,10 @@ public sealed class DayEventController : MonoBehaviour
     public bool IsDrought => IsActive(SertaoEventKind.Drought);
     public event System.Action WeatherChanged;
     public CropType PestTarget => pestTarget;
-    public int HarvestReductionFor(CropType crop) =>
-        crop != CropType.None && crop == pestTarget && IsActive(SertaoEventKind.Pests)
+    public int HarvestReductionFor(Plot plot) =>
+        plot != null && plot.Crop != CropType.None && plot.Crop == pestTarget &&
+        IsActive(SertaoEventKind.Pests) &&
+        (MandalaSynergy.Instance == null || !MandalaSynergy.Instance.ProtectsFromPests(plot))
             ? pestHarvestReduction : 0;
     private readonly List<ActiveComadre> activeComadre = new();
     private readonly Dictionary<int, List<TimelineEvent>> eventsByDay = new();
@@ -214,7 +217,10 @@ public sealed class DayEventController : MonoBehaviour
 
         if (IsActive(SertaoEventKind.Drought))
         {
-            foreach (var plot in plots) if (plot != null) plot.AdvanceGrowth(-droughtGrowthDelay);
+            foreach (var plot in plots)
+                if (plot != null && (MandalaSynergy.Instance == null ||
+                    !MandalaSynergy.Instance.ProtectsFromDrought(plot)))
+                    plot.AdvanceGrowth(-droughtGrowthDelay);
         }
         else if (IsActive(SertaoEventKind.Rain))
         {
@@ -225,18 +231,18 @@ public sealed class DayEventController : MonoBehaviour
         var activeToday = new List<TimelineEvent>();
         foreach (ActiveGeneral active in activeGeneralEvents)
             activeToday.Add(new TimelineEvent(Title(active.Kind),
-                Description(active.Kind), Art(active.Kind), active.StartedOn));
+                Description(active.Kind), Art(active.Kind), active.StartedOn, active.Kind));
         foreach (ActiveComadre comadre in activeComadre)
             activeToday.Add(new TimelineEvent(Title(SertaoEventKind.Comadre),
                 Description(SertaoEventKind.Comadre),
-                Art(SertaoEventKind.Comadre), comadre.StartedOn));
+                Art(SertaoEventKind.Comadre), comadre.StartedOn, SertaoEventKind.Comadre));
         if (announced == SertaoEventKind.Calm)
             activeToday.Add(new TimelineEvent(Title(announced),
-                Description(announced), Art(announced), day));
+                Description(announced), Art(announced), day, announced));
         else if (announced == SertaoEventKind.HeadOfCuia ||
                  announced == SertaoEventKind.Reforestation)
             activeToday.Add(new TimelineEvent(Title(announced),
-                Description(announced), Art(announced), day));
+                Description(announced), Art(announced), day, announced));
         activeToday.Sort((a, b) => a.StartedOn.CompareTo(b.StartedOn));
         eventsByDay[day] = activeToday;
         lastAnnounced = announced;
@@ -261,13 +267,10 @@ public sealed class DayEventController : MonoBehaviour
         foreach (Plot plot in plots)
         {
             if (plot == null || plot.Crop != CropType.Pumpkin) continue;
-            MandalaCombo combo = MandalaSynergy.Instance != null ?
-                MandalaSynergy.Instance.For(plot) : MandalaCombo.None;
-            int stages = (combo & MandalaCombo.CassavaJerimumCow) != 0 ?
-                cassavaRegressionWithJerimumAndCow :
-                (combo & MandalaCombo.CassavaJerimum) != 0 ?
-                cassavaRegressionWithJerimum : cassavaRegressionWithoutProtection;
-            if (stages > 0) plot.AdvanceGrowth(-stages);
+            if (MandalaSynergy.Instance != null &&
+                MandalaSynergy.Instance.ProtectsFromPests(plot)) continue;
+            if (cassavaRegressionWithoutProtection > 0)
+                plot.AdvanceGrowth(-cassavaRegressionWithoutProtection);
         }
     }
 
@@ -304,7 +307,14 @@ public sealed class DayEventController : MonoBehaviour
         _ => "COMADRE FULOZINHA"
     };
 
-    private string Description(SertaoEventKind kind) => kind switch
+    private string Description(SertaoEventKind kind)
+    {
+        CardDescriptionCatalog.Entry entry = CardDescriptionCatalog.Instance != null ?
+            CardDescriptionCatalog.Instance.Find(CardDescriptionCatalog.EventKey(kind)) : null;
+        return entry != null ? entry.text : DefaultDescription(kind);
+    }
+
+    private string DefaultDescription(SertaoEventKind kind) => kind switch
     {
         SertaoEventKind.Drought => "A seca reduz a pesca e atrasa o crescimento. Duração: " + eventDurationDays + " dia(s).",
         SertaoEventKind.Pests => "As pragas afetam " +

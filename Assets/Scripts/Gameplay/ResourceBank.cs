@@ -6,7 +6,7 @@ public sealed class ResourceBank : MonoBehaviour
     [Header("Recursos iniciais")]
     [SerializeField, Min(0), InspectorName("Madeira")] private int startingWood;
     [SerializeField, Min(0), InspectorName("Comida pronta")] private int startingFood = 2;
-    [SerializeField, Min(0), InspectorName("Moedas")] private int startingCoins = 2;
+    [SerializeField, InspectorName("Moedas")] private int startingCoins = 2;
     [SerializeField, Min(0), InspectorName("Peixes")] private int startingFish;
     [SerializeField, Min(0), InspectorName("Milho colhido")] private int startingCorn;
     [SerializeField, Min(0), InspectorName("Macaxeira colhida")] private int startingPumpkin;
@@ -122,6 +122,7 @@ public sealed class ResourceBank : MonoBehaviour
             quantities[(int)SaleItem.PumpkinSeeds] != 0 ||
             quantities[(int)SaleItem.JerimumSeeds] != 0) return false;
         long total = 0;
+        long coinRoom = int.MaxValue - (long)Coins;
         int selected = 0;
         for (int i = 0; i < quantities.Length; i++)
         {
@@ -129,9 +130,11 @@ public sealed class ResourceBank : MonoBehaviour
             if (quantity < 0 || prices[i] < 0 || quantity > StockForSale((SaleItem)i)) return false;
             if (quantity == 0) continue;
             selected++;
-            total += (long)quantity * prices[i];
+            long earnings = (long)quantity * prices[i];
+            if (earnings > coinRoom - total) return false;
+            total += earnings;
         }
-        if (selected == 0 || total > int.MaxValue - Coins) return false;
+        if (selected == 0) return false;
         Wood -= quantities[(int)SaleItem.Wood];
         Fish -= quantities[(int)SaleItem.Fish];
         Corn -= quantities[(int)SaleItem.Corn];
@@ -140,7 +143,7 @@ public sealed class ResourceBank : MonoBehaviour
         Jerimum -= quantities[(int)SaleItem.Jerimum];
         Milk -= quantities[(int)SaleItem.Milk];
         Eggs -= quantities[(int)SaleItem.Eggs];
-        Coins += (int)total;
+        Coins = (int)((long)Coins + total);
         Changed?.Invoke();
         return true;
     }
@@ -176,13 +179,14 @@ public sealed class ResourceBank : MonoBehaviour
 
     public void AddCoins(int amount)
     {
-        Coins += Mathf.Max(0, amount);
+        int gain = Mathf.Max(0, amount);
+        Coins = (int)System.Math.Min(int.MaxValue, (long)Coins + gain);
         Changed?.Invoke();
     }
 
     public bool TrySpendCoins(int amount)
     {
-        if (amount < 0 || Coins < amount) return false;
+        if (amount < 0 || (long)Coins - amount < int.MinValue) return false;
         Coins -= amount;
         Changed?.Invoke();
         return true;

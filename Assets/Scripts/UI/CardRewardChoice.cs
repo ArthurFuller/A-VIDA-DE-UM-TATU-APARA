@@ -37,6 +37,7 @@ public sealed class CardRewardChoice : MonoBehaviour
     private readonly HashSet<ActivityKind> chosenKinds = new HashSet<ActivityKind>();
     private readonly NameStyle[] defaultNames = new NameStyle[2];
     private readonly Text[] descriptions = new Text[2];
+    private readonly CardChoiceHitArea[] hitAreas = new CardChoiceHitArea[2];
     private Action completed;
     private int currentDay;
     private RectTransform panel;
@@ -162,6 +163,7 @@ public sealed class CardRewardChoice : MonoBehaviour
 
     private void OnDestroy()
     {
+        CardDescriptionCatalog.Changed -= RefreshVisibleDescriptions;
         transition?.Kill();
         foreach (RectTransform card in choiceCards)
             if (card != null) card.DOKill();
@@ -171,17 +173,88 @@ public sealed class CardRewardChoice : MonoBehaviour
             if (button != null) button.transform.DOKill();
     }
 
+    private void OnEnable() => CardDescriptionCatalog.Changed += RefreshVisibleDescriptions;
+
+    private void OnDisable() => CardDescriptionCatalog.Changed -= RefreshVisibleDescriptions;
+
+    private void RefreshVisibleDescriptions()
+    {
+        if (group == null || group.alpha <= 0f) return;
+        for (int i = 0; i < offered.Length; i++)
+            if (offered[i] != null) ShowChoice(i);
+    }
+
     private void Update()
     {
         if (group == null || transitioning || !group.interactable || Mouse.current == null) return;
         Vector2 pointer = Mouse.current.position.ReadValue();
+        Canvas canvas = group.GetComponentInParent<Canvas>()?.rootCanvas;
+        Camera camera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ?
+            canvas.worldCamera : null;
         for (int i = 0; i < descriptions.Length; i++)
         {
             if (descriptions[i] == null || choiceCards[i] == null) continue;
-            bool inside = RectTransformUtility.RectangleContainsScreenPoint(choiceCards[i], pointer);
-            descriptions[i].gameObject.transform.parent.gameObject.SetActive(inside &&
-                offered[i] != null && !string.IsNullOrWhiteSpace(offered[i].Description));
+            bool inside = hitAreas[i] != null && hitAreas[i].IsRaycastLocationValid(pointer, camera);
+            if (inside && i < rerollButtons.Length && rerollButtons[i] != null &&
+                rerollButtons[i].gameObject.activeInHierarchy &&
+                RectTransformUtility.RectangleContainsScreenPoint(
+                    (RectTransform)rerollButtons[i].transform, pointer))
+                inside = false;
+            RectTransform tip = (RectTransform)descriptions[i].transform.parent;
+            bool visible = inside && offered[i] != null &&
+                !string.IsNullOrWhiteSpace(offered[i].Description);
+            tip.gameObject.SetActive(visible);
+            if (visible) KeepDescriptionOnScreen(tip, i);
         }
+    }
+
+    private Rect CardArtRect(Image art)
+    {
+        Rect rect = art.rectTransform.rect;
+        if (art.sprite == null || art.sprite == placeholderArt) return rect;
+        // As artes finais são quadradas, com a carta desenhada nesta área central.
+        Vector2 size = art.sprite.rect.size;
+        if (art.preserveAspect)
+            size *= Mathf.Min(rect.width / size.x, rect.height / size.y);
+        else size = rect.size;
+        return new Rect(rect.center.x - size.x * 0.5f + size.x * 0.145f,
+            rect.center.y - size.y * 0.5f + size.y * 0.047f,
+            size.x * 0.708f, size.y * 0.926f);
+    }
+
+    private void KeepDescriptionOnScreen(RectTransform tip, int index)
+    {
+        Canvas canvas = group.GetComponentInParent<Canvas>()?.rootCanvas;
+        if (canvas == null) return;
+        RectTransform root = canvas.transform as RectTransform;
+        if (root == null) return;
+        tip.anchoredPosition = new Vector2(index == 0 ? -10f : 10f, 0f);
+        ShiftInsideScreen(tip, root);
+        if (CardDescriptionCatalog.Instance != null)
+        {
+            CardDescriptionCatalog catalog = CardDescriptionCatalog.Instance;
+            CardDescriptionCatalog.Entry entry = offered[index] != null ?
+                catalog.Find(CardDescriptionCatalog.ActivityKey(offered[index].Kind)) : null;
+            Vector2 sharedOffset = catalog.choiceOffset;
+            if (index == 1) sharedOffset.x = -sharedOffset.x;
+            tip.position += root.TransformVector(sharedOffset);
+            ShiftInsideScreen(tip, root);
+            if (entry != null)
+                tip.position += root.TransformVector(entry.choiceOffset);
+        }
+    }
+
+    private static void ShiftInsideScreen(RectTransform tip, RectTransform root)
+    {
+        Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(root, tip);
+        const float margin = 20f;
+        float left = root.rect.xMin + margin, right = root.rect.xMax - margin;
+        float bottom = root.rect.yMin + margin, top = root.rect.yMax - margin;
+        float dx = bounds.min.x < left ? left - bounds.min.x :
+            bounds.max.x > right ? right - bounds.max.x : 0f;
+        float dy = bounds.min.y < bottom ? bottom - bounds.min.y :
+            bounds.max.y > top ? top - bounds.max.y : 0f;
+        tip.position += root.TransformVector(new Vector3(dx, dy));
     }
 
     public void Begin(int day, Action onCompleted)
@@ -340,11 +413,23 @@ public sealed class CardRewardChoice : MonoBehaviour
         bool placeholder = sprite == null || sprite == placeholderArt;
         choiceArt[index].sprite = sprite != null ? sprite : placeholderArt;
         choiceArt[index].color = Color.white;
+        choiceArt[index].raycastPadding = Vector4.zero;
+        hitAreas[index] = choiceArt[index].GetComponent<CardChoiceHitArea>();
+        if (hitAreas[index] == null)
+            hitAreas[index] = choiceArt[index].gameObject.AddComponent<CardChoiceHitArea>();
+        hitAreas[index].Configure(panel, CardArtRect(choiceArt[index]));
         Text label = choiceNames[index];
         if (label == null) return;
         if (descriptions[index] != null)
         {
             descriptions[index].text = offered[index].Description;
+            CardDescriptionCatalog.Entry entry = CardDescriptionCatalog.Instance != null ?
+                CardDescriptionCatalog.Instance.Find(
+                    CardDescriptionCatalog.ActivityKey(offered[index].Kind)) : null;
+            if (entry != null)
+                CardDescriptionCatalog.Apply(entry,
+                    (RectTransform)descriptions[index].transform.parent, descriptions[index],
+                    new Vector2(index == 0 ? -10f : 10f, 0f), offered[index].Description, true);
             descriptions[index].transform.parent.gameObject.SetActive(false);
         }
         label.gameObject.SetActive(placeholder);

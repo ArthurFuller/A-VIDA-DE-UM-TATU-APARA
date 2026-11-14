@@ -1,0 +1,467 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1aaa1e01a96c204f9efe3687e45fe7c, type: 3}
+  m_Name: CardDescriptions
+  m_EditorClassIdentifier: Assembly-CSharp::CardDescriptionCatalog
+  inspectionOffset: {x: -39.22, y: 0}
+  choiceOffset: {x: -47.6, y: -2.4000244}
+  eventOffset: {x: 0, y: 0}
+  entries:
+  - key: A:CollectWood
+    title: CollectWood
+    art: {fileID: 21300000, guid: 7cd049b25773a3f41aa7c7e727cedc1b, type: 3}
+    text: "Envie um trabalhador \xE0 floresta para coletar madeira."
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 4
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
+  - key: A:Fish
+    title: Fish
+    art: {fileID: 21300000, guid: ea6acaff4199c98438d1fdc56d4a7aac, type: 3}
+    text: Envie um trabalhador ao lago para pescar.
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 0}
+    bold: 0
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:Plow
+    title: Plow
+    art: {fileID: 21300000, guid: 0a6b582e480882c458996e312fa818e8, type: 3}
+    text: Prepare um terreno para o plantio.
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 0}
+    bold: 0
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:BuySeeds
+    title: BuySeeds
+    art: {fileID: 21300000, guid: 1164da61acc651d4eac94b7424ead1b2, type: 3}
+    text: 
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 0}
+    bold: 0
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:PlantCorn
+    title: Plantar Milho
+    art: {fileID: 21300000, guid: 4a11058d49e5a9549b2d18ea93036c72, type: 3}
+    text: "Plante em terreno arado. \n\nCrescimento: 1 dia\n\nRendimento: 2 unidades
+      por colheita\n\nValor: 4 moedas\n\nB\xF4nus:\n\n- Ao lado de macaxeira
+      ou jerimum, quando maduro: +1 etapa de crescimento por dia e +2 na colheita.\n-
+      Ao lado de animais:
+      +1 leite ou ovo por dia."
+    boxSize: {x: 240, y: 215.64}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 215.64}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 0
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:PlantPumpkin
+    title: Plantar Macaxeira
+    art: {fileID: 21300000, guid: 38b7d34e0211c1d49a846fc7cca19f3b, type: 3}
+    text: "Plante em terreno arado. \n\nCrescimento: 1 dia \n\nRendimento: 7 unidades
+      por colheita\n \nValor: 1 moeda \n\nB\xF4nus:\n\n- Milho maduro ao lado: +1
+      etapa de crescimento por dia e +2 na colheita.\n- Galinha ao lado: sem pragas.\n-
+      Po\xE7o
+      ao lado: sem seca."
+    boxSize: {x: 186.4, y: 204.1}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 204.1}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 12
+    alignment: 0
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.121568635, g: 0.1137255, b: 0.09019608, a: 0.92}
+  - key: A:Harvest
+    title: Harvest
+    art: {fileID: 21300000, guid: af8d81a027bd9fe4ebddb6b7a1bc314c, type: 3}
+    text: "Colha uma planta\xE7\xE3o pronta."
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:PrepareFood
+    title: PrepareFood
+    art: {fileID: 21300000, guid: aee19f07feebf9d4eb91a871e1e2cb09, type: 3}
+    text: "Utilize os recursos coletados para preparar refei\xE7\xF5es mais nutritivas"
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:Gamble
+    title: Jogo do Bicho
+    art: {fileID: 21300000, guid: e73bccdfad0ea434daabdb763a4efb40, type: 3}
+    text: "Teste sua sorte apostando 10 moedas. Voc\xEA pode receber o dobro ou perder
+      tudo."
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:Rest
+    title: Descansar
+    art: {fileID: 21300000, guid: 6f27f67ec9e2fcb498ee6552dd222269, type: 3}
+    text: "Consome uma a\xE7\xE3o\n\nO trabalhar passa o dia descansando e recebe
+      uma a\xE7\xE3o extra no dia seguinte"
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:Coffee
+    title: "Caf\xE9zinho"
+    art: {fileID: 21300000, guid: c7d6793ff7a9f07489ad432087820efe, type: 3}
+    text: "Concede ao trabalhador uma a\xE7\xE3o extra (n\xE3o permite repetir a
+      a\xE7\xE3o anterior)"
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:Replay
+    title: Replay
+    art: {fileID: 21300000, guid: 5521e6861c7f94e4db1cdcd6eba1bcf7, type: 3}
+    text: "Repete a \xFAltima a\xE7\xE3o realizada (cartas de constru\xE7\xE3o n\xE3o
+      podem ser repetidas)"
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:FishPlus
+    title: Pescaria+
+    art: {fileID: 21300000, guid: 20dfe1570210a9b4a80a17232c1c09ad, type: 3}
+    text: "Teste sua for\xE7a contra peixes maiores (rendimento maior)"
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:WoodPlus
+    title: Madeira+
+    art: {fileID: 21300000, guid: ff98509903b1cb64582e500d9ebc20c7, type: 3}
+    text: "Corte \xE1rvores mais resistentes para obter um maior rendimento"
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:FoodPlus
+    title: Comida+
+    art: {fileID: 21300000, guid: 4b66664cd7add734186fdff7ce38e2d0, type: 3}
+    text: "Utilize os recursos coletados com mais cautela para preparar uma quantidade
+      maior de refei\xE7\xF5es"
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:WateringCan
+    title: Regador
+    art: {fileID: 21300000, guid: 0e15f64c19208c4428b484072b3cf5ef, type: 3}
+    text: "Adianta em um dia o crescimento da planta\xE7\xE3o escolhida"
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:Fertilizer
+    title: Adubo
+    art: {fileID: 21300000, guid: 57582edae713d1d439866339ce37cb9e, type: 3}
+    text: "Aumenta a produ\xE7\xE3o da planta\xE7\xE3o escolhida durante a colheita"
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:BuildHouse
+    title: Construir Casa
+    art: {fileID: 21300000, guid: 6fd42d970364d5c44b9aae27cae5b459, type: 3}
+    text: Escolha um lote livre para construir uma casa e expandir a comunidade
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:BuildFence
+    title: Construir Cerca
+    art: {fileID: 21300000, guid: 86eb4362d7d5a3b45a034cd8c057d78a, type: 3}
+    text: Escolha um terreno para criar um cercado de animais
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:PlantJerimum
+    title: Plantar Jerimum
+    art: {fileID: 21300000, guid: 42e3ac39a1266e944be8cd384e8cecf3, type: 3}
+    text: "Plante em terreno arado. \n\nCrescimento: 3 dias\n\nRendimento: 5 unidades
+      por colheita\n\nValor: 3 moedas\n\nB\xF4nus:\n\n- Milho maduro ao lado: +1
+      etapa de crescimento por dia e +2 na colheita.\n- Galinha ao lado: sem pragas.\n-
+      Po\xE7o
+      ao lado: sem seca."
+    boxSize: {x: 240, y: 245.1}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 204.1}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 0
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:PlaceCow
+    title: Colocar Vaca
+    art: {fileID: 21300000, guid: 27b7a0d62caa657418ab4b8905e7805f, type: 3}
+    text: "Colocar em cercado vazio.\n\nProdu\xE7\xE3o: 1 leite por dia\n\nB\xF4nus:\n\n-
+      Milho ao lado: +1 leite por dia.\n- Ao lado do po\xE7o: somente tipos de
+      planta\xE7\xE3o tamb\xE9m vizinhos vendem por +2 moedas/un."
+    boxSize: {x: 240, y: 195.1}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 220}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 0
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:PlaceChicken
+    title: Colocar Galinha
+    art: {fileID: 21300000, guid: e143afdec3040024ebbf7ee7ba860c0b, type: 3}
+    text: "Colocar em cercado vazio\n\nProdu\xE7\xE3o: 1 ovo por dia\n\nB\xF4nus:\n\n-
+      Milho ao lado: +1 ovo por dia.\n- Planta\xE7\xF5es ao lado n\xE3o sofrem
+      pragas."
+    boxSize: {x: 240, y: 121.3}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 121.3}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: A:FeedAnimals
+    title: "Ra\xE7\xE3o"
+    art: {fileID: 21300000, guid: d8cfdc7ff4ef112429df8fed28d52c78, type: 3}
+    text: "Alimenta os animais para duplicar a produ\xE7\xE3o de leite ou ovos do
+      dia"
+    boxSize: {x: 240, y: 140}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 186.4, y: 140}
+    choiceFontSize: 12
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 14
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: E:Drought
+    title: Seca
+    art: {fileID: 0}
+    text: "A seca reduziu a quantidade de peixes e dificultou o crescimento das plantas\n\nDura\xE7\xE3o:
+      2 dias"
+    boxSize: {x: 390, y: 220}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 0, y: 0}
+    choiceFontSize: 0
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 23
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: E:Pests
+    title: Pragas
+    art: {fileID: 0}
+    text: "As pragas destruiram parte das planta\xE7\xF5es\n\nRegride uma etapa do
+      crescimento das plantas\n\nDura\xE7\xE3o: 2 dias"
+    boxSize: {x: 390, y: 220}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 0, y: 0}
+    choiceFontSize: 0
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 23
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: E:Rain
+    title: Chuva
+    art: {fileID: 0}
+    text: "Por conta da chuva, as planta\xE7\xF5es crescem mais r\xE1pido  e o impacto
+      da coleta de madeira \xE9 menor\n\nDura\xE7\xE3o: 2 dias"
+    boxSize: {x: 390, y: 220}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 0, y: 0}
+    choiceFontSize: 0
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 23
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: E:Comadre
+    title: Comadre Fulozinha
+    art: {fileID: 0}
+    text: "Voc\xEA exagerou na explora\xE7\xE3o das florestas e a Comadre Fulozinha
+      deixou um dos trabalhadores desorientado\n\nO trabalhador fica sem a\xE7\xE3o
+      e n\xE3o pode ser alimentado por 1 dia"
+    boxSize: {x: 390, y: 239.9}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 0, y: 0}
+    choiceFontSize: 0
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 23
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: E:Calm
+    title: Dia tranquilo
+    art: {fileID: 0}
+    text: Hoje parece ser um dia tranquilo, sem muitas novidades
+    boxSize: {x: 390, y: 220}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 0, y: 0}
+    choiceFontSize: 0
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 23
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: E:HeadOfCuia
+    title: "Cabe\xE7a de Cuia"
+    art: {fileID: 0}
+    text: "Com tantos peixes guardados, voc\xEA atraiu a aten\xE7\xE3o do Cabe\xE7a
+      de Cuia. Ele te fez uma visita durante \xE0 noite\n\nVoc\xEA Perde 2 peixes"
+    boxSize: {x: 390, y: 220}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 0, y: 0}
+    choiceFontSize: 0
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 23
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+  - key: E:Reforestation
+    title: Reflorestamento
+    art: {fileID: 0}
+    text: "A explora\xE7\xE3o sustent\xE1vel permitiu reflorestar parte da floresta\n\nVoc\xEA
+      recebe 4 madeiras"
+    boxSize: {x: 390, y: 220}
+    choiceOffset: {x: 0, y: 0}
+    choiceBoxSize: {x: 0, y: 0}
+    choiceFontSize: 0
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
+    bold: 1
+    fontSize: 23
+    alignment: 3
+    textColor: {r: 1, g: 1, b: 1, a: 1}
+    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
