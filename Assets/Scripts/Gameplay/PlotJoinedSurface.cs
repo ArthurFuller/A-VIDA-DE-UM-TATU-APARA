@@ -11,6 +11,14 @@ public sealed class PlotJoinedSurface : MonoBehaviour, IPointerClickHandler,
     private Action<bool> hoverChanged;
     private Plot hoveredMember;
     private bool pointerInside;
+    private Renderer surfaceRenderer;
+    private Camera sceneCamera;
+
+    private void Awake()
+    {
+        surfaceRenderer = GetComponent<Renderer>();
+        sceneCamera = Camera.main;
+    }
 
     public void Configure(List<Plot> connected, Action<bool> onHoverChanged)
     {
@@ -34,12 +42,12 @@ public sealed class PlotJoinedSurface : MonoBehaviour, IPointerClickHandler,
     {
         if (members == null || members.Length == 0) return null;
         Vector3 point = transform.position;
-        Camera camera = Camera.main;
-        if (camera != null)
+        if (sceneCamera == null) sceneCamera = Camera.main;
+        if (sceneCamera != null && surfaceRenderer != null)
         {
-            float y = GetComponent<Renderer>().bounds.max.y;
+            float y = surfaceRenderer.bounds.max.y;
             Plane plane = new Plane(Vector3.up, new Vector3(0f, y, 0f));
-            Ray ray = camera.ScreenPointToRay(screenPosition);
+            Ray ray = sceneCamera.ScreenPointToRay(screenPosition);
             if (plane.Raycast(ray, out float distance)) point = ray.GetPoint(distance);
         }
         Plot nearest = null;

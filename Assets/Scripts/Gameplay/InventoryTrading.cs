@@ -1,22 +1,4 @@
-using System;
 using UnityEngine;
-
-public enum FoodIngredient { Peixe, Milho, Macaxeira, Jerimum, Leite, Ovos }
-
-[Serializable]
-public sealed class RecipeIngredient
-{
-    [InspectorName("Ingrediente")] public FoodIngredient type;
-    [Min(1), InspectorName("Quantidade")] public int amount = 1;
-}
-
-[Serializable]
-public sealed class FoodRecipe
-{
-    [InspectorName("Nome")] public string name;
-    [InspectorName("Ingredientes")] public RecipeIngredient[] ingredients;
-    [Min(1), InspectorName("Comida gerada")] public int foodYield = 1;
-}
 
 public sealed class InventoryTrading : MonoBehaviour
 {
@@ -35,9 +17,6 @@ public sealed class InventoryTrading : MonoBehaviour
     [SerializeField, Min(0)] private int jerimumSeedPrice = 2;
     [SerializeField, Min(0)] private int milkPrice = 2;
     [SerializeField, Min(0)] private int eggPrice = 2;
-    [Header("Receitas de comida")]
-    [SerializeField] private FoodRecipe[] recipes = Array.Empty<FoodRecipe>();
-    [SerializeField, Min(1), InspectorName("Multiplicador Comida+")] private int foodPlusMultiplier = 2;
 
     public int GetStock(SaleItem item) => resources == null ? 0 : item switch
     {
@@ -117,47 +96,19 @@ public sealed class InventoryTrading : MonoBehaviour
         recipeName = null;
         output = 0;
         int[] selected = { fish, corn, pumpkin, jerimum, milk, eggs };
-        foreach (int amount in selected)
-            if (amount < 0) return false;
-        if (recipes == null) return false;
-        foreach (FoodRecipe recipe in recipes)
+        int amount = 0;
+        int types = 0;
+        foreach (int count in selected)
         {
-            if (recipe == null || recipe.foodYield < 1 ||
-                !MatchesRecipe(selected, recipe, out int portions)) continue;
-            long total = (long)recipe.foodYield * portions * (plus ? foodPlusMultiplier : 1);
-            if (total <= 0 || total > int.MaxValue) continue;
-            recipeName = string.IsNullOrWhiteSpace(recipe.name) ? "Receita" : recipe.name;
-            output = (int)total;
-            return true;
+            if (count < 0 || count > 3) return false;
+            if (count > 0) types++;
+            amount += count;
+            if (amount > 3 || types > 2) return false;
         }
-        return false;
-    }
-
-    private static bool MatchesRecipe(int[] selected, FoodRecipe recipe, out int portions)
-    {
-        portions = 0;
-        if (recipe.ingredients == null || recipe.ingredients.Length == 0) return false;
-        var required = new int[6];
-        foreach (RecipeIngredient ingredient in recipe.ingredients)
-        {
-            if (ingredient == null || ingredient.amount < 1 ||
-                (int)ingredient.type < 0 || (int)ingredient.type >= required.Length) return false;
-            int index = (int)ingredient.type;
-            if (required[index] > int.MaxValue - ingredient.amount) return false;
-            required[index] += ingredient.amount;
-        }
-        for (int i = 0; i < required.Length; i++)
-        {
-            if (required[i] == 0)
-            {
-                if (selected[i] != 0) return false;
-                continue;
-            }
-            if (selected[i] == 0 || selected[i] % required[i] != 0) return false;
-            int count = selected[i] / required[i];
-            if (portions == 0) portions = count;
-            else if (portions != count) return false;
-        }
-        return portions > 0;
+        if (amount < 2) return false;
+        recipeName = types == 1 ? "Alimentos iguais" : "Alimentos diferentes";
+        int baseOutput = types == 1 ? amount - 1 : amount;
+        output = baseOutput + (plus ? amount - 1 : 0);
+        return true;
     }
 }

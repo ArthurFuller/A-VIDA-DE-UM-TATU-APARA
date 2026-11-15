@@ -1,0 +1,23 @@
+{
+  "rules": {
+    "ranking": {
+      ".read": "auth != null",
+      ".indexOn": ["coins"],
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid && (!data.exists() || newData.child('coins').val() >= data.child('coins').val())",
+        ".validate": "newData.hasChildren(['nickname', 'nicknameKey', 'coins']) && root.child('nicknames').child(newData.child('nicknameKey').val()).val() === $uid",
+        "nickname": { ".validate": "newData.isString() && newData.val().length >= 2 && newData.val().length <= 18" },
+        "nicknameKey": { ".validate": "newData.isString() && newData.val().matches(/^[0-9a-f]{4,144}$/)" },
+        "coins": { ".validate": "newData.isNumber()" },
+        "$other": { ".validate": false }
+      }
+    },
+    "nicknames": {
+      "$key": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.val() === auth.uid) || (data.val() === auth.uid && (!newData.exists() || newData.val() === auth.uid)))",
+        ".validate": "newData.isString()"
+      }
+    }
+  }
+}

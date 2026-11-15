@@ -47,6 +47,7 @@ public sealed class CardRewardChoice : MonoBehaviour
     private Sequence transition;
     private bool transitioning;
     private Image backdrop;
+    private Canvas rootCanvas;
     private Color backdropColor;
 
     private struct NameStyle
@@ -99,6 +100,7 @@ public sealed class CardRewardChoice : MonoBehaviour
         {
             backdrop = group.GetComponent<Image>();
             if (backdrop != null) backdropColor = backdrop.color;
+            rootCanvas = group.GetComponentInParent<Canvas>()?.rootCanvas;
         }
         if (choiceCards.Length > 0 && choiceCards[0] != null)
         {
@@ -188,9 +190,10 @@ public sealed class CardRewardChoice : MonoBehaviour
     {
         if (group == null || transitioning || !group.interactable || Mouse.current == null) return;
         Vector2 pointer = Mouse.current.position.ReadValue();
-        Canvas canvas = group.GetComponentInParent<Canvas>()?.rootCanvas;
-        Camera camera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ?
-            canvas.worldCamera : null;
+        if (rootCanvas == null) rootCanvas = group.GetComponentInParent<Canvas>()?.rootCanvas;
+        RectTransform root = rootCanvas != null ? rootCanvas.transform as RectTransform : null;
+        Camera camera = rootCanvas != null && rootCanvas.renderMode != RenderMode.ScreenSpaceOverlay ?
+            rootCanvas.worldCamera : null;
         for (int i = 0; i < descriptions.Length; i++)
         {
             if (descriptions[i] == null || choiceCards[i] == null) continue;
@@ -203,8 +206,8 @@ public sealed class CardRewardChoice : MonoBehaviour
             RectTransform tip = (RectTransform)descriptions[i].transform.parent;
             bool visible = inside && offered[i] != null &&
                 !string.IsNullOrWhiteSpace(offered[i].Description);
-            tip.gameObject.SetActive(visible);
-            if (visible) KeepDescriptionOnScreen(tip, i);
+            if (tip.gameObject.activeSelf != visible) tip.gameObject.SetActive(visible);
+            if (visible) KeepDescriptionOnScreen(tip, i, root);
         }
     }
 
@@ -222,11 +225,8 @@ public sealed class CardRewardChoice : MonoBehaviour
             size.x * 0.708f, size.y * 0.926f);
     }
 
-    private void KeepDescriptionOnScreen(RectTransform tip, int index)
+    private void KeepDescriptionOnScreen(RectTransform tip, int index, RectTransform root)
     {
-        Canvas canvas = group.GetComponentInParent<Canvas>()?.rootCanvas;
-        if (canvas == null) return;
-        RectTransform root = canvas.transform as RectTransform;
         if (root == null) return;
         tip.anchoredPosition = new Vector2(index == 0 ? -10f : 10f, 0f);
         ShiftInsideScreen(tip, root);

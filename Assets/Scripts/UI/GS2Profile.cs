@@ -39,8 +39,27 @@ public sealed class GS2Profile : MonoBehaviour
             if (notice != null) notice.text = "Nickname: use entre 2 e 18 caracteres.";
             return;
         }
+        if (!GS2LeaderboardOnline.Instance.Configured)
+        {
+            StoreNickname(value);
+            return;
+        }
+        if (saveButton != null) saveButton.interactable = false;
+        if (notice != null) notice.text = "Verificando nickname...";
+        GS2LeaderboardOnline.Instance.SaveNickname(value, (saved, error) =>
+        {
+            if (saveButton != null) saveButton.interactable = true;
+            if (!saved) { if (notice != null) notice.text = error; return; }
+            StoreNickname(value);
+            if (GS2LeaderboardScore.HasLocalScore)
+                GS2LeaderboardOnline.Instance.SubmitFinishedGame(GS2LeaderboardScore.LocalBestCoins);
+        });
+    }
+
+    private void StoreNickname(string value)
+    {
         PlayerPrefs.SetString(NicknameKey, value);
         PlayerPrefs.Save();
-        if (notice != null) notice.text = "Nickname salvo neste dispositivo.";
+        if (notice != null) notice.text = "Nickname salvo.";
     }
 }

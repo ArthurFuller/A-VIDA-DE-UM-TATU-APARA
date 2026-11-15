@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b1aaa1e01a96c204f9efe3687e45fe7c, type: 3}
   m_Name: CardDescriptions
   m_EditorClassIdentifier: Assembly-CSharp::CardDescriptionCatalog
-  inspectionOffset: {x: -39.22, y: 0}
+  inspectionOffset: {x: -40.01999, y: -0.8000488}
   choiceOffset: {x: -47.6, y: -2.4000244}
   eventOffset: {x: 0, y: 0}
   entries:
@@ -75,12 +75,12 @@ MonoBehaviour:
   - key: A:PlantCorn
     title: Plantar Milho
     art: {fileID: 21300000, guid: 4a11058d49e5a9549b2d18ea93036c72, type: 3}
-    text: "Plante em terreno arado. \n\nCrescimento: 1 dia\n\nRendimento: 2 unidades
-      por colheita\n\nValor: 4 moedas\n\nB\xF4nus:\n\n- Ao lado de macaxeira
-      ou jerimum, quando maduro: +1 etapa de crescimento por dia e +2 na colheita.\n-
-      Ao lado de animais:
-      +1 leite ou ovo por dia."
-    boxSize: {x: 240, y: 215.64}
+    text: "Plante em terreno arado\n\nCrescimento: 1 dia\n\nRendimento: 2 unidades
+      por colheita\n\nValor: 4 moedas\n\nQuando crescer, far\xE1 sombra nas planta\xE7\xF5es
+      adjacentes que crescer\xE3o mais, al\xE9m de produzirem +2 plantas por colheita\n\nAnimais
+      se alimentam do milho adjacente, fazendo com que a produ\xE7\xE3o dos animais
+      seja +1 \n"
+    boxSize: {x: 240, y: 296.54}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 215.64}
     choiceFontSize: 12
@@ -96,8 +96,7 @@ MonoBehaviour:
     text: "Plante em terreno arado. \n\nCrescimento: 1 dia \n\nRendimento: 7 unidades
       por colheita\n \nValor: 1 moeda \n\nB\xF4nus:\n\n- Milho maduro ao lado: +1
       etapa de crescimento por dia e +2 na colheita.\n- Galinha ao lado: sem pragas.\n-
-      Po\xE7o
-      ao lado: sem seca."
+      Po\xE7o ao lado: sem seca."
     boxSize: {x: 186.4, y: 204.1}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 204.1}
@@ -301,8 +300,7 @@ MonoBehaviour:
     text: "Plante em terreno arado. \n\nCrescimento: 3 dias\n\nRendimento: 5 unidades
       por colheita\n\nValor: 3 moedas\n\nB\xF4nus:\n\n- Milho maduro ao lado: +1
       etapa de crescimento por dia e +2 na colheita.\n- Galinha ao lado: sem pragas.\n-
-      Po\xE7o
-      ao lado: sem seca."
+      Po\xE7o ao lado: sem seca."
     boxSize: {x: 240, y: 245.1}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 204.1}
@@ -316,10 +314,11 @@ MonoBehaviour:
   - key: A:PlaceCow
     title: Colocar Vaca
     art: {fileID: 21300000, guid: 27b7a0d62caa657418ab4b8905e7805f, type: 3}
-    text: "Colocar em cercado vazio.\n\nProdu\xE7\xE3o: 1 leite por dia\n\nB\xF4nus:\n\n-
-      Milho ao lado: +1 leite por dia.\n- Ao lado do po\xE7o: somente tipos de
-      planta\xE7\xE3o tamb\xE9m vizinhos vendem por +2 moedas/un."
-    boxSize: {x: 240, y: 195.1}
+    text: "Colocar em cercado vazio.\n\nProdu\xE7\xE3o: 1 leite por dia\n\nB\xF4nus:\n\nAo
+      lado do po\xE7o de \xE1gua, as vacas ficam mais \xE0 vontade e adubam as planta\xE7\xF5es.
+      Cada tipo de planta adijacente tem seu valor de venda aumentado em +2 (esse
+      efeito vale para a fazenda inteira)\n"
+    boxSize: {x: 240, y: 211.9}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 220}
     choiceFontSize: 12
@@ -332,10 +331,10 @@ MonoBehaviour:
   - key: A:PlaceChicken
     title: Colocar Galinha
     art: {fileID: 21300000, guid: e143afdec3040024ebbf7ee7ba860c0b, type: 3}
-    text: "Colocar em cercado vazio\n\nProdu\xE7\xE3o: 1 ovo por dia\n\nB\xF4nus:\n\n-
-      Milho ao lado: +1 ovo por dia.\n- Planta\xE7\xF5es ao lado n\xE3o sofrem
-      pragas."
-    boxSize: {x: 240, y: 121.3}
+    text: "Colocar em cercado vazio\n\nProdu\xE7\xE3o: 1 ovo por dia\n\nA galinha
+      pode se alimentar de insetos, anulando o efeito das pragas em qualquer planta\xE7\xE3o
+      adjacente"
+    boxSize: {x: 240, y: 148.6}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 121.3}
     choiceFontSize: 12
@@ -379,8 +378,7 @@ MonoBehaviour:
     title: Pragas
     art: {fileID: 0}
     text: "As pragas destru\xEDram parte das planta\xE7\xF5es\n\nA cultura afetada
-      regride no crescimento, inclusive as plantas prontas.\n\nDura\xE7\xE3o:
-      2 dias"
+      regride no crescimento, inclusive as plantas prontas.\n\nDura\xE7\xE3o: 2 dias"
     boxSize: {x: 390, y: 220}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 0, y: 0}

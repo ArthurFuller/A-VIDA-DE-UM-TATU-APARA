@@ -56,6 +56,10 @@ public sealed class ResourceHud : MonoBehaviour
     private readonly Transform[] counterRoots = new Transform[9];
     private readonly Vector3[] counterRootScales = new Vector3[9];
     private readonly Color[] iconColors = new Color[9];
+    private readonly bool[] missingSpriteWarnings = new bool[9];
+    private readonly Stack<RectTransform> iconPool = new();
+    private readonly HashSet<RectTransform> activeIcons = new();
+    private const int MaxPooledIcons = 64;
     private readonly Material[] iconFlashMaterials = new Material[9];
     private readonly Material[] originalIconMaterials = new Material[9];
     private static readonly int FlashId = Shader.PropertyToID("_Flash");
@@ -139,6 +143,8 @@ public sealed class ResourceHud : MonoBehaviour
     {
         if (resources != null) resources.Changed -= Refresh;
         DOTween.Kill(this);
+        foreach (RectTransform rect in new List<RectTransform>(activeIcons))
+            RecycleIcon(rect);
         for (int i = 0; i < displayed.Length; i++)
         {
             ResourceKind kind = (ResourceKind)i;
@@ -164,6 +170,15 @@ public sealed class ResourceHud : MonoBehaviour
                 counterRoots[i].localScale = counterRootScales[i];
         }
         System.Array.Clear(inFlight, 0, inFlight.Length);
+    }
+
+    private void OnDestroy()
+    {
+        while (iconPool.Count > 0)
+        {
+            RectTransform rect = iconPool.Pop();
+            if (rect != null) Destroy(rect.gameObject);
+        }
     }
 
     public void FlyFromWorld(ResourceKind kind, int amount, Vector3 origin,
@@ -198,20 +213,10 @@ public sealed class ResourceHud : MonoBehaviour
         if (batch == null || batch.Released || canvasRect == null) return;
         Vector2 origin = CanvasPoint(screenOrigin);
         int index = batch.Icons.Count;
-        var icon = new GameObject("Recurso dropado - " + batch.Kind,
-            typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        RectTransform rect = (RectTransform)icon.transform;
-        rect.SetParent(canvasRect, false);
-        rect.SetAsLastSibling();
-        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        RectTransform rect = GetIcon(batch.Kind);
         rect.sizeDelta = new Vector2(34f, 34f);
         rect.anchoredPosition = origin;
         rect.localScale = Vector3.zero;
-        Image image = icon.GetComponent<Image>();
-        image.sprite = SpriteFor(batch.Kind);
-        image.enabled = image.sprite != null;
-        image.preserveAspect = true;
-        image.raycastTarget = false;
         batch.Icons.Add(rect);
         float angle = index * 2.39996f;
         Vector2 landing = screenLanding.HasValue
@@ -236,7 +241,10 @@ public sealed class ResourceHud : MonoBehaviour
         if (target == null)
         {
             foreach (RectTransform icon in batch.Icons)
-                if (icon != null) Destroy(icon.gameObject);
+            {
+                if (icon != null) icon.DOKill();
+                RecycleIcon(icon);
+            }
             onAllArrived?.Invoke();
             return;
         }
@@ -266,7 +274,7 @@ public sealed class ResourceHud : MonoBehaviour
                 CreditArrival(batch.Kind, 1);
                 if (--pending == 0) onAllArrived?.Invoke();
             });
-            flight.OnKill(() => { if (rect != null) Destroy(rect.gameObject); });
+            flight.OnKill(() => RecycleIcon(rect));
         }
     }
 
@@ -326,24 +334,12 @@ public sealed class ResourceHud : MonoBehaviour
     private void CreateIcon(ResourceKind kind, int index, int count, Vector2 origin,
         Text target, float pauseSeconds, System.Action onArrived)
     {
-        var icon = new GameObject("Recurso em voo - " + kind, typeof(RectTransform),
-            typeof(CanvasRenderer), typeof(Image));
-        RectTransform rect = (RectTransform)icon.transform;
-        rect.SetParent(canvasRect, false);
-        rect.SetAsLastSibling();
-        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        RectTransform rect = GetIcon(kind);
         rect.sizeDelta = new Vector2(32f, 32f);
         float angle = index * 2.39996f;
         float radius = 4f + 11f * Mathf.Sqrt((index + 0.5f) / count);
         rect.anchoredPosition = origin + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
         rect.localScale = Vector3.zero;
-        Image image = icon.GetComponent<Image>();
-        image.sprite = SpriteFor(kind);
-        image.enabled = image.sprite != null;
-        image.color = Color.white; // Do not override the sprite colors selected in ResourceHud.
-        image.preserveAspect = true;
-        image.raycastTarget = false;
-
         const float appearDuration = 0.12f;
         float flightWait = FlightWait(kind, appearDuration + Mathf.Max(0f, pauseSeconds));
         Sequence flight = DOTween.Sequence().SetId(this);
@@ -356,7 +352,35 @@ public sealed class ResourceHud : MonoBehaviour
                 CreditArrival(kind, 1);
                 onArrived?.Invoke();
             })
-            .OnKill(() => { if (icon != null) Destroy(icon); });
+            .OnKill(() => RecycleIcon(rect));
+    }
+
+    private RectTransform GetIcon(ResourceKind kind)
+    {
+        RectTransform rect = iconPool.Count > 0 ? iconPool.Pop() : null;
+        if (rect == null)
+            rect = (RectTransform)new GameObject("Recurso em voo", typeof(RectTransform),
+                typeof(CanvasRenderer), typeof(Image)).transform;
+        rect.SetParent(canvasRect, false);
+        rect.gameObject.SetActive(true);
+        activeIcons.Add(rect);
+        rect.SetAsLastSibling();
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+        Image image = rect.GetComponent<Image>();
+        image.sprite = SpriteFor(kind);
+        image.enabled = image.sprite != null;
+        image.color = Color.white;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+        return rect;
+    }
+
+    private void RecycleIcon(RectTransform rect)
+    {
+        if (rect == null || !activeIcons.Remove(rect)) return;
+        rect.gameObject.SetActive(false);
+        if (iconPool.Count < MaxPooledIcons) iconPool.Push(rect);
+        else Destroy(rect.gameObject);
     }
 
     private Sprite SpriteFor(ResourceKind kind)
@@ -374,8 +398,13 @@ public sealed class ResourceHud : MonoBehaviour
             ResourceKind.Eggs => eggSprite,
             _ => null
         };
-        if (selected == null)
+        int index = (int)kind;
+        if (selected == null && !missingSpriteWarnings[index])
+        {
+            missingSpriteWarnings[index] = true;
             Debug.LogWarning("Ícone em voo não configurado no ResourceHud: " + kind, this);
+        }
+        else if (selected != null) missingSpriteWarnings[index] = false;
         return selected;
     }
 

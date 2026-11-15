@@ -227,6 +227,7 @@ public sealed class DayCycle : MonoBehaviour
 
         if (gameOver)
         {
+            GS2LeaderboardScore.RecordFinishedGame(resources.Coins);
             feedback.ShowSummary(BuildFinalSummary());
             if (merchant != null) merchant.HideShop();
             actions.ReturnWorkersHome();

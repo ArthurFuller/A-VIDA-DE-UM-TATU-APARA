@@ -63,6 +63,7 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
     private Transform actionDotsRoot;
     private ParticleSystem comadreDizzy;
     private Transform spriteVisual;
+    private SpriteRenderer spriteRenderer;
     private Camera spriteCamera;
     private Vector3 initialHomePosition;
     private Vector3 previousPosition;
@@ -121,20 +122,19 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
             spriteVisual = new GameObject("Visual 2D - teste", typeof(SpriteRenderer)).transform;
             spriteVisual.SetParent(transform, false);
         }
-        SpriteRenderer visual = spriteVisual.GetComponent<SpriteRenderer>();
-        visual.sprite = firstFrame;
-        visual.spriteSortPoint = SpriteSortPoint.Pivot;
-        visual.sortingOrder = 100;
+        spriteRenderer = spriteVisual.GetComponent<SpriteRenderer>();
+        spriteRenderer.sprite = firstFrame;
+        spriteRenderer.spriteSortPoint = SpriteSortPoint.Pivot;
+        spriteRenderer.sortingOrder = 100;
         RefreshSpriteAppearance();
     }
 
     public void RefreshSpriteAppearance()
     {
         if (spriteVisual == null) return;
-        SpriteRenderer renderer = spriteVisual.GetComponent<SpriteRenderer>();
-        if (renderer == null || renderer.sprite == null) return;
+        if (spriteRenderer == null || spriteRenderer.sprite == null) return;
         spriteVisual.localPosition = spriteOffset;
-        spriteVisual.localScale = Vector3.one * (testSpriteHeight / renderer.sprite.bounds.size.y);
+        spriteVisual.localScale = Vector3.one * (testSpriteHeight / spriteRenderer.sprite.bounds.size.y);
     }
 
     public void FaceTowards(Vector3 destination) => UpdateFacing(destination - transform.position);
@@ -142,15 +142,14 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
     public void RestoreHomeFacing()
     {
         previousPosition = transform.position;
-        if (spriteVisual != null && spriteVisual.TryGetComponent(out SpriteRenderer renderer))
-            renderer.flipX = false; // A arte de repouso original olha para a esquerda.
+        if (spriteRenderer != null)
+            spriteRenderer.flipX = false; // A arte de repouso original olha para a esquerda.
     }
 
     private void UpdateFacing(Vector3 direction)
     {
         if (spriteVisual == null || direction.sqrMagnitude < 0.000001f) return;
-        SpriteRenderer renderer = spriteVisual.GetComponent<SpriteRenderer>();
-        if (renderer == null) return;
+        if (spriteRenderer == null) return;
         if (spriteCamera == null) spriteCamera = Camera.main;
         Vector3 right = spriteCamera != null ? spriteCamera.transform.right : Vector3.right;
         Vector3 forward = spriteCamera != null ? spriteCamera.transform.forward : Vector3.forward;
@@ -158,7 +157,7 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
         if (Mathf.Abs(horizontal) < direction.magnitude * 0.1f)
             horizontal = Vector3.Dot(direction, Vector3.ProjectOnPlane(forward, Vector3.up));
         if (Mathf.Abs(horizontal) > 0.0001f)
-            renderer.flipX = horizontal > 0f; // A arte original olha para a esquerda.
+            spriteRenderer.flipX = horizontal > 0f; // A arte original olha para a esquerda.
     }
 
     private void UpdateSpriteAnimation()
@@ -169,7 +168,6 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
         Sprite[] frames = moving ? runFrames : idleFrames;
         if (frames == null || frames.Length == 0) return;
 
-        SpriteRenderer renderer = spriteVisual.GetComponent<SpriteRenderer>();
         if (moving) UpdateFacing(movement);
         if (moving != wasMoving)
         {
@@ -184,7 +182,8 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
             animationTime -= frameDuration;
             animationFrame = (animationFrame + 1) % frames.Length;
         }
-        renderer.sprite = frames[animationFrame];
+        if (spriteRenderer != null && spriteRenderer.sprite != frames[animationFrame])
+            spriteRenderer.sprite = frames[animationFrame];
     }
 
     private void OnDestroy()

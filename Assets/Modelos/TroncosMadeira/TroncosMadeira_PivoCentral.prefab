@@ -1,0 +1,96 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &7606345381130480694
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2360680214945871949}
+  m_Layer: 0
+  m_Name: TroncosMadeira_PivoCentral
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2360680214945871949
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7606345381130480694}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 11.664807, y: 3.6922562, z: 14.7500305}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 3818705089263137115}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &2306794915487838037
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 2360680214945871949}
+    m_Modifications:
+    - target: {fileID: 1512547341848354318, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 12.014194
+      objectReference: {fileID: 0}
+    - target: {fileID: 1512547341848354318, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.4622562
+      objectReference: {fileID: 0}
+    - target: {fileID: 1512547341848354318, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 54.50097
+      objectReference: {fileID: 0}
+    - target: {fileID: 1512547341848354318, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071067
+      objectReference: {fileID: 0}
+    - target: {fileID: 1512547341848354318, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 1512547341848354318, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1512547341848354318, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1512547341848354318, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1512547341848354318, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1512547341848354318, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2285142949172167860, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+      propertyPath: m_Name
+      value: TroncosMadeira
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+--- !u!4 &3818705089263137115 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1512547341848354318, guid: e05583d3b830663449c06d32457dfeed, type: 3}
+  m_PrefabInstance: {fileID: 2306794915487838037}
+  m_PrefabAsset: {fileID: 0}

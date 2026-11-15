@@ -103,7 +103,7 @@ Material:
     - _EnvironmentReflections: 1
     - _EscalaTremido: 2
     - _EscalaVariacao: 1
-    - _EspessuraLineArt: 3
+    - _EspessuraLineArt: 0
     - _EspessuraTraco: 0.5
     - _Falhas: 0.25
     - _FecharQuinas: 0.5
@@ -114,9 +114,10 @@ Material:
     - _InfluenciaLuz: 0.3
     - _IntensidadeTraco: 1
     - _IntensidadeTracoLuz: 0
-    - _LimiteSombra: 0.5
+    - _LimiteSombra: 0.179
     - _LinhasPorMetro: 6
     - _Metallic: 0
+    - _NormalStrength: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QuantidadeTraco: 0.6
