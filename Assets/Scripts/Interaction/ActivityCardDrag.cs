@@ -32,12 +32,15 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
     private Tween shopHoverTween;
     private Vector3 dragWorldOffset;
     private RectTransform handBoundary;
+    private float dragShrinkTopInset;
     private Camera dragEventCamera;
     private Vector2 dragPointerScreen;
     private float dragCenterBlend;
     private bool miniature;
     private Tween dragCenterTween;
     private Quaternion homeRotation;
+    private Quaternion dragRotation;
+    private Quaternion hoverHomeRotation;
     private int dragSibling;
     private Graphic[] fadeGraphics;
     private Color[] fadeColors;
@@ -99,9 +102,9 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
 
     public void PlayRejectedReplay()
     {
-        returning = true;
         RectTransform rect = (RectTransform)transform;
         rect.DOKill();
+        returning = true;
         float center = rect.anchoredPosition.x;
         DOTween.Sequence()
             .Append(rect.DOAnchorPosX(center + 18f, 0.045f))
@@ -223,10 +226,10 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
 
     public void FadeOut(System.Action onFinished)
     {
-        returning = true;
         RectTransform rect = (RectTransform)transform;
         rect.DOKill();
         pendingFloat?.Kill();
+        returning = true;
         if (activity == ActivityKind.BuildHouse || activity == ActivityKind.BuildFence)
         {
             DissolveDisposable(onFinished);
@@ -332,10 +335,10 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         RectTransform rect = (RectTransform)transform;
         Canvas canvas = GetComponentInParent<Canvas>();
         if (canvas == null || rect.parent == null) return;
-        waitingForTarget = true;
-        returning = true;
         rect.DOKill();
         pendingFloat?.Kill();
+        waitingForTarget = true;
+        returning = true;
         rect.localRotation = homeRotation;
         RectTransform parent = (RectTransform)rect.parent;
         Vector2 screen = new Vector2(Screen.width * 0.17f, Screen.height * 0.82f);
@@ -490,12 +493,13 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             targetAngle = Mathf.Sin(Time.unscaledTime * 48f) * 5f;
         dragAngle = Mathf.SmoothDampAngle(dragAngle, targetAngle, ref angleVelocity,
             hoveredWorker != null ? 0.035f : 0.11f, Mathf.Infinity, Time.unscaledDeltaTime);
-        transform.localRotation = homeRotation * Quaternion.Euler(0f, 0f, dragAngle);
+        transform.localRotation = dragRotation * Quaternion.Euler(0f, 0f, dragAngle);
     }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
         if (dragging || hovered || returning) return;
+        if (activity != ActivityKind.BuySeeds && Hand != null && Hand.ContainsCard(this)) return;
         if (activity != ActivityKind.BuySeeds && Hand != null && Hand.IsSelectionLocked) return;
         hovered = true;
         if (activity == ActivityKind.BuySeeds)
@@ -511,6 +515,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         originalScale = transform.localScale;
         originalSibling = transform.GetSiblingIndex();
         originalPosition = ((RectTransform)transform).anchoredPosition;
+        hoverHomeRotation = transform.localRotation;
         transform.SetAsLastSibling();
         transform.DOKill();
         transform.DOScale(originalScale * 1.18f, 0.18f).SetEase(Ease.OutCubic);
@@ -519,6 +524,16 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
 
     public void OnPointerExit(PointerEventData eventData)
     {
+        if (returning || dragging)
+        {
+            hovered = false;
+            return;
+        }
+        if (activity != ActivityKind.BuySeeds && Hand != null && Hand.ContainsCard(this))
+        {
+            hovered = false;
+            return;
+        }
         if (activity == ActivityKind.BuySeeds)
         {
             hovered = false;
@@ -532,6 +547,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
 
     public void OnPointerClick(PointerEventData eventData)
     {
+        if (eventData.button != PointerEventData.InputButton.Left) return;
         if (activity == ActivityKind.BuySeeds)
         {
             if (shop == null || shopClicking) return;
@@ -548,23 +564,30 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
                 });
             return;
         }
-        if (!eventData.dragging && !dragging && !returning &&
-            eventData.button == PointerEventData.InputButton.Left)
+        if (!eventData.dragging && !dragging && !returning)
             Hand?.InspectCard(this);
     }
 
     public void OnBeginDrag(PointerEventData eventData)
     {
-        if (!HasEffect || activity == ActivityKind.BuySeeds || returning) return;
+        if (eventData.button != PointerEventData.InputButton.Left ||
+            !HasEffect || activity == ActivityKind.BuySeeds || returning) return;
         if (Hand != null && Hand.IsSelectionLocked) return;
         GetComponent<CardHoverOutline>()?.SetHighlighted(false);
-        Hand?.ClosePopupsForDrag();
+        ActivityCardAvailability hand = Hand;
+        hand?.ClosePopupsForDrag();
+        Vector2 restingPosition = default;
+        float restingScale = 1f;
+        Quaternion restingRotation = Quaternion.identity;
+        bool hasRestingPose = hand != null && hand.ClearHoverForDrag(this,
+            out restingPosition, out restingScale, out restingRotation);
         RestoreHover(true);
         RectTransform rect = (RectTransform)transform;
         rect.DOKill();
-        originalPosition = rect.anchoredPosition;
-        originalScale = rect.localScale;
-        homeRotation = rect.localRotation;
+        dragRotation = rect.localRotation;
+        originalPosition = hasRestingPose ? restingPosition : rect.anchoredPosition;
+        originalScale = hasRestingPose ? Vector3.one * restingScale : rect.localScale;
+        homeRotation = hasRestingPose ? restingRotation : rect.localRotation;
         homePivot = rect.pivot;
         Vector3 cardCenter = rect.TransformPoint(rect.rect.center);
         rect.pivot = new Vector2(0.5f, 1f);
@@ -573,9 +596,8 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         previousPointer = eventData.position;
         lastPointerMove = Time.unscaledTime;
         dragSibling = rect.GetSiblingIndex();
-        ActivityCardAvailability hand = rect.parent != null ?
-            rect.parent.GetComponentInChildren<ActivityCardAvailability>(true) : null;
         handBoundary = hand != null ? hand.DragBoundary : null;
+        dragShrinkTopInset = hand != null ? hand.DragShrinkTopInset : 0f;
         dragEventCamera = eventData.pressEventCamera;
         dragPointerScreen = eventData.position;
         float pointerDelta = eventData.position.x - previousPointer.x;
@@ -609,6 +631,9 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         dragPointerScreen = eventData.position;
         bool outside = handBoundary == null || !RectTransformUtility.RectangleContainsScreenPoint(
             handBoundary, eventData.position, dragEventCamera);
+        if (!outside && RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                handBoundary, eventData.position, dragEventCamera, out Vector2 handPoint))
+            outside = handPoint.y >= handBoundary.rect.yMax - dragShrinkTopInset;
         if (outside != miniature)
         {
             miniature = outside;
@@ -647,7 +672,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         }
         OnDrag(eventData);
         dragging = false;
-        transform.localRotation = homeRotation * Quaternion.Euler(0f, 0f, dragAngle);
+        transform.localRotation = dragRotation * Quaternion.Euler(0f, 0f, dragAngle);
         dragCenterTween?.Kill();
         UpdateHover(eventData.position);
         WorkerAssignment target = hoveredWorker;
@@ -720,11 +745,13 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         {
             transform.localScale = originalScale;
             rect.anchoredPosition = originalPosition;
+            rect.localRotation = hoverHomeRotation;
         }
         else
         {
             transform.DOScale(originalScale, 0.15f).SetEase(Ease.OutCubic);
             rect.DOAnchorPos(originalPosition, 0.15f).SetEase(Ease.OutCubic);
+            rect.DOLocalRotateQuaternion(hoverHomeRotation, 0.15f).SetEase(Ease.OutCubic);
         }
         transform.SetSiblingIndex(originalSibling);
     }

@@ -110,6 +110,7 @@ public sealed class DayCycle : MonoBehaviour
         UpdateDayLabel();
         UpdateMarket();
         if (dayEvents != null) dayEvents.StartDay(currentDay);
+        if (dayEvents != null) dayEvents.ApplyPendingPestRegression(seedCatalog);
         if (actions != null) actions.BeginNextDay();
         OpenDayAfterEvent(false);
     }
@@ -291,6 +292,7 @@ public sealed class DayCycle : MonoBehaviour
         if (dayEvents != null) dayEvents.StartDay(currentDay);
         if (MandalaSynergy.Instance != null)
             MandalaSynergy.Instance.ApplyGrowthBonuses(currentDay, seedCatalog);
+        if (dayEvents != null) dayEvents.ApplyPendingPestRegression(seedCatalog);
         actions.BeginNextDay();
         if (houseSites != null)
         {

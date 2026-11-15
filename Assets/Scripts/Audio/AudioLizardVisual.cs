@@ -14,7 +14,8 @@ public sealed class AudioLizardVisual : MonoBehaviour
     {
         if (image == null) image = GetComponent<Image>();
         if (closedEyeSprite == null && image != null) closedEyeSprite = image.sprite;
-        if (animator != null) animator.updateMode = AnimatorUpdateMode.UnscaledTime;
+        // O lagarto pertence a gameplay: deve respeitar Time.timeScale durante o pause.
+        if (animator != null) animator.updateMode = AnimatorUpdateMode.Normal;
     }
 
     public void SetMuted(bool value)

@@ -297,7 +297,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         CropSettings settings = catalog != null ? catalog.Get(Crop) : null;
         int age = currentDay + growthAdjustment - PlantedDay;
         return settings != null && age >= settings.growthDays &&
-            age <= settings.growthDays + settings.witherDaysAfterMaturity;
+            age < settings.growthDays + settings.witherDaysAfterMaturity;
     }
 
     public List<Plot> ReadyConnectedPlots(int currentDay, SeedCatalog catalog)
@@ -358,7 +358,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         CropSettings settings = catalog != null ? catalog.Get(Crop) : null;
         int growthDays = settings != null ? settings.growthDays : 2;
         int age = currentDay + growthAdjustment - PlantedDay;
-        if (settings != null && age > growthDays + settings.witherDaysAfterMaturity)
+        if (settings != null && age >= growthDays + settings.witherDaysAfterMaturity)
         {
             Harvest();
             return;
@@ -410,6 +410,18 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     {
         if (Crop != CropType.None) growthAdjustment += days;
         StateChanged?.Invoke();
+    }
+
+    public void RegressGrowthFromPests(int stages, int currentDay, SeedCatalog catalog)
+    {
+        if (isWater || Crop == CropType.None || stages <= 0 || catalog == null) return;
+        CropSettings settings = catalog.Get(Crop);
+        if (settings == null) return;
+        int age = currentDay + growthAdjustment - PlantedDay;
+        int regression = IsReady(currentDay, catalog)
+            ? Mathf.Max(stages, age - settings.growthDays + 1) : stages;
+        AdvanceGrowth(-regression);
+        RefreshGrowth(currentDay, catalog);
     }
 
     public void AdvanceGrowthTowardMaturity(int days, int currentDay, SeedCatalog catalog)

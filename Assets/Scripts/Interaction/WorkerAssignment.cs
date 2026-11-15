@@ -137,6 +137,30 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
         spriteVisual.localScale = Vector3.one * (testSpriteHeight / renderer.sprite.bounds.size.y);
     }
 
+    public void FaceTowards(Vector3 destination) => UpdateFacing(destination - transform.position);
+
+    public void RestoreHomeFacing()
+    {
+        previousPosition = transform.position;
+        if (spriteVisual != null && spriteVisual.TryGetComponent(out SpriteRenderer renderer))
+            renderer.flipX = false; // A arte de repouso original olha para a esquerda.
+    }
+
+    private void UpdateFacing(Vector3 direction)
+    {
+        if (spriteVisual == null || direction.sqrMagnitude < 0.000001f) return;
+        SpriteRenderer renderer = spriteVisual.GetComponent<SpriteRenderer>();
+        if (renderer == null) return;
+        if (spriteCamera == null) spriteCamera = Camera.main;
+        Vector3 right = spriteCamera != null ? spriteCamera.transform.right : Vector3.right;
+        Vector3 forward = spriteCamera != null ? spriteCamera.transform.forward : Vector3.forward;
+        float horizontal = Vector3.Dot(direction, right);
+        if (Mathf.Abs(horizontal) < direction.magnitude * 0.1f)
+            horizontal = Vector3.Dot(direction, Vector3.ProjectOnPlane(forward, Vector3.up));
+        if (Mathf.Abs(horizontal) > 0.0001f)
+            renderer.flipX = horizontal > 0f; // A arte original olha para a esquerda.
+    }
+
     private void UpdateSpriteAnimation()
     {
         Vector3 movement = transform.position - previousPosition;
@@ -146,12 +170,7 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
         if (frames == null || frames.Length == 0) return;
 
         SpriteRenderer renderer = spriteVisual.GetComponent<SpriteRenderer>();
-        if (moving && spriteCamera != null)
-        {
-            float horizontal = Vector3.Dot(movement, spriteCamera.transform.right);
-            if (Mathf.Abs(horizontal) > 0.0001f)
-                renderer.flipX = horizontal > 0f; // A arte original olha para a esquerda.
-        }
+        if (moving) UpdateFacing(movement);
         if (moving != wasMoving)
         {
             wasMoving = moving;

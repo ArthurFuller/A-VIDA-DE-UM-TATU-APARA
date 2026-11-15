@@ -8,6 +8,8 @@ Shader "Sertao/XiloCartoon Completo"
     {
         [Header(Cartoon)]
         [MainTexture] _BaseMap ("Textura Base", 2D) = "white" {}
+        [Normal] _BumpMap ("Textura Normal", 2D) = "bump" {}
+        _NormalStrength ("Forca do Relevo", Range(0, 2)) = 1
         [MainColor] _CorBase ("Cor Base", Color) = (0.77, 0.39, 0.23, 1)
         _CorSombra ("Cor da Sombra (multiplica)", Color) = (0.55, 0.45, 0.55, 1)
         _LimiteSombra ("Limite da Sombra", Range(0, 1)) = 0.5
@@ -48,9 +50,11 @@ Shader "Sertao/XiloCartoon Completo"
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
         TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
+        TEXTURE2D(_BumpMap); SAMPLER(sampler_BumpMap);
 
         CBUFFER_START(UnityPerMaterial)
             float4 _BaseMap_ST;
+            float _NormalStrength;
             half4 _CorBase, _CorSombra, _CorTraco, _CorTracoLuz, _CorLineArt;
             float _LimiteSombra, _SuavidadeSombra, _ForcaSombraProjetada, _InfluenciaLuz;
             float _IntensidadeTraco, _QuantidadeTraco, _LinhasPorMetro, _EspessuraTraco, _Tremido, _EscalaTremido;
@@ -77,7 +81,7 @@ Shader "Sertao/XiloCartoon Completo"
             #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float4 tangentOS : TANGENT; float2 uv : TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings
             {
                 float4 positionCS : SV_POSITION;
@@ -86,6 +90,7 @@ Shader "Sertao/XiloCartoon Completo"
                 float3 normalWS   : TEXCOORD2;
                 float2 uv         : TEXCOORD3;
                 float  fog        : TEXCOORD4;
+                float4 tangentWS  : TEXCOORD5;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -99,6 +104,7 @@ Shader "Sertao/XiloCartoon Completo"
                 o.positionWS = p.positionWS;
                 o.positionOS = v.positionOS.xyz;
                 o.normalWS = TransformObjectToWorldNormal(v.normalOS);
+                o.tangentWS = float4(TransformObjectToWorldDir(v.tangentOS.xyz), v.tangentOS.w * GetOddNegativeScale());
                 o.uv = TRANSFORM_TEX(v.uv, _BaseMap);
                 o.fog = ComputeFogFactor(p.positionCS.z);
                 return o;
@@ -106,7 +112,11 @@ Shader "Sertao/XiloCartoon Completo"
 
             half4 frag(Varyings i) : SV_Target
             {
-                float3 N = normalize(i.normalWS);
+                float3 geometryNormal = normalize(i.normalWS);
+                float3 tangent = normalize(i.tangentWS.xyz);
+                float3 bitangent = normalize(cross(geometryNormal, tangent)) * i.tangentWS.w;
+                float3 normalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, i.uv), _NormalStrength);
+                float3 N = normalize(tangent * normalTS.x + bitangent * normalTS.y + geometryNormal * normalTS.z);
                 float3 W = i.positionWS;
 
                 // ---------- cartoon ----------
@@ -121,7 +131,7 @@ Shader "Sertao/XiloCartoon Completo"
 
                 // ---------- xilogravura ----------
                 float3 p = lerp(W, i.positionOS, _TracoNoObjeto);
-                float3 n = abs(N);
+                float3 n = abs(geometryNormal);
                 float2 uv; float extra = 0.0;
                 if (n.y >= n.x && n.y >= n.z) { uv = p.xz; extra = 0.785398; }
                 else if (n.x >= n.z)          { uv = p.zy; }
@@ -152,7 +162,7 @@ Shader "Sertao/XiloCartoon Completo"
 
                 // ---------- contorno interno (bordas que viram de lado) ----------
                 float3 V = GetWorldSpaceNormalizeViewDir(W);
-                float ndv = saturate(dot(N, V));
+                float ndv = saturate(dot(geometryNormal, V));
                 float lim = _ContornoInterno * 0.5;
                 float rim = (1.0 - smoothstep(lim - 0.03, lim + 0.03, ndv)) * step(0.001, _ContornoInterno);
                 cor = lerp(cor, _CorLineArt.rgb, rim);

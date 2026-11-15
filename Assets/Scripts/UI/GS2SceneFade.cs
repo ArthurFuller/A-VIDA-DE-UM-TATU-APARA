@@ -16,6 +16,13 @@ public sealed class GS2SceneFade : MonoBehaviour
     {
         if (blackOverlay == null) blackOverlay = GetComponent<CanvasGroup>();
         if (blackOverlay == null) return;
+        // Na volta radial do pause, a transicao persistente ja cobre a tela.
+        if (PauseIrisTransition.ReturningToMenu)
+        {
+            blackOverlay.alpha = 0f;
+            blackOverlay.interactable = blackOverlay.blocksRaycasts = false;
+            return;
+        }
         blackOverlay.alpha = 1f;
         blackOverlay.interactable = false;
         blackOverlay.blocksRaycasts = true;

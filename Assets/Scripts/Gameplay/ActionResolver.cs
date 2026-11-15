@@ -901,6 +901,7 @@ public sealed class ActionResolver : MonoBehaviour
         }
         if (isReturn) returningHome.Add(worker);
         float duration = Mathf.Max(0.01f, Vector3.Distance(worker.transform.position, destination) / movementSpeed);
+        worker.FaceTowards(destination);
         Tween travel = worker.transform.DOMove(destination, duration).SetEase(Ease.Linear);
         if (braking) travel = DOTween.Sequence().AppendInterval(0.1f).Append(travel);
         movements[worker] = travel;
@@ -926,7 +927,11 @@ public sealed class ActionResolver : MonoBehaviour
         MoveAlongRoute(worker, new[] { outside }, () =>
         {
             void FinishExit() => MoveAlongRoute(worker, new[] { worker.HomePosition },
-                () => worker.SetStatus("em casa"), false);
+                () =>
+                {
+                    worker.RestoreHomeFacing();
+                    worker.SetStatus("em casa");
+                }, false);
             if (visual != null)
                 visual.DOScale(outdoorScale, 0.3f).SetEase(Ease.OutBack).OnComplete(FinishExit);
             else FinishExit();
@@ -938,11 +943,16 @@ public sealed class ActionResolver : MonoBehaviour
         if (worker == null) return;
         if (Vector3.Distance(worker.transform.position, worker.HomePosition) < 0.05f)
         {
+            worker.RestoreHomeFacing();
             worker.SetStatus("em casa");
             return;
         }
         worker.SetStatus("voltando para casa");
-        MoveWorker(worker, worker.HomePosition, () => worker.SetStatus("em casa"), false, true);
+        MoveWorker(worker, worker.HomePosition, () =>
+        {
+            worker.RestoreHomeFacing();
+            worker.SetStatus("em casa");
+        }, false, true);
     }
 
     private void MoveAndWork(WorkerAssignment worker, Vector3 destination, float workDuration, System.Action onFinished)
@@ -1185,6 +1195,7 @@ public sealed class ActionResolver : MonoBehaviour
         worker.SetStatus("voltando para casa");
         MoveAlongRoute(worker, new[] { fencePassage.position, worker.HomePosition }, () =>
         {
+            worker.RestoreHomeFacing();
             if (dayCycle.CurrentDay == returnDay) worker.SetStatus("em casa");
         }, false);
     }
@@ -1205,6 +1216,7 @@ public sealed class ActionResolver : MonoBehaviour
         foreach (Vector3 point in points)
         {
             float duration = Mathf.Max(0.01f, Vector3.Distance(from, point) / movementSpeed);
+            route.AppendCallback(() => worker.FaceTowards(point));
             route.Append(worker.transform.DOMove(point, duration).SetEase(Ease.Linear));
             from = point;
         }

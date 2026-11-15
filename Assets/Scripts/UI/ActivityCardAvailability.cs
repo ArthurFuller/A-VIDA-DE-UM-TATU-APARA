@@ -31,6 +31,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
     [SerializeField, Min(1f)] private float hoverScale = 1.08f;
     [SerializeField, Min(0f)] private float hoverDuration = 0.16f;
     [SerializeField, Min(0f)] private float hoverSpread = 22f;
+    [SerializeField, Min(0f)] private float dragShrinkTopInset = 100f;
     [SerializeField] private RectTransform descriptionPanel;
     [SerializeField] private Text descriptionText;
     [SerializeField, Min(0f)] private float descriptionGap = 12f;
@@ -43,6 +44,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
     private readonly List<ActivityCardDrag> deckOrder = new List<ActivityCardDrag>();
     private readonly List<ActivityCardDrag> testCards = new List<ActivityCardDrag>();
     private readonly List<ActivityKind> pendingRewards = new List<ActivityKind>();
+    private readonly List<ActivityCardDrag> pendingEntrances = new List<ActivityCardDrag>();
     private ActivityCardDrag hovered;
     private ActivityCardDrag dragging;
     private Tween shopPositionTween;
@@ -131,6 +133,16 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         pointerInside = false;
         ClearHover(true);
     }
+    public bool ClearHoverForDrag(ActivityCardDrag card, out Vector2 position,
+        out float scale, out Quaternion rotation)
+    {
+        int index = shown.IndexOf(card);
+        position = index >= 0 ? CardPosition(index) : Vector2.zero;
+        scale = normalScale;
+        rotation = index >= 0 ? Quaternion.Euler(0f, 0f, CardAngle(position.x)) : Quaternion.identity;
+        ClearHover(false);
+        return index >= 0;
+    }
     public void ClosePopupsForDrag()
     {
         if (timeline != null) timeline.ClosePanel();
@@ -154,6 +166,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         return null;
     }
     public RectTransform DragBoundary => (RectTransform)transform.parent;
+    public float DragShrinkTopInset => dragShrinkTopInset;
 
     private void OnEnable()
     {
@@ -166,6 +179,8 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
 #endif
         if (resources != null) resources.Changed += Refresh;
         if (merchant != null) merchant.AvailabilityChanged += Refresh;
+        if (merchant != null) merchant.Closed += ShowPendingEntrances;
+        if (activeMissionsPanel != null) activeMissionsPanel.Closed += ShowPendingEntrances;
         if (actions != null) actions.CardUsed += OnCardUsed;
         if (actions != null) actions.PendingSelectionChanged += SetSelectionLocked;
         if (dayCycle == null) dayCycle = FindFirstObjectByType<DayCycle>();
@@ -182,6 +197,8 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         if (!Application.isPlaying) return;
         if (resources != null) resources.Changed -= Refresh;
         if (merchant != null) merchant.AvailabilityChanged -= Refresh;
+        if (merchant != null) merchant.Closed -= ShowPendingEntrances;
+        if (activeMissionsPanel != null) activeMissionsPanel.Closed -= ShowPendingEntrances;
         if (actions != null) actions.CardUsed -= OnCardUsed;
         if (actions != null) actions.PendingSelectionChanged -= SetSelectionLocked;
         if (dayCycle != null) dayCycle.DayChanged -= OnDayChanged;
@@ -214,6 +231,8 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
     private void Update()
     {
         if (!Application.isPlaying || dragging != null || Time.timeScale == 0f) return;
+        for (int i = 0; i < shown.Count; i++)
+            if (shown[i] != null && shown[i].IsDragging) return;
         Vector2 size = ((RectTransform)transform.parent).rect.size;
         if (size != lastContainerSize)
         {
@@ -329,6 +348,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
     private void AnimateDayEntrance(bool returnSpent)
     {
         entranceSuspended = false;
+        pendingEntrances.Clear();
         if (returnSpent) AddPendingRewards();
         Refresh();
         if (!initialized || shown.Count == 0 && spent.Count == 0) return;
@@ -429,17 +449,37 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         {
             ActivityCardDrag card = returningCards[i];
             if (card == null) continue;
-            int index = shown.IndexOf(card);
-            RectTransform rect = (RectTransform)card.transform;
-            Vector2 target = CardPosition(index);
-            rect.DOKill();
-            rect.anchoredPosition = new Vector2(target.x, -rect.rect.height * normalScale - 80f);
-            rect.localScale = Vector3.one * normalScale * 0.85f;
-            rect.DOAnchorPos(target, 0.38f).SetDelay(i * 0.08f).SetEase(Ease.OutBack);
-            rect.DOScale(normalScale, 0.38f).SetDelay(i * 0.08f).SetEase(Ease.OutBack);
-            rect.DOLocalRotate(new Vector3(0f, 0f, CardAngle(target.x)), 0.38f)
-                .SetDelay(i * 0.08f);
+            AnimateCardIntoHand(card, i * 0.08f);
         }
+    }
+
+    private void ShowPendingEntrances()
+    {
+        if (entranceSuspended || merchant != null && merchant.IsOpen ||
+            activeMissionsPanel != null && activeMissionsPanel.IsOpen) return;
+        for (int i = 0; i < pendingEntrances.Count; i++)
+        {
+            ActivityCardDrag card = pendingEntrances[i];
+            if (card == null || !shown.Contains(card)) continue;
+            SetVisible(card, true);
+            AnimateCardIntoHand(card, i * 0.08f);
+        }
+        pendingEntrances.Clear();
+    }
+
+    private void AnimateCardIntoHand(ActivityCardDrag card, float delay)
+    {
+        int index = shown.IndexOf(card);
+        if (index < 0) return;
+        RectTransform rect = (RectTransform)card.transform;
+        Vector2 target = CardPosition(index);
+        rect.DOKill();
+        rect.anchoredPosition = new Vector2(target.x, -rect.rect.height * normalScale - 80f);
+        rect.localScale = Vector3.one * normalScale * 0.85f;
+        rect.DOAnchorPos(target, 0.38f).SetDelay(delay).SetEase(Ease.OutBack);
+        rect.DOScale(normalScale, 0.38f).SetDelay(delay).SetEase(Ease.OutBack);
+        rect.DOLocalRotate(new Vector3(0f, 0f, CardAngle(target.x)), 0.38f)
+            .SetDelay(delay);
     }
 
     private int CountCards(ActivityKind kind)
@@ -543,16 +583,14 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         if (arrange)
         {
             Layout(true, true);
-            int index = shown.IndexOf(card);
-            RectTransform rect = (RectTransform)card.transform;
-            Vector2 target = CardPosition(index);
-            rect.DOKill();
-            rect.anchoredPosition = new Vector2(target.x,
-                -rect.rect.height * normalScale - 80f);
-            rect.localScale = Vector3.one * normalScale * 0.85f;
-            rect.DOAnchorPos(target, 0.38f).SetEase(Ease.OutBack);
-            rect.DOScale(normalScale, 0.38f).SetEase(Ease.OutBack);
-            rect.DOLocalRotate(new Vector3(0f, 0f, CardAngle(target.x)), 0.38f);
+            if ((card.Kind == ActivityKind.BuildFence || card.Kind == ActivityKind.BuildHouse) &&
+                (merchant != null && merchant.IsOpen ||
+                 activeMissionsPanel != null && activeMissionsPanel.IsOpen))
+            {
+                SetVisible(card, false);
+                pendingEntrances.Add(card);
+            }
+            else AnimateCardIntoHand(card, 0f);
         }
         return true;
     }
@@ -700,7 +738,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         float nearest = float.MaxValue;
         for (int i = 0; i < shown.Count; i++)
         {
-            if (shown[i].IsReturning) continue;
+            if (shown[i].IsReturning || shown[i].IsDragging) continue;
             if (!ContainsCard(i, screenPoint, eventCamera)) continue;
             float distance = Mathf.Abs(x - CardPosition(i).x);
             if (distance >= nearest) continue;
@@ -758,7 +796,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
 
     private void SetHover(ActivityCardDrag card)
     {
-        if (selectionLocked) return;
+        if (selectionLocked || card != null && (card.IsDragging || card.IsReturning)) return;
         if (card == hovered) return;
         ClearHover(false);
         hovered = card;
@@ -811,7 +849,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
     {
         for (int i = 0; i < shown.Count; i++)
         {
-            if (i == selected) continue;
+            if (i == selected || shown[i].IsReturning || shown[i].IsDragging) continue;
             RectTransform rect = shown[i].GetComponent<RectTransform>();
             float offset = apart ? Mathf.Sign(i - selected) * hoverSpread : 0f;
             Vector2 baseline = CardPosition(i);
@@ -844,10 +882,9 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
 
     public void OnBeginDrag(PointerEventData eventData)
     {
-        if (selectionLocked) return;
+        if (eventData.button != PointerEventData.InputButton.Left || selectionLocked) return;
         ActivityCardDrag card = CardAt(eventData.pressPosition, eventData.pressEventCamera);
         if (card == null || testCards.Contains(card) || !card.HasEffect) return;
-        ClearHover(true);
         dragging = card;
         dragging.OnBeginDrag(eventData);
     }

@@ -26,6 +26,7 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
     [SerializeField] private Button deliverButton;
     [SerializeField] private Button nextButton;
     [SerializeField] private ActiveMissionsPanel activePanel;
+    [SerializeField] private ShopTabs shopTabs;
     [Header("Comunidade")]
     [SerializeField] private ActivityCardAvailability hand;
     [SerializeField, Min(1)] private int deliveriesPerHouse = 2;
@@ -80,6 +81,13 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
     }
 
     public void Next()
+    {
+        if (missions.Count == 0) return;
+        if (shopTabs != null && shopTabs.AnimateOrderChange(AdvanceOrder)) return;
+        AdvanceOrder();
+    }
+
+    private void AdvanceOrder()
     {
         if (missions.Count == 0) return;
         selectedIndex = (selectedIndex + 1) % missions.Count;

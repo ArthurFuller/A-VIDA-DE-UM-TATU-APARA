@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 using System.Collections.Generic;
 
 public enum SertaoEventKind { None, Drought, Pests, Rain, Comadre, Calm, HeadOfCuia, Reforestation }
@@ -55,8 +56,9 @@ public sealed class DayEventController : MonoBehaviour
     [SerializeField, Min(1)] private int eventDurationDays = 2;
     [SerializeField, Min(0)] private int droughtFishingReduction = 1;
     [SerializeField, Min(0)] private int pestHarvestReduction = 1;
-    [Header("Pragas na macaxeira")]
-    [SerializeField, Min(0)] private int cassavaRegressionWithoutProtection;
+    [Header("Pragas")]
+    [FormerlySerializedAs("cassavaRegressionWithoutProtection")]
+    [SerializeField, Min(0)] private int pestGrowthRegression = 2;
     [SerializeField, Min(0)] private int droughtGrowthDelay = 1;
     [SerializeField, Min(0)] private int rainGrowthBonus = 1;
     [SerializeField, Min(1)] private int forestExploitationThreshold = 6;
@@ -78,6 +80,7 @@ public sealed class DayEventController : MonoBehaviour
     private int lastWoodCollectionDay = 1;
     private int lastReforestationDay = -100;
     private int pendingWoodReward;
+    private bool pestRegressionPending;
     private CropType pestTarget = CropType.None;
     public bool IsRaining => IsActive(SertaoEventKind.Rain);
     public bool IsDrought => IsActive(SertaoEventKind.Drought);
@@ -147,6 +150,7 @@ public sealed class DayEventController : MonoBehaviour
     {
         currentDay = day;
         stolenFishToday = 0;
+        pestRegressionPending = false;
         for (int i = activeGeneralEvents.Count - 1; i >= 0; i--)
             if (--activeGeneralEvents[i].DaysRemaining <= 0) activeGeneralEvents.RemoveAt(i);
         for (int i = activeComadre.Count - 1; i >= 0; i--)
@@ -206,7 +210,7 @@ public sealed class DayEventController : MonoBehaviour
                 if (announced == SertaoEventKind.Pests)
                 {
                     pestTarget = SelectAffectedCrop();
-                    ApplyPestRegression();
+                    pestRegressionPending = true;
                 }
                 activeGeneralEvents.Add(new ActiveGeneral
                 {
@@ -261,16 +265,22 @@ public sealed class DayEventController : MonoBehaviour
         }
     }
 
-    private void ApplyPestRegression()
+    public void ApplyPendingPestRegression(SeedCatalog catalog)
     {
-        if (pestTarget != CropType.Pumpkin || plots == null) return;
+        if (!pestRegressionPending) return;
+        pestRegressionPending = false;
+        ApplyPestRegression(catalog);
+    }
+
+    private void ApplyPestRegression(SeedCatalog catalog)
+    {
+        if (pestTarget == CropType.None || plots == null || catalog == null) return;
         foreach (Plot plot in plots)
         {
-            if (plot == null || plot.Crop != CropType.Pumpkin) continue;
+            if (plot == null || plot.Crop != pestTarget) continue;
             if (MandalaSynergy.Instance != null &&
                 MandalaSynergy.Instance.ProtectsFromPests(plot)) continue;
-            if (cassavaRegressionWithoutProtection > 0)
-                plot.AdvanceGrowth(-cassavaRegressionWithoutProtection);
+            plot.RegressGrowthFromPests(pestGrowthRegression, currentDay, catalog);
         }
     }
 

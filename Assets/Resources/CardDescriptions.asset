@@ -378,8 +378,9 @@ MonoBehaviour:
   - key: E:Pests
     title: Pragas
     art: {fileID: 0}
-    text: "As pragas destruiram parte das planta\xE7\xF5es\n\nRegride uma etapa do
-      crescimento das plantas\n\nDura\xE7\xE3o: 2 dias"
+    text: "As pragas destru\xEDram parte das planta\xE7\xF5es\n\nA cultura afetada
+      regride no crescimento, inclusive as plantas prontas.\n\nDura\xE7\xE3o:
+      2 dias"
     boxSize: {x: 390, y: 220}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 0, y: 0}

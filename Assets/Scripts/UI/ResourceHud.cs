@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,19 +35,20 @@ public sealed class ResourceHud : MonoBehaviour
     [SerializeField] private Sprite coinSprite;
     [SerializeField] private Sprite milkSprite;
     [SerializeField] private Sprite eggSprite;
-    [SerializeField, Min(0.1f)] private float flightDuration = 0.55f;
-    [SerializeField, Min(0f), Tooltip("Intervalo mínimo entre a chegada de dois recursos.")]
-    private float iconInterval = 0.22f;
+    [SerializeField, Min(0.1f), Tooltip("Duração da viagem de cada ícone até seu contador (segundos).")]
+    private float flightDuration = 0.38f;
+    [SerializeField, Min(0f), Tooltip("Intervalo mínimo entre chegadas de ícones do mesmo recurso (segundos). A animação do contador pode aumentar esse mínimo.")]
+    private float iconInterval = 0.14f;
     [Header("Feedback do contador")]
     [SerializeField, Min(1f)] private float counterPulseScale = 1.08f;
-    [SerializeField, Min(0.05f)] private float counterPulseDuration = 0.18f;
-    [SerializeField, Min(0.05f)] private float counterFlashDuration = 0.17f;
+    [SerializeField, Min(0.05f)] private float counterPulseDuration = 0.12f;
+    [SerializeField, Min(0.05f)] private float counterFlashDuration = 0.11f;
 
     private readonly int[] inFlight = new int[9];
+    // One arrival timeline per resource prevents overlapping gains from swallowing counter pulses.
+    private readonly float[] lastScheduledArrival = new float[9];
     private Canvas canvas;
     private RectTransform canvasRect;
-    private Texture2D circleTexture;
-    private Sprite circleSprite;
     private readonly int[] displayed = new int[9];
     private readonly Tween[] counterTweens = new Tween[9];
     private readonly Tween[] counterPulses = new Tween[9];
@@ -76,7 +77,20 @@ public sealed class ResourceHud : MonoBehaviour
     private Camera UiCamera => canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
         ? canvas.worldCamera : null;
     private float ArrivalInterval => Mathf.Max(iconInterval,
-        counterPulseDuration, counterFlashDuration) + 0.02f;
+        counterPulseDuration, counterFlashDuration) + 0.01f;
+
+    // Shared final-flight scheduler for regular gains and staged wood/fish drops.
+    // Returns how long this icon waits BEFORE starting its trip to the counter.
+    private float FlightWait(ResourceKind kind, float earliestDeparture)
+    {
+        int index = (int)kind;
+        float now = Time.time;
+        float travel = Mathf.Max(0.1f, flightDuration);
+        float arrival = Mathf.Max(now + earliestDeparture + travel,
+            lastScheduledArrival[index] + ArrivalInterval);
+        lastScheduledArrival[index] = arrival;
+        return Mathf.Max(earliestDeparture, arrival - now - travel);
+    }
 
     private void Awake()
     {
@@ -88,6 +102,7 @@ public sealed class ResourceHud : MonoBehaviour
 
     private void OnEnable()
     {
+        System.Array.Clear(lastScheduledArrival, 0, lastScheduledArrival.Length);
         counterHover = GetComponent<ResourceCounterHover>();
         Shader flashShader = Resources.Load<Shader>("ResourceIconFlash");
         for (int i = 0; i < displayed.Length; i++)
@@ -151,12 +166,6 @@ public sealed class ResourceHud : MonoBehaviour
         System.Array.Clear(inFlight, 0, inFlight.Length);
     }
 
-    private void OnDestroy()
-    {
-        if (circleSprite != null) Destroy(circleSprite);
-        if (circleTexture != null) Destroy(circleTexture);
-    }
-
     public void FlyFromWorld(ResourceKind kind, int amount, Vector3 origin,
         float pauseSeconds = 0f, System.Action onAllArrived = null)
     {
@@ -199,7 +208,8 @@ public sealed class ResourceHud : MonoBehaviour
         rect.anchoredPosition = origin;
         rect.localScale = Vector3.zero;
         Image image = icon.GetComponent<Image>();
-        image.sprite = SpriteFor(batch.Kind) ?? CircleSprite();
+        image.sprite = SpriteFor(batch.Kind);
+        image.enabled = image.sprite != null;
         image.preserveAspect = true;
         image.raycastTarget = false;
         batch.Icons.Add(rect);
@@ -232,6 +242,9 @@ public sealed class ResourceHud : MonoBehaviour
         }
         int pending = batch.Icons.Count;
         inFlight[(int)batch.Kind] += pending;
+        // Do not let a ResourceBank notification count these units before their icons land.
+        counterTweens[(int)batch.Kind]?.Kill();
+        counterTweens[(int)batch.Kind] = null;
         Refresh();
         topBar?.RevealForResources();
         for (int i = 0; i < batch.Icons.Count; i++)
@@ -245,7 +258,7 @@ public sealed class ResourceHud : MonoBehaviour
             }
             rect.DOKill();
             Sequence flight = DOTween.Sequence().SetId(this);
-            flight.AppendInterval(i * ArrivalInterval);
+            flight.AppendInterval(FlightWait(batch.Kind, 0f));
             flight.Append(FollowCounter(rect, target));
             flight.Join(rect.DOScale(0.4f, flightDuration).SetEase(Ease.InQuad));
             flight.OnComplete(() =>
@@ -283,7 +296,7 @@ public sealed class ResourceHud : MonoBehaviour
         int pending = count;
         for (int i = 0; i < count; i++)
             CreateIcon(kind, i, count, origin, target,
-                1, pauseSeconds, () =>
+                pauseSeconds, () =>
                 {
                     if (--pending == 0) onAllArrived?.Invoke();
                 });
@@ -311,8 +324,7 @@ public sealed class ResourceHud : MonoBehaviour
     }
 
     private void CreateIcon(ResourceKind kind, int index, int count, Vector2 origin,
-        Text target, int credited, float pauseSeconds,
-        System.Action onArrived)
+        Text target, float pauseSeconds, System.Action onArrived)
     {
         var icon = new GameObject("Recurso em voo - " + kind, typeof(RectTransform),
             typeof(CanvasRenderer), typeof(Image));
@@ -326,24 +338,22 @@ public sealed class ResourceHud : MonoBehaviour
         rect.anchoredPosition = origin + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
         rect.localScale = Vector3.zero;
         Image image = icon.GetComponent<Image>();
-        image.sprite = SpriteFor(kind) ?? CircleSprite();
-        image.color = kind == ResourceKind.Coins ? new Color(1f, 0.74f, 0.16f) :
-            kind == ResourceKind.Milk ? new Color(0.83f, 0.95f, 1f) : Color.white;
+        image.sprite = SpriteFor(kind);
+        image.enabled = image.sprite != null;
+        image.color = Color.white; // Do not override the sprite colors selected in ResourceHud.
         image.preserveAspect = true;
         image.raycastTarget = false;
+
+        const float appearDuration = 0.12f;
+        float flightWait = FlightWait(kind, appearDuration + Mathf.Max(0f, pauseSeconds));
         Sequence flight = DOTween.Sequence().SetId(this);
-        if (kind == ResourceKind.Coins)
-            flight.Append(rect.DOScale(1f, 0.15f).SetEase(Ease.OutBack))
-                .AppendInterval(0.08f + index * ArrivalInterval);
-        else
-            flight.AppendInterval(index * ArrivalInterval)
-                .Append(rect.DOScale(1f, 0.15f).SetEase(Ease.OutBack));
-        if (pauseSeconds > 0f) flight.AppendInterval(pauseSeconds);
+        flight.Append(rect.DOScale(1f, appearDuration).SetEase(Ease.OutBack));
+        flight.AppendInterval(Mathf.Max(0f, flightWait - appearDuration));
         flight.Append(FollowCounter(rect, target))
-            .Join(rect.DOScale(0.45f, flightDuration).SetEase(Ease.InQuad))
+            .Join(rect.DOScale(0.4f, flightDuration).SetEase(Ease.InQuad))
             .OnComplete(() =>
             {
-                CreditArrival(kind, credited);
+                CreditArrival(kind, 1);
                 onArrived?.Invoke();
             })
             .OnKill(() => { if (icon != null) Destroy(icon); });
@@ -364,27 +374,9 @@ public sealed class ResourceHud : MonoBehaviour
             ResourceKind.Eggs => eggSprite,
             _ => null
         };
-        if (selected != null) return selected;
-        return (counterHover?.IconFor(kind) as Image)?.sprite;
-    }
-
-    private Sprite CircleSprite()
-    {
-        if (circleSprite != null) return circleSprite;
-        circleTexture = new Texture2D(32, 32, TextureFormat.RGBA32, false);
-        circleTexture.filterMode = FilterMode.Bilinear;
-        var pixels = new Color[1024];
-        for (int y = 0; y < 32; y++)
-            for (int x = 0; x < 32; x++)
-            {
-                float distance = Vector2.Distance(new Vector2(x, y), new Vector2(15.5f, 15.5f));
-                pixels[y * 32 + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(16f - distance));
-            }
-        circleTexture.SetPixels(pixels);
-        circleTexture.Apply();
-        circleSprite = Sprite.Create(circleTexture, new Rect(0, 0, 32, 32),
-            new Vector2(0.5f, 0.5f), 32f);
-        return circleSprite;
+        if (selected == null)
+            Debug.LogWarning("Ícone em voo não configurado no ResourceHud: " + kind, this);
+        return selected;
     }
 
     private Text TargetFor(ResourceKind kind) => kind switch
@@ -484,6 +476,7 @@ public sealed class ResourceHud : MonoBehaviour
             Material material = iconFlashMaterials[index];
             if (material != null)
             {
+                material.SetFloat(FlashId, 0f);
                 material.SetColor(FlashColorId, flash);
                 material.SetFloat(FlashId, 0f);
                 pulse.Insert(0f, DOTween.To(() => material.GetFloat(FlashId),

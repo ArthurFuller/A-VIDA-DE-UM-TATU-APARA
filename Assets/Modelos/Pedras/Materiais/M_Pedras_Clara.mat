@@ -29,7 +29,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 4fb97bf9e44eac348a211c803dbd8c70, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DetailAlbedoMap:
@@ -91,7 +91,7 @@ Material:
     - _BumpScale: 1
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
-    - _ContornoInterno: 0.726
+    - _ContornoInterno: 0.655
     - _Cull: 2
     - _Curvatura: 0
     - _Cutoff: 0.5
@@ -101,21 +101,22 @@ Material:
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
     - _EscalaTremido: 0.1
-    - _EscalaVariacao: 3.68
-    - _EspessuraLineArt: 0.9
+    - _EscalaVariacao: 0.05
+    - _EspessuraLineArt: 0
     - _EspessuraTraco: 0.5
     - _Falhas: 0.23
-    - _FecharQuinas: 1
-    - _ForcaSombraProjetada: 1
+    - _FecharQuinas: 0.536
+    - _ForcaSombraProjetada: 0.801
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _InfluenciaLuz: 0.3
+    - _InfluenciaLuz: 0.229
     - _IntensidadeTraco: 1
     - _IntensidadeTracoLuz: 0
-    - _LimiteSombra: 0.52
-    - _LinhasPorMetro: 44
+    - _LimiteSombra: 0.605
+    - _LinhasPorMetro: 27
     - _Metallic: 0
+    - _NormalStrength: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QuantidadeTraco: 1
@@ -126,12 +127,12 @@ Material:
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
-    - _SuavidadeSombra: 0.03
+    - _SuavidadeSombra: 0.332
     - _Surface: 0
     - _TamanhoCurva: 1
     - _TracoNoObjeto: 0
     - _Tremido: 0.3
-    - _VariacaoLineArt: 0.229
+    - _VariacaoLineArt: 1
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
