@@ -75,11 +75,7 @@ MonoBehaviour:
   - key: A:PlantCorn
     title: Plantar Milho
     art: {fileID: 21300000, guid: 4a11058d49e5a9549b2d18ea93036c72, type: 3}
-    text: "Plante em terreno arado\n\nCrescimento: 1 dia\n\nRendimento: 2 unidades
-      por colheita\n\nValor: 4 moedas\n\nQuando crescer, far\xE1 sombra nas planta\xE7\xF5es
-      adjacentes que crescer\xE3o mais, al\xE9m de produzirem +2 plantas por colheita\n\nAnimais
-      se alimentam do milho adjacente, fazendo com que a produ\xE7\xE3o dos animais
-      seja +1 \n"
+    text: "Plante em terreno arado.\n\nCresce em 1 dia e rende 2 milhos por terreno.\n\nMilho maduro acelera a macaxeira e o jerimum vizinhos em 1 etapa por dia e dá +1 à colheita deles. Animais vizinhos produzem +1."
     boxSize: {x: 240, y: 296.54}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 215.64}
@@ -93,10 +89,7 @@ MonoBehaviour:
   - key: A:PlantPumpkin
     title: Plantar Macaxeira
     art: {fileID: 21300000, guid: 38b7d34e0211c1d49a846fc7cca19f3b, type: 3}
-    text: "Plante em terreno arado. \n\nCrescimento: 1 dia \n\nRendimento: 7 unidades
-      por colheita\n \nValor: 1 moeda \n\nB\xF4nus:\n\n- Milho maduro ao lado: +1
-      etapa de crescimento por dia e +2 na colheita.\n- Galinha ao lado: sem pragas.\n-
-      Po\xE7o ao lado: sem seca."
+    text: "Plante em terreno arado.\n\nCresce em 2 dias e rende 3 macaxeiras por terreno.\n\nMilho maduro ao lado acelera o crescimento e dá +1 à colheita. Galinha protege contra pragas, e poço protege contra seca."
     boxSize: {x: 186.4, y: 204.1}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 204.1}
@@ -124,7 +117,7 @@ MonoBehaviour:
   - key: A:PrepareFood
     title: PrepareFood
     art: {fileID: 21300000, guid: aee19f07feebf9d4eb91a871e1e2cb09, type: 3}
-    text: "Utilize os recursos coletados para preparar refei\xE7\xF5es mais nutritivas"
+    text: "Use 2 ou 3 ingredientes para cozinhar. Três ingredientes de dois tipos rendem 2 porções. As outras combinações rendem 1."
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
@@ -226,8 +219,7 @@ MonoBehaviour:
   - key: A:FoodPlus
     title: Comida+
     art: {fileID: 21300000, guid: 4b66664cd7add734186fdff7ce38e2d0, type: 3}
-    text: "Utilize os recursos coletados com mais cautela para preparar uma quantidade
-      maior de refei\xE7\xF5es"
+    text: "Prepare uma porção a mais com os mesmos ingredientes."
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
@@ -255,7 +247,7 @@ MonoBehaviour:
   - key: A:Fertilizer
     title: Adubo
     art: {fileID: 21300000, guid: 57582edae713d1d439866339ce37cb9e, type: 3}
-    text: "Aumenta a produ\xE7\xE3o da planta\xE7\xE3o escolhida durante a colheita"
+    text: "Aumenta em 1 unidade a próxima colheita do terreno adubado."
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
@@ -297,10 +289,7 @@ MonoBehaviour:
   - key: A:PlantJerimum
     title: Plantar Jerimum
     art: {fileID: 21300000, guid: 42e3ac39a1266e944be8cd384e8cecf3, type: 3}
-    text: "Plante em terreno arado. \n\nCrescimento: 3 dias\n\nRendimento: 5 unidades
-      por colheita\n\nValor: 3 moedas\n\nB\xF4nus:\n\n- Milho maduro ao lado: +1
-      etapa de crescimento por dia e +2 na colheita.\n- Galinha ao lado: sem pragas.\n-
-      Po\xE7o ao lado: sem seca."
+    text: "Plante em terreno arado.\n\nCresce em 3 dias e rende 4 jerimuns por terreno. Deixe mais um dia para colher 1 a mais.\n\nMilho maduro ao lado acelera o crescimento e dá +1 à colheita. Galinha protege contra pragas, e poço protege contra seca."
     boxSize: {x: 240, y: 245.1}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 204.1}

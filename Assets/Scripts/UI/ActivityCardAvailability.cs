@@ -74,6 +74,17 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
     public int FreeSlots => Mathf.Max(0, maxHandCards - shown.Count - spent.Count -
         pendingRewards.Count + testCards.Count);
     public bool ContainsCard(ActivityCardDrag card) => shown.Contains(card);
+    public int CountOwnedCards(ActivityKind kind)
+    {
+        int count = 0;
+        foreach (ActivityCardDrag card in shown)
+            if (card != null && card.Kind == kind) count++;
+        foreach (ActivityCardDrag card in spent)
+            if (card != null && card.Kind == kind) count++;
+        foreach (ActivityKind reward in pendingRewards)
+            if (reward == kind) count++;
+        return count;
+    }
     public bool IsSelectionLocked => selectionLocked;
     public void SetFollowingWorker(bool following)
     {
@@ -453,18 +464,34 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         }
     }
 
+    private bool WaitForCardEntrance(ActivityKind kind)
+    {
+        if (kind != ActivityKind.BuildFence && kind != ActivityKind.BuildHouse) return false;
+        if (merchant != null && merchant.IsOpen) return true;
+        return kind == ActivityKind.BuildFence && activeMissionsPanel != null && activeMissionsPanel.IsOpen;
+    }
+
     private void ShowPendingEntrances()
     {
-        if (entranceSuspended || merchant != null && merchant.IsOpen ||
-            activeMissionsPanel != null && activeMissionsPanel.IsOpen) return;
-        for (int i = 0; i < pendingEntrances.Count; i++)
+        if (entranceSuspended) return;
+        int entering = 0;
+        for (int i = 0; i < pendingEntrances.Count;)
         {
             ActivityCardDrag card = pendingEntrances[i];
-            if (card == null || !shown.Contains(card)) continue;
+            if (card == null || !shown.Contains(card))
+            {
+                pendingEntrances.RemoveAt(i);
+                continue;
+            }
+            if (WaitForCardEntrance(card.Kind))
+            {
+                i++;
+                continue;
+            }
+            pendingEntrances.RemoveAt(i);
             SetVisible(card, true);
-            AnimateCardIntoHand(card, i * 0.08f);
+            AnimateCardIntoHand(card, entering++ * 0.08f);
         }
-        pendingEntrances.Clear();
     }
 
     private void AnimateCardIntoHand(ActivityCardDrag card, float delay)
@@ -583,9 +610,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         if (arrange)
         {
             Layout(true, true);
-            if ((card.Kind == ActivityKind.BuildFence || card.Kind == ActivityKind.BuildHouse) &&
-                (merchant != null && merchant.IsOpen ||
-                 activeMissionsPanel != null && activeMissionsPanel.IsOpen))
+            if (WaitForCardEntrance(card.Kind))
             {
                 SetVisible(card, false);
                 pendingEntrances.Add(card);

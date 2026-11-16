@@ -16,6 +16,11 @@ public sealed class DeliveryMissionTemplate
     [TextArea(2, 5)] public string description;
     public List<DeliveryRequirement> requirements = new();
     [Min(0)] public int coinReward;
+    [Min(1)] public int availableFromDay = 1;
+    [Min(0), Tooltip("Dias adicionais para a entrega a partir da oferta.")]
+    public int deliveryDays = 2;
+    [Tooltip("Disputa a vaga de encomenda grande do dia depois de ser liberada.")]
+    public bool largeOrder;
 }
 
 public sealed class DeliveryMissionCatalog : ScriptableObject
@@ -27,11 +32,15 @@ public sealed class DeliveryMissionCatalog : ScriptableObject
         if (template == null || string.IsNullOrWhiteSpace(template.title) ||
             template.coinReward < 0 || template.requirements == null ||
             template.requirements.Count == 0) return false;
+        long totalUnits = 0;
         foreach (DeliveryRequirement requirement in template.requirements)
+        {
             if (requirement == null || requirement.quantity < 1 ||
                 (int)requirement.item < 0 || (int)requirement.item > (int)SaleItem.Eggs)
                 return false;
-        return true;
+            totalUnits += requirement.quantity;
+        }
+        return totalUnits >= 2;
     }
 
     public static string ItemName(SaleItem item) => item switch

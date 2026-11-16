@@ -37,7 +37,7 @@ public sealed class ShopTabs : MonoBehaviour
     [Header("Ritmo geral da mercearia")]
     [SerializeField, Range(0.5f, 4f),
         Tooltip("Multiplica a velocidade de TODAS as animacoes internas. 1 = tempos individuais normais; 2 = duas vezes mais rapido. Nao altera os valores individuais.")]
-    private float overallAnimationSpeed = 2.2f;
+    private float overallAnimationSpeed = 1.4f;
     [SerializeField, Min(0.05f),
         Tooltip("Tempo maximo, em segundos reais, entre o inicio da primeira e da ultima linha da lista. Evita que Vender demore demais por ter muitos itens.")]
     private float maxRowWaveSpan = 0.52f;
@@ -67,7 +67,7 @@ public sealed class ShopTabs : MonoBehaviour
 
     private float Fast(float duration) =>
         Mathf.Max(0f, duration) / Mathf.Max(0.5f,
-            overallAnimationSpeed > 0f ? overallAnimationSpeed : 2.2f);
+            overallAnimationSpeed > 0f ? overallAnimationSpeed : 1.4f);
 
     private void OnEnable()
     {
@@ -164,7 +164,7 @@ public sealed class ShopTabs : MonoBehaviour
         float enterX = OffsetOutside(details, OutsideEdge.Left).x;
         orderSequence = DOTween.Sequence().SetUpdate(true).SetTarget(this);
         orderSequence.Append(details.DOAnchorPosX(home.x + exitX, Fast(orderSwapDuration))
-            .SetEase(Ease.InCubic));
+            .SetEase(Ease.InOutSine));
         orderSequence.AppendCallback(() =>
         {
             // O conteudo e atualizado depois da saida, nunca na frente do jogador.
@@ -174,7 +174,7 @@ public sealed class ShopTabs : MonoBehaviour
                 details.anchoredPosition = home + new Vector2(enterX, 0f);
         });
         orderSequence.Append(details.DOAnchorPos(home, Fast(orderSwapDuration * 1.4f))
-            .SetEase(Ease.OutBack, 1.12f));
+            .SetEase(Ease.OutCubic));
         orderSequence.OnComplete(() =>
         {
             if (details != null) details.anchoredPosition = home;
@@ -306,7 +306,7 @@ public sealed class ShopTabs : MonoBehaviour
         Vector2 home = Home(element);
         element.anchoredPosition = home + OffsetOutside(element, edge);
         sequence.Insert(start, element.DOAnchorPos(home, duration)
-            .SetEase(Ease.OutBack, 1.11f));
+            .SetEase(Ease.OutCubic));
     }
 
     private void MoveOutside(RectTransform[] elements, OutsideEdge edge)

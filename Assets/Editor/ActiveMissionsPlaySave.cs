@@ -1,239 +1,428 @@
-// Temporario: para retirar o salvamento automatico no fim do projeto,
-// basta excluir este arquivo (e seu .meta) de Assets/Editor.
-// Nunca e compilado para as builds do jogo.
+// Temporário: remova este arquivo e o seu .meta para desligar o salvamento em Play Mode.
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using Object = UnityEngine.Object;
 
 [InitializeOnLoad]
-public static class ActiveMissionsPlaySave
+internal static class ActiveMissionsPlaySave
 {
     [Serializable]
-    private sealed class Settings
+    private sealed class State
     {
         public string scenePath;
-        public string hierarchyPath;
-        public float[] floats;
-        public Vector2[] vectors;
-        public string[] spriteIds;
-        public bool changed;
+        public List<Setting> settings = new();
     }
 
-    private const string Key = "Sertao.ActiveMissions.PlaySettings.v1";
-    private static double nextCaptureTime;
+    [Serializable]
+    private sealed class Setting
+    {
+        public string target;
+        public string path;
+        public string value;
+    }
 
-    // Apenas os ajustes visuais, nunca o estado de missoes ou os RectTransforms
-    // animados em runtime. Isso impede salvar estados temporarios do gameplay.
-    private static readonly string[] FloatFields =
+    private const string BaselineKey = "Sertao.MissionFormatting.Baseline";
+    private const string PendingKey = "Sertao.MissionFormatting.Pending";
+    private static readonly CultureInfo NumberFormat = CultureInfo.InvariantCulture;
+
+    private static readonly string[] PanelFields =
     {
         "firstCardTopPadding", "cardSpacing", "cardHeight", "listBottomPadding",
-        "iconToTextGap", "quantityRightMargin", "animationDuration", "hiddenOffset",
-        "cardDropDuration", "cardWaveInterval", "cardDropDistance"
+        "animationDuration", "hiddenOffset", "cardDropDuration", "cardWaveInterval", "cardDropDistance",
+        "previewFirst", "previewSecond", "previewThird", "iconProfiles"
     };
-
-    private static readonly string[] VectorFields =
+    private static readonly string[] OrderFields = { "previewLeft", "previewRight", "previewThird", "icons" };
+    private static readonly string[] GridFields = { "m_CellSize", "m_Spacing", "m_Padding", "m_ChildAlignment" };
+    private static readonly string[] TextFields = { "m_FontData", "m_Color", "m_Material" };
+    private static readonly string[] ImageFields =
     {
-        "itemIconSize", "itemIconPosition"
+        "m_Color", "m_Material", "m_Type", "m_PreserveAspect", "m_FillCenter", "m_FillMethod",
+        "m_FillAmount", "m_FillClockwise", "m_FillOrigin", "m_UseSpriteMesh", "m_PixelsPerUnitMultiplier"
     };
+    private static readonly string[] RectFields =
+    {
+        "m_AnchorMin", "m_AnchorMax", "m_Pivot", "m_SizeDelta", "m_AnchoredPosition",
+        "m_LocalScale", "m_LocalRotation"
+    };
+    private static readonly string[] ProfileRectFields =
+    {
+        "m_AnchorMin", "m_AnchorMax", "m_Pivot", "m_LocalScale", "m_LocalRotation"
+    };
+    private static readonly string[] ActiveLabels =
+    {
+        "description", "quantityText", "secondQuantityText", "thirdQuantityText", "rewardText", "deadlineText", "deliverLabel"
+    };
+    private static readonly string[] OrderLabels = { "title", "description", "deadline", "rewardAmount", "community" };
 
     static ActiveMissionsPlaySave()
     {
-        EditorApplication.playModeStateChanged += OnPlayModeChanged;
-        EditorApplication.update += EditorUpdate;
+        EditorApplication.playModeStateChanged += PlayModeChanged;
+        Undo.postprocessModifications += FormattingEdited;
+        Undo.undoRedoPerformed += RefreshAfterUndoRedo;
+        EditorSceneManager.sceneOpened += (_, _) => ApplyPending();
+        EditorApplication.delayCall += ApplyPending;
     }
 
-    private static void OnPlayModeChanged(PlayModeStateChange state)
+    private static void PlayModeChanged(PlayModeStateChange state)
     {
-        if (state == PlayModeStateChange.ExitingEditMode)
+        switch (state)
         {
-            SessionState.EraseString(Key);
-            ActiveMissionsPanel panel = FindPanel(SceneManager.GetActiveScene().path, null);
-            Settings initial = Capture(panel);
-            if (initial != null)
-                SessionState.SetString(Key, JsonUtility.ToJson(initial));
-        }
-        else if (state == PlayModeStateChange.ExitingPlayMode)
-        {
-            Settings previous = Read();
-            if (previous == null || previous.changed) return;
-            ActiveMissionsPanel panel = FindPanel(previous.scenePath, previous.hierarchyPath);
-            Settings current = Capture(panel);
-            if (current == null) return;
-            current.changed = Different(previous, current);
-            SessionState.SetString(Key, JsonUtility.ToJson(current));
-        }
-        else if (state == PlayModeStateChange.EnteredEditMode)
-        {
-            EditorApplication.delayCall -= ApplyPending;
-            EditorApplication.delayCall += ApplyPending;
+            case PlayModeStateChange.ExitingEditMode:
+                ApplyPending();
+                Scene scene = SceneManager.GetActiveScene();
+                if (string.IsNullOrEmpty(scene.path)) return;
+                var baseline = new State { scenePath = scene.path };
+                Capture(baseline);
+                SessionState.SetString(BaselineKey, JsonUtility.ToJson(baseline));
+                break;
+            case PlayModeStateChange.ExitingPlayMode:
+                Undo.FlushUndoRecordObjects();
+                State original = Read(BaselineKey);
+                if (original == null) return;
+                var current = new State { scenePath = original.scenePath };
+                Capture(current);
+                var oldValues = new Dictionary<(string, string), string>();
+                foreach (Setting setting in original.settings)
+                    oldValues[(setting.target, setting.path)] = setting.value;
+                current.settings.RemoveAll(setting =>
+                    oldValues.TryGetValue((setting.target, setting.path), out string old) && setting.value == old);
+                if (current.settings.Count != 0)
+                    SessionState.SetString(PendingKey, JsonUtility.ToJson(current));
+                SessionState.EraseString(BaselineKey);
+                break;
+            case PlayModeStateChange.EnteredEditMode:
+                EditorApplication.delayCall += ApplyPending;
+                break;
         }
     }
 
-    private static void EditorUpdate()
+    private static void Capture(State state)
     {
-        if (!EditorApplication.isPlaying)
+        foreach (ActiveMissionsPanel panel in ViewsInScene<ActiveMissionsPanel>(state.scenePath))
         {
-            ApplyPending();
-            return;
-        }
-
-        if (EditorApplication.timeSinceStartup < nextCaptureTime) return;
-        nextCaptureTime = EditorApplication.timeSinceStartup + 0.12d;
-
-        Settings previous = Read();
-        if (previous == null) return;
-        ActiveMissionsPanel panel = FindPanel(previous.scenePath, previous.hierarchyPath);
-        Settings current = Capture(panel);
-        if (current == null || !Different(previous, current)) return;
-        current.changed = true;
-        SessionState.SetString(Key, JsonUtility.ToJson(current));
-    }
-
-    private static ActiveMissionsPanel FindPanel(string scenePath, string hierarchyPath)
-    {
-        if (string.IsNullOrEmpty(scenePath)) return null;
-        ActiveMissionsPanel soleMatch = null;
-        int matchCount = 0;
-        foreach (ActiveMissionsPanel panel in UnityEngine.Object.FindObjectsByType<ActiveMissionsPanel>(
-            FindObjectsInactive.Include, FindObjectsSortMode.None))
-        {
-            if (panel.gameObject.scene.path != scenePath) continue;
-            matchCount++;
-            soleMatch = panel;
-            if (string.IsNullOrEmpty(hierarchyPath) || HierarchyPath(panel.transform) == hierarchyPath)
-                return panel;
-        }
-        return matchCount == 1 ? soleMatch : null;
-    }
-
-    private static string HierarchyPath(Transform transform)
-    {
-        // Caminho completo com indices para nao depender de nomes duplicados.
-        string path = "";
-        while (transform != null)
-        {
-            path = transform.GetSiblingIndex() + "/" + path;
-            transform = transform.parent;
-        }
-        return path;
-    }
-
-    private static Settings Capture(ActiveMissionsPanel panel)
-    {
-        if (panel == null) return null;
-        var source = new SerializedObject(panel);
-        var settings = new Settings
-        {
-            scenePath = panel.gameObject.scene.path,
-            hierarchyPath = HierarchyPath(panel.transform),
-            floats = new float[FloatFields.Length],
-            vectors = new Vector2[VectorFields.Length]
-        };
-
-        for (int i = 0; i < FloatFields.Length; i++)
-        {
-            SerializedProperty property = source.FindProperty(FloatFields[i]);
-            if (property == null) return null;
-            settings.floats[i] = property.floatValue;
-        }
-        for (int i = 0; i < VectorFields.Length; i++)
-        {
-            SerializedProperty property = source.FindProperty(VectorFields[i]);
-            if (property == null) return null;
-            settings.vectors[i] = property.vector2Value;
-        }
-        SerializedProperty icons = source.FindProperty("itemIcons");
-        if (icons != null && icons.isArray)
-        {
-            settings.spriteIds = new string[icons.arraySize];
-            for (int i = 0; i < icons.arraySize; i++)
+            CaptureFields(state, panel, PanelFields);
+            ActiveMissionCard model = panel.EditorPreviewCard;
+            if (model == null) continue;
+            var data = new SerializedObject(model);
+            foreach (string path in ActiveLabels)
             {
-                UnityEngine.Object sprite = icons.GetArrayElementAtIndex(i).objectReferenceValue;
-                settings.spriteIds[i] = sprite != null
-                    ? GlobalObjectId.GetGlobalObjectIdSlow(sprite).ToString() : "";
+                var text = Reference<Text>(data, path);
+                float offset = text != null && model.UsesExtraRowOffset(text.rectTransform)
+                    ? model.EditorExtraRowOffset : 0f;
+                CaptureGraphic(state, text, new Vector2(0f, offset));
+            }
+            CaptureGraphic(state, Reference<Image>(data, "coinIcon"), new Vector2(0f, model.EditorExtraRowOffset));
+            var button = Reference<Button>(data, "deliverButton");
+            if (button != null)
+            {
+                CaptureGraphic(state, button.targetGraphic);
+                CaptureFields(state, button, new[] { "m_Colors" });
+            }
+            CaptureFields(state, model.GetComponent<Image>(), ImageFields);
+            CaptureFields(state, model.GetComponent<Image>(), new[] { "m_Sprite" });
+            CaptureFields(state, model.transform, new[] { "m_SizeDelta.x" });
+            for (int i = 0; i < 3; i++) CaptureGraphic(state, model.IconAt(i), profileDriven: true);
+        }
+
+        foreach (DeliveryOrderCardView card in ViewsInScene<DeliveryOrderCardView>(state.scenePath))
+        {
+            CaptureFields(state, card, OrderFields);
+            CaptureFields(state, card.ItemLayout, GridFields);
+            var data = new SerializedObject(card);
+            foreach (string path in OrderLabels) CaptureGraphic(state, Reference<Text>(data, path));
+            CaptureGraphic(state, Reference<Image>(data, "rewardIcon"));
+            var itemsRoot = Reference<RectTransform>(data, "itemsRoot");
+            CaptureFields(state, itemsRoot, RectFields);
+            if (itemsRoot == null) continue;
+            for (int i = 0; i < Mathf.Min(3, itemsRoot.childCount); i++)
+            {
+                Transform row = itemsRoot.GetChild(i);
+                Text quantity = row.GetComponentInChildren<Text>(true);
+                if (quantity != null)
+                    CaptureGraphic(state, quantity, card.EditorItemOffset(quantity.rectTransform));
+                CaptureGraphic(state, row.GetComponentInChildren<Image>(true), profileDriven: true);
             }
         }
-        return settings;
     }
 
-    private static bool Different(Settings a, Settings b)
+    private static void CaptureGraphic(State state, Graphic graphic, Vector2 offset = default,
+        bool profileDriven = false)
     {
-        if (a.floats == null || b.floats == null ||
-            a.floats.Length != b.floats.Length ||
-            a.vectors == null || b.vectors == null ||
-            a.vectors.Length != b.vectors.Length) return true;
-
-        for (int i = 0; i < a.floats.Length; i++)
-            if (!Mathf.Approximately(a.floats[i], b.floats[i])) return true;
-        for (int i = 0; i < a.vectors.Length; i++)
-            if ((a.vectors[i] - b.vectors[i]).sqrMagnitude > 0.0001f) return true;
-
-        if (a.spriteIds == null || b.spriteIds == null)
-            return a.spriteIds != b.spriteIds;
-        if (a.spriteIds.Length != b.spriteIds.Length) return true;
-        for (int i = 0; i < a.spriteIds.Length; i++)
-            if (a.spriteIds[i] != b.spriteIds[i]) return true;
-        return false;
+        if (graphic == null) return;
+        CaptureFields(state, graphic.rectTransform, profileDriven ? ProfileRectFields : RectFields, offset);
+        CaptureFields(state, graphic, graphic is Text ? TextFields : ImageFields);
+        if (graphic is Image && !profileDriven) CaptureFields(state, graphic, new[] { "m_Sprite" });
     }
 
-    private static Settings Read()
+    private static void CaptureFields(State state, Object target, string[] fields, Vector2 offset = default)
     {
-        string data = SessionState.GetString(Key, "");
-        return string.IsNullOrEmpty(data) ? null : JsonUtility.FromJson<Settings>(data);
+        if (target == null) return;
+        var source = new SerializedObject(target);
+        string id = SceneKey((Component)target);
+        foreach (string field in fields)
+        {
+            SerializedProperty property = source.FindProperty(field);
+            if (property == null) continue;
+            if (field == "m_AnchoredPosition")
+                CaptureVector2(state, id, field, property.vector2Value - offset);
+            else
+                CaptureProperty(state, id, property);
+        }
+    }
+
+    private static void CaptureProperty(State state, string target, SerializedProperty property)
+    {
+        switch (property.propertyType)
+        {
+            case SerializedPropertyType.Float:
+                AddFloat(state, target, property.propertyPath, property.floatValue);
+                return;
+            case SerializedPropertyType.Vector2:
+                CaptureVector2(state, target, property.propertyPath, property.vector2Value);
+                return;
+            case SerializedPropertyType.Integer:
+            case SerializedPropertyType.Enum:
+            case SerializedPropertyType.ArraySize:
+                Add(state, target, property.propertyPath, property.intValue.ToString(NumberFormat));
+                return;
+            case SerializedPropertyType.Boolean:
+                Add(state, target, property.propertyPath, property.boolValue ? "1" : "0");
+                return;
+            case SerializedPropertyType.ObjectReference:
+                Object value = property.objectReferenceValue;
+                if (value == null || EditorUtility.IsPersistent(value))
+                    Add(state, target, property.propertyPath, value == null ? "" : Id(value));
+                return;
+            case SerializedPropertyType.Generic:
+            case SerializedPropertyType.Color:
+            case SerializedPropertyType.Vector3:
+                break;
+            case SerializedPropertyType.Quaternion:
+                Quaternion rotation = property.quaternionValue;
+                Add(state, target, property.propertyPath,
+                    JsonUtility.ToJson(new Rotation { value = rotation }));
+                return;
+            default:
+                return;
+        }
+
+        SerializedProperty end = property.GetEndProperty(true);
+        SerializedProperty child = property.Copy();
+        if (!child.Next(true)) return;
+        while (!SerializedProperty.EqualContents(child, end))
+        {
+            CaptureProperty(state, target, child);
+            if (!child.Next(false)) break;
+        }
+    }
+
+    [Serializable]
+    private struct Rotation { public Quaternion value; }
+
+    private static void CaptureVector2(State state, string target, string path, Vector2 value)
+    {
+        AddFloat(state, target, path + ".x", value.x);
+        AddFloat(state, target, path + ".y", value.y);
+    }
+
+    private static void AddFloat(State state, string target, string path, float value) =>
+        Add(state, target, path, Math.Round(value, 4).ToString("R", NumberFormat));
+
+    private static void Add(State state, string target, string path, string value) =>
+        state.settings.Add(new Setting { target = target, path = path, value = value });
+
+    private static UndoPropertyModification[] FormattingEdited(UndoPropertyModification[] changes)
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode && !Application.isPlaying)
+            return changes;
+
+        var active = new HashSet<ActiveMissionsPanel>();
+        var orders = new HashSet<DeliveryOrderCardView>();
+        foreach (UndoPropertyModification change in changes)
+        {
+            PropertyModification current = change.currentValue;
+            if (current?.target is not Component component) continue;
+            string path = current.propertyPath;
+            if (component is RectTransform &&
+                !Array.Exists(RectFields, field => path == field ||
+                    path.StartsWith(field + ".", StringComparison.Ordinal))) continue;
+            if (component is Button && !path.StartsWith("m_Colors.", StringComparison.Ordinal)) continue;
+            if (component is not RectTransform && component is not Graphic && component is not Button) continue;
+            if (component is Graphic && path != "m_Sprite" &&
+                !Array.Exists(component is Text ? TextFields : ImageFields, field =>
+                    path == field || path.StartsWith(field + ".", StringComparison.Ordinal))) continue;
+
+            ActiveMissionCard model = component.GetComponentInParent<ActiveMissionCard>(true);
+            if (model != null)
+            {
+                ActiveMissionsPanel panel = model.GetComponentInParent<ActiveMissionsPanel>(true);
+                if (panel == null || panel.EditorPreviewCard != model) continue;
+                for (int i = 0; i < 3; i++)
+                    if (IsProfileEdit(component, model.IconAt(i), path))
+                    {
+                        panel.CaptureEditorIcon(i);
+                        if (!Application.isPlaying && path == "m_Sprite")
+                            panel.RefreshMatchingEditorSprites(i);
+                    }
+                active.Add(panel);
+                continue;
+            }
+            DeliveryOrderCardView card = component.GetComponentInParent<DeliveryOrderCardView>(true);
+            if (card == null) continue;
+            for (int i = 0; i < 3; i++)
+                if (IsProfileEdit(component, card.EditorIconAt(i), path))
+                    card.CaptureEditorPreview(i);
+            orders.Add(card);
+        }
+        foreach (ActiveMissionsPanel panel in active)
+        {
+            EditorUtility.SetDirty(panel);
+            if (!Application.isPlaying) EditorSceneManager.MarkSceneDirty(panel.gameObject.scene);
+            EditorApplication.delayCall += () => { if (panel != null) panel.RefreshEditorCardFormatting(); };
+        }
+        foreach (DeliveryOrderCardView card in orders)
+        {
+            EditorUtility.SetDirty(card);
+            if (!Application.isPlaying) EditorSceneManager.MarkSceneDirty(card.gameObject.scene);
+            EditorApplication.delayCall += () => { if (card != null) card.RefreshEditorPreview(); };
+        }
+        return changes;
+    }
+
+    private static bool IsProfileEdit(Component changed, Image icon, string path) =>
+        icon != null && ((changed == icon && path == "m_Sprite") ||
+            (changed == icon.rectTransform && (path.StartsWith("m_SizeDelta", StringComparison.Ordinal) ||
+                path.StartsWith("m_AnchoredPosition", StringComparison.Ordinal))));
+
+    private static void RefreshAfterUndoRedo()
+    {
+        string scenePath = SceneManager.GetActiveScene().path;
+        foreach (ActiveMissionsPanel panel in ViewsInScene<ActiveMissionsPanel>(scenePath))
+        {
+            if (Application.isPlaying) panel.RefreshEditorCardFormatting();
+            else panel.RefreshEditorPreview();
+        }
+        foreach (DeliveryOrderCardView card in ViewsInScene<DeliveryOrderCardView>(scenePath))
+            card.RefreshEditorPreview();
     }
 
     private static void ApplyPending()
     {
-        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
-        Settings saved = Read();
+        if (Application.isPlaying) return;
+        State saved = Read(PendingKey);
         if (saved == null) return;
-        if (!saved.changed)
-        {
-            SessionState.EraseString(Key);
-            return;
-        }
+        Scene scene = SceneManager.GetSceneByPath(saved.scenePath);
+        if (!scene.IsValid() || !scene.isLoaded) return;
 
-        Scene scene = SceneManager.GetActiveScene();
-        if (scene.path != saved.scenePath) return;
-        ActiveMissionsPanel panel = FindPanel(saved.scenePath, saved.hierarchyPath);
-        if (panel == null) return;
-
-        var destination = new SerializedObject(panel);
-        for (int i = 0; saved.floats != null && i < FloatFields.Length &&
-            i < saved.floats.Length; i++)
+        var wanted = new HashSet<string>();
+        foreach (Setting setting in saved.settings) wanted.Add(setting.target);
+        var targets = new Dictionary<string, Component>();
+        foreach (GameObject root in scene.GetRootGameObjects())
         {
-            SerializedProperty property = destination.FindProperty(FloatFields[i]);
-            if (property != null) property.floatValue = saved.floats[i];
-        }
-        for (int i = 0; saved.vectors != null && i < VectorFields.Length &&
-            i < saved.vectors.Length; i++)
-        {
-            SerializedProperty property = destination.FindProperty(VectorFields[i]);
-            if (property != null) property.vector2Value = saved.vectors[i];
-        }
-
-        SerializedProperty icons = destination.FindProperty("itemIcons");
-        if (icons != null && icons.isArray && saved.spriteIds != null)
-        {
-            icons.arraySize = saved.spriteIds.Length;
-            for (int i = 0; i < saved.spriteIds.Length; i++)
+            foreach (Component component in root.GetComponentsInChildren<Component>(true))
             {
-                UnityEngine.Object sprite = null;
-                string id = saved.spriteIds[i];
-                if (!string.IsNullOrEmpty(id) && GlobalObjectId.TryParse(id, out GlobalObjectId globalId))
-                    sprite = GlobalObjectId.GlobalObjectIdentifierToObjectSlow(globalId);
-                // Nao substituir uma referencia valida se o asset nao for encontrado.
-                if (string.IsNullOrEmpty(id) || sprite != null)
-                    icons.GetArrayElementAtIndex(i).objectReferenceValue = sprite;
+                if (component is RectTransform || component is Graphic || component is ActiveMissionsPanel ||
+                    component is DeliveryOrderCardView || component is GridLayoutGroup || component is Button)
+                {
+                    string key = SceneKey(component);
+                    if (wanted.Contains(key)) targets[key] = component;
+                }
             }
         }
 
-        destination.ApplyModifiedPropertiesWithoutUndo();
-        panel.RefreshEditorLayoutAfterPlayMode();
-        EditorUtility.SetDirty(panel);
+        string currentId = null;
+        SerializedObject destination = null;
+        foreach (Setting setting in saved.settings)
+        {
+            if (setting.target != currentId)
+            {
+                destination?.ApplyModifiedPropertiesWithoutUndo();
+                currentId = setting.target;
+                destination = targets.TryGetValue(currentId, out Component target)
+                    ? new SerializedObject(target) : null;
+            }
+
+            SerializedProperty property = destination?.FindProperty(setting.path);
+            if (property == null) continue;
+            switch (property.propertyType)
+            {
+                case SerializedPropertyType.Float:
+                    property.floatValue = float.Parse(setting.value, NumberFormat);
+                    if (setting.path == "m_AnchoredPosition.y" && destination.targetObject is RectTransform rect)
+                    {
+                        ActiveMissionCard card = rect.GetComponentInParent<ActiveMissionCard>(true);
+                        if (card != null && card.UsesExtraRowOffset(rect))
+                            property.floatValue += card.EditorExtraRowOffset;
+                    }
+                    break;
+                case SerializedPropertyType.Integer:
+                case SerializedPropertyType.Enum:
+                case SerializedPropertyType.ArraySize:
+                    property.intValue = int.Parse(setting.value, NumberFormat);
+                    break;
+                case SerializedPropertyType.Boolean:
+                    property.boolValue = setting.value == "1";
+                    break;
+                case SerializedPropertyType.ObjectReference:
+                    Object value = Resolve(setting.value);
+                    if (value != null || setting.value.Length == 0) property.objectReferenceValue = value;
+                    break;
+                case SerializedPropertyType.Quaternion:
+                    property.quaternionValue = JsonUtility.FromJson<Rotation>(setting.value).value;
+                    break;
+            }
+        }
+        destination?.ApplyModifiedPropertiesWithoutUndo();
+
+        foreach (ActiveMissionsPanel panel in ViewsInScene<ActiveMissionsPanel>(scene.path))
+            panel.RefreshEditorLayoutAfterPlayMode();
+        foreach (DeliveryOrderCardView card in ViewsInScene<DeliveryOrderCardView>(scene.path))
+            card.RefreshEditorPreview();
+
         EditorSceneManager.MarkSceneDirty(scene);
-        if (EditorSceneManager.SaveScene(scene)) SessionState.EraseString(Key);
+        if (EditorSceneManager.SaveScene(scene)) SessionState.EraseString(PendingKey);
     }
+
+    private static State Read(string key)
+    {
+        string json = SessionState.GetString(key, "");
+        return json.Length == 0 ? null : JsonUtility.FromJson<State>(json);
+    }
+
+    private static T Reference<T>(SerializedObject source, string path) where T : Object =>
+        source.FindProperty(path)?.objectReferenceValue as T;
+
+    private static IEnumerable<T> ViewsInScene<T>(string scenePath) where T : Component
+    {
+        foreach (T view in Object.FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            if (view.gameObject.scene.path == scenePath) yield return view;
+    }
+
+    private static string SceneKey(Component target)
+    {
+        // Game UI can reorder siblings at runtime. Only siblings with the same name
+        // need an occurrence index to identify authored objects such as both item icons.
+        string path = target.GetType().FullName;
+        for (Transform node = target.transform; node != null; node = node.parent)
+        {
+            string name = node.name;
+            int occurrence = 0;
+            if (node.parent != null)
+                for (int i = 0; i < node.GetSiblingIndex(); i++)
+                    if (node.parent.GetChild(i).name == name) occurrence++;
+            path = name.Length + ":" + name + ":" + occurrence + "/" + path;
+        }
+        return path;
+    }
+
+    private static string Id(Object target) => GlobalObjectId.GetGlobalObjectIdSlow(target).ToString();
+
+    private static Object Resolve(string id) => GlobalObjectId.TryParse(id, out GlobalObjectId parsed)
+        ? GlobalObjectId.GlobalObjectIdentifierToObjectSlow(parsed) : null;
 }

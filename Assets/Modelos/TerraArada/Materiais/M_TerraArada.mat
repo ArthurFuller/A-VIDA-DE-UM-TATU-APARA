@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_TerraArada
+  m_Shader: {fileID: 4800000, guid: 2e2863d8a0c7f684b9a5accf99c6c449, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords:
+  - _DESLOCAR_ON
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _TexturaTerra:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Achatamento: 1.5
+    - _AlturaLeiras: 0.084
+    - _AnguloHachura: 35
+    - _AnguloLeiras: -90
+    - _Curvatura: -0.15
+    - _Deslocar: 1
+    - _EscalaTorroes: 40
+    - _EspessuraHachura: 0.22
+    - _EspessuraSulco: 0.09
+    - _FaixaSolta: 0.059
+    - _Falhas: 0.35
+    - _ForcaSombraProjetada: 0.8
+    - _Hachura: 0.35
+    - _HachurasPorMetro: 28
+    - _InfluenciaLuz: 0.23
+    - _Irregularidade: 0.55
+    - _LimiteSombra: 0.09
+    - _Pontilhado: 0
+    - _QuantidadeLeiras: 22.6
+    - _Semente: 0
+    - _Suavidade: 0.102
+    - _SuavidadeSombra: 0.04
+    - _Tamanho: 1
+    - _TamanhoPonto: 45
+    - _Torroes: 0.5
+    - _Tortura: 0.22
+    - _TracoSulco: 0.73
+    m_Colors:
+    - _CorSombra: {r: 0.62, g: 0.52, b: 0.5, a: 1}
+    - _CorSulco: {r: 0.33699998, g: 0.21199995, b: 0.13299996, a: 1}
+    - _CorTerraSolta: {r: 0.675, g: 0.5019999, b: 0.32899997, a: 1}
+    - _CorTopo: {r: 0.573, g: 0.39199996, b: 0.24299997, a: 1}
+    - _CorTraco: {r: 0.12999997, g: 0.079999976, b: 0.049999982, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

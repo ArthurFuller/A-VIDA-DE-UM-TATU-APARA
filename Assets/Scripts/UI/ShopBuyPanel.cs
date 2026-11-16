@@ -93,6 +93,6 @@ public sealed class ShopBuyPanel : MonoBehaviour
         if (totalText != null) totalText.text = "TOTAL: " + total + " moedas" +
             (fenceRow.Quantity > 0 ? " + " +
                 fenceRow.Quantity * merchant.FenceWoodCost + " madeiras" : "");
-        if (buyButton != null) buyButton.interactable = total > 0 && merchant.IsAvailable;
+        if (buyButton != null) buyButton.interactable = total > 0 && merchant.CanTrade;
     }
 }

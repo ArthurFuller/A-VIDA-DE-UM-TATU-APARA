@@ -190,11 +190,18 @@ public sealed class ResourceHud : MonoBehaviour
         FlyFromScreen(kind, amount, screen, pauseSeconds, onAllArrived);
     }
 
-    public void FlyFromRect(ResourceKind kind, int amount, RectTransform origin)
+    public void FlyFromRect(ResourceKind kind, int amount, RectTransform origin,
+        System.Action onLastDeparture = null, int maxIcons = int.MaxValue)
     {
-        if (origin != null)
-            FlyFromScreen(kind, amount, RectTransformUtility.WorldToScreenPoint(UiCamera,
-                origin.TransformPoint(origin.rect.center)));
+        if (origin == null)
+        {
+            onLastDeparture?.Invoke();
+            return;
+        }
+
+        Vector2 screenOrigin = RectTransformUtility.WorldToScreenPoint(UiCamera,
+            origin.TransformPoint(origin.rect.center));
+        FlyFromScreen(kind, amount, screenOrigin, onLastDeparture: onLastDeparture, maxIcons: maxIcons);
     }
 
     public DropBatch CreateDropBatch(ResourceKind kind) => new DropBatch(kind);
@@ -279,16 +286,13 @@ public sealed class ResourceHud : MonoBehaviour
     }
 
     public void FlyFromScreen(ResourceKind kind, int amount, Vector2 screenOrigin,
-        float pauseSeconds = 0f, System.Action onAllArrived = null)
+        float pauseSeconds = 0f, System.Action onAllArrived = null, System.Action onLastDeparture = null,
+        int maxIcons = int.MaxValue)
     {
-        if (amount <= 0 || canvasRect == null || !isActiveAndEnabled)
-        {
-            onAllArrived?.Invoke();
-            return;
-        }
         Text target = TargetFor(kind);
-        if (target == null)
+        if (amount <= 0 || canvasRect == null || !isActiveAndEnabled || target == null)
         {
+            onLastDeparture?.Invoke();
             onAllArrived?.Invoke();
             return;
         }
@@ -300,14 +304,17 @@ public sealed class ResourceHud : MonoBehaviour
         if (topBar != null)
             pauseSeconds = Mathf.Max(pauseSeconds, topBar.PrepareResourceFeedback());
         Vector2 origin = CanvasPoint(screenOrigin);
-        int count = amount;
+        int count = Mathf.Min(amount, Mathf.Max(1, maxIcons));
         int pending = count;
+        // Lotes grandes mantêm o voo curto. Cada ícone credita sua parte ao chegar.
         for (int i = 0; i < count; i++)
-            CreateIcon(kind, i, count, origin, target,
-                pauseSeconds, () =>
+        {
+            int credit = amount / count + (i < amount % count ? 1 : 0);
+            CreateIcon(kind, i, count, origin, target, pauseSeconds, credit, () =>
                 {
                     if (--pending == 0) onAllArrived?.Invoke();
-                });
+                }, i == count - 1 ? onLastDeparture : null);
+        }
     }
 
     private Vector2 CanvasPoint(Vector2 screen)
@@ -332,7 +339,7 @@ public sealed class ResourceHud : MonoBehaviour
     }
 
     private void CreateIcon(ResourceKind kind, int index, int count, Vector2 origin,
-        Text target, float pauseSeconds, System.Action onArrived)
+        Text target, float pauseSeconds, int credit, System.Action onArrived, System.Action onDeparture)
     {
         RectTransform rect = GetIcon(kind);
         rect.sizeDelta = new Vector2(32f, 32f);
@@ -345,14 +352,26 @@ public sealed class ResourceHud : MonoBehaviour
         Sequence flight = DOTween.Sequence().SetId(this);
         flight.Append(rect.DOScale(1f, appearDuration).SetEase(Ease.OutBack));
         flight.AppendInterval(Mathf.Max(0f, flightWait - appearDuration));
+        if (onDeparture != null) flight.AppendCallback(NotifyDeparture);
         flight.Append(FollowCounter(rect, target))
             .Join(rect.DOScale(0.4f, flightDuration).SetEase(Ease.InQuad))
             .OnComplete(() =>
             {
-                CreditArrival(kind, 1);
+                CreditArrival(kind, credit);
                 onArrived?.Invoke();
             })
-            .OnKill(() => RecycleIcon(rect));
+            .OnKill(() =>
+            {
+                RecycleIcon(rect);
+                NotifyDeparture();
+            });
+
+        void NotifyDeparture()
+        {
+            System.Action callback = onDeparture;
+            onDeparture = null;
+            callback?.Invoke();
+        }
     }
 
     private RectTransform GetIcon(ResourceKind kind)

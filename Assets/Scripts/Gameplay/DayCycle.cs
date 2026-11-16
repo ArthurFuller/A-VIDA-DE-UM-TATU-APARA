@@ -123,10 +123,10 @@ public sealed class DayCycle : MonoBehaviour
     private void Start()
     {
         UpdateDayLabel();
-        UpdateMarket();
         if (dayEvents != null) dayEvents.StartDay(currentDay);
         if (dayEvents != null) dayEvents.ApplyPendingPestRegression(seedCatalog);
         if (actions != null) actions.BeginNextDay();
+        UpdateMarket();
         OpenDayAfterEvent(false);
     }
 
@@ -363,8 +363,13 @@ public sealed class DayCycle : MonoBehaviour
     {
         if (merchant != null)
             merchant.SetDay(currentDay, missionBoard != null && missionBoard.HasDeliveryDueOn(currentDay));
-        if (missionBoard != null) missionBoard.SetDay(currentDay, merchant != null && merchant.IsAvailable);
+        if (missionBoard != null)
+            missionBoard.SetDay(currentDay, merchant != null && merchant.IsAvailable, CreateOfferForecast);
     }
+
+    private DeliveryOfferForecast CreateOfferForecast() => new DeliveryOfferForecast(resources, plots,
+        workers, seedCatalog, hand, dayEvents, currentDay, totalDays, todayMilk, todayEggs,
+        milkPerCow, eggsPerChicken);
 
     private void UpdateDayLabel()
     {

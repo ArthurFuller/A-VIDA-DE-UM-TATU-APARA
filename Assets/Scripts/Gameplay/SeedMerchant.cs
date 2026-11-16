@@ -27,18 +27,19 @@ public sealed class SeedMerchant : MonoBehaviour
     [SerializeField, Min(0.1f)] private float panelEntranceDuration = 0.46f;
     [SerializeField, Range(0.5f, 4f),
         Tooltip("Multiplica a velocidade da entrada e saida da janela, sem alterar as distancias. 1 = tempo normal; 2 = duas vezes mais rapido.")]
-    private float panelAnimationSpeed = 1.55f;
+    private float panelAnimationSpeed = 1.35f;
     [SerializeField, Min(0f)] private float entranceExtraDistance = 40f;
     private RectTransform panelRect;
     private Vector2 panelHome;
     private Sequence panelTransition;
     private float PanelTime(float duration) =>
         Mathf.Max(0f, duration) / Mathf.Max(0.5f,
-            panelAnimationSpeed > 0f ? panelAnimationSpeed : 1.55f);
+            panelAnimationSpeed > 0f ? panelAnimationSpeed : 1.35f);
 
     public event Action AvailabilityChanged;
     public event Action Closed;
     public bool IsAvailable { get; private set; }
+    public bool CanTrade { get; private set; }
     public bool IsOpen => shopGroup != null && shopGroup.interactable;
     public int FenceWoodCost => fenceWoodCost;
     public int FenceCoinCost => fenceCoinCost;
@@ -82,7 +83,10 @@ public sealed class SeedMerchant : MonoBehaviour
     public void SetDay(int day, bool hasDeliveryDue = false)
     {
         bool scheduled = Array.IndexOf(marketDays, day) >= 0;
-        IsAvailable = hasDeliveryDue || scheduled || day == 12;
+        GameBalance balance = GameBalance.Current;
+        bool dailyOffers = balance != null && balance.dailyMissionOffers;
+        CanTrade = scheduled || day == 12 || (!dailyOffers && hasDeliveryDue);
+        IsAvailable = CanTrade || dailyOffers;
         HideShop();
         AvailabilityChanged?.Invoke();
     }
@@ -102,7 +106,7 @@ public sealed class SeedMerchant : MonoBehaviour
 
     public bool TryBuyCart(int cornSeeds, int pumpkinSeeds, int jerimumSeeds, int food, int fences)
     {
-        if (!IsAvailable || !IsOpen || dayCycle == null || !dayCycle.CanAcceptActions || resources == null ||
+        if (!CanTrade || !IsOpen || dayCycle == null || !dayCycle.CanAcceptActions || resources == null ||
             catalog == null ||
             cornSeeds != 0 || pumpkinSeeds != 0 || jerimumSeeds != 0 || food < 0 || fences < 0 ||
             fences > FenceSlotsAvailable ||
@@ -150,7 +154,7 @@ public sealed class SeedMerchant : MonoBehaviour
         if (dragPreview != null) dragPreview.CancelCurrentDrag();
         if (activeMissionsPanel != null) activeMissionsPanel.Close();
         if (timeline != null) timeline.ClosePanel();
-        if (shopTabs != null) shopTabs.ShowDefault(true);
+        if (shopTabs != null) shopTabs.ShowDefault(CanTrade);
         AudioManager.Play(SoundCue.PanelOpen);
 
         if (backdropGroup != null)

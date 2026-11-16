@@ -38,7 +38,7 @@ public sealed class DeliveryMissionEditor : EditorWindow
         SerializedProperty entries = data.FindProperty("entries");
 
         EditorGUILayout.LabelField("Missões de encomenda", EditorStyles.boldLabel);
-        EditorGUILayout.HelpBox("Cada missão pode pedir vários recursos. O jogo sorteia estas missões nos dias de mercearia. As edições ficam salvas no projeto e nas builds.", MessageType.Info);
+        EditorGUILayout.HelpBox("Cada missão pode pedir vários recursos. O balanceamento define se as ofertas aparecem todo dia ou nos dias de comércio. As edições ficam salvas no projeto e nas builds.", MessageType.Info);
         if (GUILayout.Button("Nova missão"))
         {
             selected = entries.arraySize;
@@ -47,10 +47,11 @@ public sealed class DeliveryMissionEditor : EditorWindow
             created.FindPropertyRelative("title").stringValue = "Nova encomenda";
             created.FindPropertyRelative("description").stringValue = "";
             created.FindPropertyRelative("coinReward").intValue = 1;
+            created.FindPropertyRelative("availableFromDay").intValue = 1;
+            created.FindPropertyRelative("deliveryDays").intValue = 2;
+            created.FindPropertyRelative("largeOrder").boolValue = false;
             SerializedProperty requirements = created.FindPropertyRelative("requirements");
-            requirements.arraySize = 1;
-            requirements.GetArrayElementAtIndex(0).FindPropertyRelative("item").enumValueIndex = 0;
-            requirements.GetArrayElementAtIndex(0).FindPropertyRelative("quantity").intValue = 1;
+            requirements.arraySize = 0;
         }
 
         if (entries.arraySize > 0)
@@ -77,42 +78,65 @@ public sealed class DeliveryMissionEditor : EditorWindow
 
     private static void DrawMission(SerializedProperty entry)
     {
-        EditorGUILayout.PropertyField(entry.FindPropertyRelative("title"), new GUIContent("Título"));
+        SerializedProperty title = entry.FindPropertyRelative("title");
+        EditorGUILayout.PropertyField(title, new GUIContent("Título"));
+        if (string.IsNullOrWhiteSpace(title.stringValue))
+            EditorGUILayout.HelpBox("Escreva um título para a missão entrar no sorteio.", MessageType.Warning);
         SerializedProperty description = entry.FindPropertyRelative("description");
         EditorGUILayout.LabelField("Descrição");
         description.stringValue = EditorGUILayout.TextArea(description.stringValue, GUILayout.MinHeight(85f));
 
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("Itens para entregar", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("0 = não exigir este recurso", EditorStyles.miniLabel);
         SerializedProperty requirements = entry.FindPropertyRelative("requirements");
-        for (int i = 0; i < requirements.arraySize; i++)
+        for (int itemIndex = 0; itemIndex < ItemNames.Length; itemIndex++)
         {
-            SerializedProperty requirement = requirements.GetArrayElementAtIndex(i);
-            SerializedProperty item = requirement.FindPropertyRelative("item");
-            SerializedProperty quantity = requirement.FindPropertyRelative("quantity");
+            int requirementIndex = -1;
+            for (int i = 0; i < requirements.arraySize; i++)
+                if (requirements.GetArrayElementAtIndex(i).FindPropertyRelative("item").enumValueIndex == itemIndex)
+                {
+                    requirementIndex = i;
+                    break;
+                }
+            int quantity = requirementIndex >= 0 ? requirements.GetArrayElementAtIndex(requirementIndex)
+                .FindPropertyRelative("quantity").intValue : 0;
             EditorGUILayout.BeginHorizontal();
-            item.enumValueIndex = EditorGUILayout.Popup(item.enumValueIndex, ItemNames, GUILayout.MinWidth(165f));
-            quantity.intValue = Mathf.Max(1, EditorGUILayout.IntField(quantity.intValue, GUILayout.Width(60f)));
-            if (GUILayout.Button("×", GUILayout.Width(28f)))
-            {
-                requirements.DeleteArrayElementAtIndex(i);
-                EditorGUILayout.EndHorizontal();
-                break;
-            }
+            GUILayout.Label(ItemNames[itemIndex], EditorStyles.wordWrappedLabel,
+                GUILayout.MinWidth(160f), GUILayout.ExpandWidth(true));
+            int edited = Mathf.Max(0, EditorGUILayout.IntField(quantity, GUILayout.Width(65f)));
             EditorGUILayout.EndHorizontal();
+            if (edited == quantity) continue;
+            if (edited == 0 && requirementIndex >= 0)
+                requirements.DeleteArrayElementAtIndex(requirementIndex);
+            else if (requirementIndex >= 0)
+                requirements.GetArrayElementAtIndex(requirementIndex)
+                    .FindPropertyRelative("quantity").intValue = edited;
+            else
+            {
+                int index = requirements.arraySize;
+                requirements.InsertArrayElementAtIndex(index);
+                SerializedProperty added = requirements.GetArrayElementAtIndex(index);
+                added.FindPropertyRelative("item").enumValueIndex = itemIndex;
+                added.FindPropertyRelative("quantity").intValue = edited;
+            }
         }
-        if (GUILayout.Button("Adicionar item"))
-        {
-            int index = requirements.arraySize;
-            requirements.InsertArrayElementAtIndex(index);
-            SerializedProperty added = requirements.GetArrayElementAtIndex(index);
-            added.FindPropertyRelative("item").enumValueIndex = 0;
-            added.FindPropertyRelative("quantity").intValue = 1;
-        }
+
+        long totalUnits = 0;
+        for (int i = 0; i < requirements.arraySize; i++)
+            totalUnits += requirements.GetArrayElementAtIndex(i).FindPropertyRelative("quantity").intValue;
+        if (totalUnits < 2)
+            EditorGUILayout.HelpBox("O pedido precisa de pelo menos duas unidades no total para entrar no sorteio.", MessageType.Warning);
         if (requirements.arraySize == 0)
             EditorGUILayout.HelpBox("Adicione pelo menos um item. Missões vazias não são sorteadas.", MessageType.Warning);
 
         EditorGUILayout.Space(8f);
+        EditorGUILayout.PropertyField(entry.FindPropertyRelative("largeOrder"),
+            new GUIContent("Encomenda grande", "Uma das ofertas do dia prioriza estas encomendas após a liberação."));
+        SerializedProperty firstDay = entry.FindPropertyRelative("availableFromDay");
+        firstDay.intValue = Mathf.Max(1, EditorGUILayout.IntField("Disponível a partir do dia", firstDay.intValue));
+        SerializedProperty duration = entry.FindPropertyRelative("deliveryDays");
+        duration.intValue = Mathf.Max(0, EditorGUILayout.IntField("Dias adicionais para entregar", duration.intValue));
         SerializedProperty reward = entry.FindPropertyRelative("coinReward");
         reward.intValue = Mathf.Max(0, EditorGUILayout.IntField("Moedas de recompensa", reward.intValue));
     }

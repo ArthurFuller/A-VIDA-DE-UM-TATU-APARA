@@ -44,13 +44,13 @@ public sealed class GameBalanceEditor : EditorWindow
             "jerimumPrice", "foodPrice", "milkPrice", "eggPrice", "cornSeedPrice",
             "pumpkinSeedPrice", "jerimumSeedPrice");
         Section(data, "Produção e coleta", "totalDays", "milkPerCow", "eggsPerChicken",
-            "woodReward", "gambleStake");
+            "woodReward", "fertilizerHarvestBonus", "maxPreparedFoodPerAction", "foodPlusBonus", "gambleStake");
         Section(data, "Mandala", "cropGrowthNearCorn", "cropYieldNearCorn",
             "animalProductionNearCorn", "cropSalePriceNearWaterCow");
         Section(data, "Mercearia", "fenceWoodCost", "fenceCoinCost", "foodCoinCost", "marketDays");
         Section(data, "Comunidade", "deliveriesPerHouse", "secondHouseDeliveries",
             "thirdHouseDeliveries", "houseRewardLimit", "minimumOffers",
-            "maximumOffers", "campaignDays", "returningOffersPerMarket");
+            "maximumOffers", "campaignDays", "returningOffersPerMarket", "dailyMissionOffers");
         Section(data, "Eventos", "generalEventChance", "droughtDurationDays", "pestDurationDays",
             "rainDurationDays", "droughtFishingReduction", "pestHarvestReduction",
             "pestGrowthRegression", "droughtGrowthDelay", "rainGrowthBonus",
@@ -98,7 +98,9 @@ public sealed class GameBalanceEditor : EditorWindow
 
         EditorGUILayout.BeginHorizontal();
         GUILayout.Label(label, EditorStyles.wordWrappedLabel, GUILayout.MinWidth(110), GUILayout.ExpandWidth(true));
-        if (property.propertyType == SerializedPropertyType.Float)
+        if (property.propertyType == SerializedPropertyType.Boolean)
+            property.boolValue = EditorGUILayout.Toggle(property.boolValue, GUILayout.Width(85));
+        else if (property.propertyType == SerializedPropertyType.Float)
             property.floatValue = Mathf.Clamp01(EditorGUILayout.FloatField(property.floatValue, GUILayout.Width(85)));
         else if (property.propertyType == SerializedPropertyType.Integer)
             property.intValue = Mathf.Clamp(EditorGUILayout.IntField(property.intValue, GUILayout.Width(85)),
@@ -110,7 +112,7 @@ public sealed class GameBalanceEditor : EditorWindow
     {
         "startingCoins" => int.MinValue,
         "growthDays" or "witherDaysAfterMaturity" or "totalDays" or
-        "milkPerCow" or "eggsPerChicken" or "gambleStake" or "foodCoinCost" or
+        "milkPerCow" or "eggsPerChicken" or "gambleStake" or "foodCoinCost" or "maxPreparedFoodPerAction" or
         "deliveriesPerHouse" or "secondHouseDeliveries" or "thirdHouseDeliveries" or
         "houseRewardLimit" or "minimumOffers" or "maximumOffers" or "campaignDays" or
         "droughtDurationDays" or "pestDurationDays" or "rainDurationDays" or
@@ -121,6 +123,7 @@ public sealed class GameBalanceEditor : EditorWindow
 
     private static int Maximum(string name) => name switch
     {
+        "maxPreparedFoodPerAction" => 2,
         "houseRewardLimit" or "returningOffersPerMarket" => 3,
         "minimumOffers" or "maximumOffers" => 5,
         _ => int.MaxValue
@@ -145,6 +148,10 @@ public sealed class GameBalanceEditor : EditorWindow
         "milkPerCow" => "Leite produzido por vaca a cada dia, antes do bônus do milho.",
         "eggsPerChicken" => "Ovos produzidos por galinha a cada dia, antes do bônus do milho.",
         "woodReward" => "Madeira base da coleta normal. A precisão do minigame, a carta Coleta de madeira + e eventuais penalidades ajustam o total.",
+        "fertilizerHarvestBonus" => "Unidades extras recebidas ao colher um terreno adubado.",
+        "maxPreparedFoodPerAction" => "Limite de porções por preparo comum.",
+        "foodPlusBonus" => "Porções adicionais com a carta Comida+.",
+        "dailyMissionOffers" => "Abre a aba de encomendas todos os dias. Comprar e vender seguem o calendário da mercearia.",
         "gambleStake" => "Moedas ganhas ao vencer ou perdidas ao perder no Jogo do Bicho.",
         "cropGrowthNearCorn" => "Etapas de crescimento antecipadas por dia para macaxeira ou jerimum ao lado de milho já pronto, até a planta ficar madura.",
         "cropYieldNearCorn" => "Unidades extras por colheita de macaxeira ou jerimum ao lado de milho pronto.",
@@ -153,7 +160,7 @@ public sealed class GameBalanceEditor : EditorWindow
         "fenceWoodCost" => "Madeira gasta para comprar uma carta de cerca na mercearia.",
         "fenceCoinCost" => "Moedas gastas para comprar uma carta de cerca na mercearia.",
         "foodCoinCost" => "Moedas gastas para comprar uma unidade de comida pronta na mercearia.",
-        "marketDays" => "Dias programados para a mercearia abrir. Ela também abre se houver entrega vencendo no dia e, atualmente, no dia 12.",
+        "marketDays" => "Dias em que Comprar e Vender ficam disponíveis. O comércio também abre no dia 12.",
         "deliveriesPerHouse" => "Entregas concluídas para receber a primeira carta de casa.",
         "secondHouseDeliveries" => "Entregas adicionais depois da primeira casa para receber a segunda carta de casa.",
         "thirdHouseDeliveries" => "Entregas adicionais depois da segunda casa para receber a terceira carta de casa.",
@@ -161,7 +168,7 @@ public sealed class GameBalanceEditor : EditorWindow
         "minimumOffers" => "Menor número de encomendas oferecidas quando a mercearia gera novos pedidos.",
         "maximumOffers" => "Maior número de encomendas oferecidas quando a mercearia gera novos pedidos.",
         "campaignDays" => "Limite do dia de vencimento das encomendas da comunidade.",
-        "returningOffersPerMarket" => "Máximo de encomendas não aceitas anteriormente que podem voltar em um novo dia de mercearia.",
+        "returningOffersPerMarket" => "Máximo de encomendas recusadas que entram por dia depois de esgotar as opções inéditas.",
         "generalEventChance" => "Probabilidade diária de sortear um evento geral, se Comadre e Reflorestamento não forem anunciados antes.",
         "droughtDurationDays" => "Dias em que a seca permanece ativa, contando o dia em que aparece.",
         "pestDurationDays" => "Dias em que as pragas permanecem ativas, contando o dia em que aparecem.",
@@ -202,6 +209,10 @@ public sealed class GameBalanceEditor : EditorWindow
         "totalDays" => "Dias de jogo", "milkPerCow" => "Leite por vaca",
         "eggsPerChicken" => "Ovos por galinha", "woodReward" => "Madeira base por coleta",
         "gambleStake" => "Aposta",
+        "fertilizerHarvestBonus" => "Unidades extras com adubo",
+        "maxPreparedFoodPerAction" => "Porções por preparo comum",
+        "foodPlusBonus" => "Porções extras com Comida+",
+        "dailyMissionOffers" => "Ofertas todos os dias",
         "cropGrowthNearCorn" => "Crescimento junto ao milho",
         "cropYieldNearCorn" => "Colheita junto ao milho",
         "animalProductionNearCorn" => "Produção animal junto ao milho",

@@ -12,15 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e0c66594e354fc69d6a41a6071e1f73, type: 3}
   m_Name: GameBalance
   m_EditorClassIdentifier: Assembly-CSharp::GameBalance
-  startingWood: 99
-  startingFood: 99
-  startingCoins: 99
-  startingFish: 99
-  startingCorn: 99
-  startingPumpkin: 99
-  startingJerimum: 99
-  startingMilk: 99
-  startingEggs: 99
+  startingWood: 0
+  startingFood: 2
+  startingCoins: 4
+  startingFish: 0
+  startingCorn: 0
+  startingPumpkin: 0
+  startingJerimum: 0
+  startingMilk: 0
+  startingEggs: 0
   startingCornSeeds: 0
   startingPumpkinSeeds: 0
   startingJerimumSeeds: 0
@@ -31,16 +31,16 @@ MonoBehaviour:
     seedsPerPurchase: 1
     growthDays: 1
     foodYield: 2
-    bonusYieldPerExtraDay: 1
+    bonusYieldPerExtraDay: 0
     witherDaysAfterMaturity: 2
   pumpkin:
     type: 2
     displayName: Macaxeira
     coinCost: 2
     seedsPerPurchase: 1
-    growthDays: 1
-    foodYield: 7
-    bonusYieldPerExtraDay: 1
+    growthDays: 2
+    foodYield: 3
+    bonusYieldPerExtraDay: 0
     witherDaysAfterMaturity: 2
   jerimum:
     type: 3
@@ -48,15 +48,15 @@ MonoBehaviour:
     coinCost: 4
     seedsPerPurchase: 1
     growthDays: 3
-    foodYield: 5
+    foodYield: 4
     bonusYieldPerExtraDay: 1
     witherDaysAfterMaturity: 2
   woodPrice: 1
   fishPrice: 2
-  cornPrice: 4
-  pumpkinPrice: 1
+  cornPrice: 3
+  pumpkinPrice: 2
   jerimumPrice: 3
-  foodPrice: 1
+  foodPrice: 2
   milkPrice: 2
   eggPrice: 2
   cornSeedPrice: 1
@@ -65,24 +65,28 @@ MonoBehaviour:
   totalDays: 12
   milkPerCow: 1
   eggsPerChicken: 1
-  woodReward: 2
+  woodReward: 1
+  fertilizerHarvestBonus: 1
+  maxPreparedFoodPerAction: 2
+  foodPlusBonus: 1
   gambleStake: 10
   cropGrowthNearCorn: 1
-  cropYieldNearCorn: 2
+  cropYieldNearCorn: 1
   animalProductionNearCorn: 1
   cropSalePriceNearWaterCow: 2
-  fenceWoodCost: 4
-  fenceCoinCost: 8
-  foodCoinCost: 1
+  fenceWoodCost: 3
+  fenceCoinCost: 5
+  foodCoinCost: 4
   marketDays: 01000000030000000500000007000000090000000a0000000c000000
   deliveriesPerHouse: 2
   secondHouseDeliveries: 3
   thirdHouseDeliveries: 4
   houseRewardLimit: 3
   minimumOffers: 2
-  maximumOffers: 3
+  maximumOffers: 2
   campaignDays: 12
   returningOffersPerMarket: 1
+  dailyMissionOffers: 1
   generalEventChance: 0.35
   comadreChance: 0.5
   droughtDurationDays: 2

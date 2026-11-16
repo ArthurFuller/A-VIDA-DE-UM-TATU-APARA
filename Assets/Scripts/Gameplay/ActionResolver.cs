@@ -696,7 +696,7 @@ public sealed class ActionResolver : MonoBehaviour
                 worker.SetStatus(activity == ActivityKind.Fertilizer ? "plantação adubada" :
                     "crescimento acelerado");
                 feedback.ShowMessage(activity == ActivityKind.Fertilizer ?
-                    "Adubo: produção dobrada na colheita." : "Plantação avançou um dia.");
+                    "Adubo: aumenta a produção na colheita." : "Plantação avançou um dia.");
                 SendWorkerHome(worker);
                 return;
             }

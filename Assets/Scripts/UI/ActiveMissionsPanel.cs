@@ -10,7 +10,12 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
     [SerializeField] private RectTransform contentRect;
     [SerializeField] private Text toggleText;
     [SerializeField] private ActiveMissionCard[] cards;
-    [SerializeField] private Sprite[] itemIcons;
+    [Header("Prévia dos recursos no primeiro card")]
+    [SerializeField] private SaleItem previewFirst = SaleItem.Fish;
+    [SerializeField] private SaleItem previewSecond = SaleItem.Wood;
+    [SerializeField] private SaleItem previewThird = SaleItem.Corn;
+    [Header("Sprite, tamanho e posição de cada recurso")]
+    [SerializeField] private List<ActiveMissionIconProfile> iconProfiles = new();
     [SerializeField] private DayTimeline timeline;
     [SerializeField] private SeedMerchant merchant;
 
@@ -24,13 +29,6 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
     private float cardHeight = 70f;
     [SerializeField, Min(0f)] private float listBottomPadding = 4f;
 
-    [Header("Icones dos cards (editavel no Inspector)")]
-    [SerializeField] private Vector2 itemIconSize = new Vector2(25f, 25f);
-    [SerializeField, Tooltip("Posicao relativa ao canto superior esquerdo de cada card.")]
-    private Vector2 itemIconPosition = new Vector2(8f, -27f);
-    [SerializeField, Min(0f)] private float iconToTextGap = 6f;
-    [SerializeField, Min(0f)] private float quantityRightMargin = 8f;
-
     [Header("Entrada da janela")]
     [SerializeField, Min(0.05f)] private float animationDuration = 0.36f;
     [SerializeField, Min(0f), Tooltip("Folga acima da area recortada antes de a janela descer.")]
@@ -41,6 +39,16 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
     [SerializeField, Min(0f)] private float cardWaveInterval = 0.11f;
     [SerializeField, Min(0f)] private float cardDropDistance = 56f;
 
+    [Header("Entrega dos cards")]
+    [SerializeField, Min(0.05f)] private float deliveryExitDuration = 0.27f;
+    [SerializeField, Min(0.05f)] private float deliveryReflowDuration = 0.31f;
+
+    private ActiveMissionCard deliveredCard;
+    private int deliveryVersion;
+    private bool rebindingAfterDelivery;
+    private Sequence deliveryMotion;
+    private System.Action refreshAfterDelivery;
+
     private readonly List<CanvasGroup> cardGroups = new List<CanvasGroup>();
     private readonly List<RectTransform> cardRects = new List<RectTransform>();
     private readonly List<Vector2> cardPositions = new List<Vector2>();
@@ -48,6 +56,92 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
     private Vector2 openPosition;
 
     public bool IsOpen => isOpen;
+
+#if UNITY_EDITOR
+    public ActiveMissionCard EditorPreviewCard =>
+        cards != null && cards.Length > 0 ? cards[0] : null;
+    private SaleItem PreviewItem(int index) => index switch
+    {
+        0 => previewFirst,
+        1 => previewSecond,
+        _ => previewThird
+    };
+
+    public void RefreshEditorIconPreview(int index)
+    {
+        if (Application.isPlaying || cards == null || cards.Length == 0 || cards[0] == null) return;
+        ActiveMissionIconProfile profile = ProfileFor(PreviewItem(index));
+        profile?.Apply(cards[0].IconAt(index), index);
+    }
+
+    public void RefreshMatchingEditorSprites(int changedIndex)
+    {
+        if (Application.isPlaying || EditorPreviewCard == null) return;
+        SaleItem item = PreviewItem(changedIndex);
+        ActiveMissionIconProfile profile = ProfileFor(item);
+        if (profile == null) return;
+        for (int i = 0; i < 3; i++)
+        {
+            if (i == changedIndex || PreviewItem(i) != item) continue;
+            Image image = EditorPreviewCard.IconAt(i);
+            if (image == null) continue;
+            image.sprite = profile.sprite;
+            image.enabled = profile.sprite != null;
+        }
+    }
+
+    public void RefreshEditorCardFormatting()
+    {
+        if (EditorPreviewCard == null) return;
+        EditorPreviewCard.RefreshEditorFormatting(iconProfiles);
+        ApplySharedCardFormatting();
+        if (Application.isPlaying)
+            foreach (ActiveMissionCard card in cards)
+                if (card != null && card != EditorPreviewCard)
+                    card.RefreshIconProfiles(iconProfiles);
+    }
+
+    public void RefreshEditorPreview()
+    {
+        if (Application.isPlaying || EditorPreviewCard == null) return;
+        EditorPreviewCard.ShowEditorThirdItem();
+        for (int i = 0; i < 3; i++) RefreshEditorIconPreview(i);
+        ApplyCardLayout();
+        RefreshEditorCardFormatting();
+    }
+
+    public void CaptureEditorIcon(int index)
+    {
+        if (EditorPreviewCard == null) return;
+        if (index < 0 || index > 2) return;
+        ActiveMissionIconProfile profile = ProfileFor(EditorPreviewCard.PreviewedItem(index, PreviewItem(index)));
+        Image image = EditorPreviewCard.IconAt(index);
+        if (profile == null || image == null) return;
+        profile.sprite = image.sprite;
+        if (index == 0)
+        {
+            profile.firstSize = image.rectTransform.sizeDelta;
+            profile.firstPosition = image.rectTransform.anchoredPosition;
+        }
+        else if (index == 1)
+        {
+            profile.secondSize = image.rectTransform.sizeDelta;
+            profile.secondPosition = image.rectTransform.anchoredPosition;
+        }
+        else
+        {
+            profile.thirdSize = image.rectTransform.sizeDelta;
+            profile.thirdPosition = image.rectTransform.anchoredPosition;
+        }
+    }
+#endif
+
+    private ActiveMissionIconProfile ProfileFor(SaleItem item)
+    {
+        foreach (ActiveMissionIconProfile profile in iconProfiles)
+            if (profile != null && profile.item == item) return profile;
+        return null;
+    }
 
     private Vector2 HiddenPosition
     {
@@ -63,6 +157,7 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
     private void Awake()
     {
         if (contentRect != null) openPosition = contentRect.anchoredPosition;
+        ApplySharedCardFormatting();
         ApplyCardLayout();
         CacheCards();
         isOpen = false;
@@ -70,7 +165,6 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
         if (contentGroup != null)
         {
             contentGroup.alpha = 1f; // No panel fade: visibility is controlled by the mask.
-            contentGroup.interactable = false;
             contentGroup.blocksRaycasts = false;
         }
         UpdateToggleText();
@@ -96,6 +190,7 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
 
     private void AnimateWindow()
     {
+        if (!isOpen) FinishDelivery();
         DOTween.Kill(this);
         if (contentRect != null) contentRect.DOKill();
         RestoreCards();
@@ -104,7 +199,7 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
         if (contentGroup != null)
         {
             contentGroup.alpha = 1f;
-            contentGroup.interactable = isOpen;
+            // Bloqueia o ponteiro sem aplicar a cor de botão desativado.
             contentGroup.blocksRaycasts = false;
         }
         if (contentRect == null)
@@ -134,6 +229,13 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
         }
     }
 
+    private void ApplySharedCardFormatting()
+    {
+        if (cards == null || cards.Length == 0 || cards[0] == null) return;
+        for (int i = 1; i < cards.Length; i++)
+            if (cards[i] != null) cards[i].CopyFormattingFrom(cards[0]);
+    }
+
     private void ApplyCardLayout()
     {
         if (cards == null) return;
@@ -144,26 +246,19 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
         for (int i = 0; i < cards.Length; i++)
         {
             ActiveMissionCard card = cards[i];
-            if (card == null) continue;
+            if (card == null || (Application.isPlaying && !card.gameObject.activeSelf)) continue;
             RectTransform rect = card.transform as RectTransform;
             if (rect == null) continue;
             Vector2 position = rect.anchoredPosition;
-            position.y = -top - validCards * (height + spacing);
+            position.y = -top;
             rect.anchoredPosition = position;
-            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
-            card.ConfigureIconLayout(itemIconSize, itemIconPosition,
-                iconToTextGap, quantityRightMargin, rect.rect.width);
+            float actualHeight = Mathf.Max(height, card.RequiredHeight);
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, actualHeight);
+            top += actualHeight + spacing;
             validCards++;
         }
-        ResizeScrollContent(validCards);
-    }
-
-    private void ResizeScrollContent(int count)
-    {
-        float needed = Mathf.Max(0f, firstCardTopPadding) + Mathf.Max(0, count) *
-            Mathf.Max(1f, cardHeight) + Mathf.Max(0, count - 1) *
-            Mathf.Max(0f, cardSpacing) + Mathf.Max(0f, listBottomPadding);
-        ResizeScrollContentHeight(needed);
+        ResizeScrollContentHeight(top - (validCards > 0 ? spacing : 0f) +
+            Mathf.Max(0f, listBottomPadding));
     }
 
     private void ResizeScrollContentHeight(float needed)
@@ -180,8 +275,7 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
     // Rebuilds the card positions before the scene is saved to disk.
     public void RefreshEditorLayoutAfterPlayMode()
     {
-        if (Application.isPlaying) return;
-        ApplyCardLayout();
+        RefreshEditorPreview();
     }
 
     private void OnValidate()
@@ -198,6 +292,7 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
 
         bool runtimePreview = Application.isPlaying && cards != null &&
             cardRects.Count == cards.Length;
+        if (runtimePreview && deliveredCard != null) return;
         if (runtimePreview)
         {
             // Só interrompe tweens dos cards enquanto o desenvolvedor está
@@ -208,6 +303,10 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
 
         ApplyCardLayout();
 
+        if (runtimePreview)
+            foreach (ActiveMissionCard card in cards)
+                if (card != null) card.RefreshIconProfiles(iconProfiles);
+
         if (!runtimePreview) return;
         // Atualiza os destinos usados por RestoreCards / AnimateCards.
         // Sem isso, reabrir a aba faria os cards voltarem à posição antiga.
@@ -217,7 +316,10 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
                 cardPositions[i] = cardRects[i].anchoredPosition;
             if (isOpen && cards[i] != null && cards[i].gameObject.activeSelf &&
                 cardGroups[i] != null)
+            {
                 cardGroups[i].alpha = 1f;
+                cardGroups[i].blocksRaycasts = true;
+            }
         }
     }
 #endif
@@ -250,7 +352,11 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
                 rect.DOKill();
                 rect.anchoredPosition = cardPositions[i];
             }
-            if (cardGroups[i] != null) cardGroups[i].alpha = 1f;
+            if (cardGroups[i] != null)
+            {
+                cardGroups[i].alpha = 1f;
+                cardGroups[i].blocksRaycasts = true;
+            }
         }
     }
 
@@ -260,7 +366,11 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
         for (int i = 0; i < cardRects.Count; i++)
         {
             if (cards[i] == null || !cards[i].gameObject.activeSelf) continue;
-            if (cardGroups[i] != null) cardGroups[i].alpha = 0f;
+            if (cardGroups[i] != null)
+            {
+                cardGroups[i].alpha = 0f;
+                cardGroups[i].blocksRaycasts = false;
+            }
             if (cardRects[i] != null)
                 cardRects[i].anchoredPosition = cardPositions[i] + Vector2.up * cardDropDistance;
         }
@@ -278,10 +388,11 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
             CanvasGroup group = cardGroups[i];
             Vector2 destination = cardPositions[i];
             float delay = visibleIndex++ * cardWaveInterval;
-            Sequence entry = DOTween.Sequence().SetId(this);
+            Sequence entry = DOTween.Sequence().SetId(this).SetTarget(rect);
             entry.AppendInterval(delay);
             entry.AppendCallback(() => { if (isOpen && group != null) group.alpha = 1f; });
             entry.Append(rect.DOAnchorPos(destination, cardDropDuration).SetEase(Ease.OutCubic));
+            entry.OnComplete(() => { if (isOpen && group != null) group.blocksRaycasts = true; });
         }
     }
 
@@ -292,14 +403,115 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
 
     private void OnDisable()
     {
+        FinishDelivery();
         DOTween.Kill(this);
         if (contentRect != null) contentRect.DOKill();
         RestoreCards();
     }
 
-    public void Refresh(IReadOnlyList<DeliveryMission> missions, int day, ResourceBank resources)
+    public bool BeginDelivery(ActiveMissionCard card, System.Action refresh, out System.Action onLastDeparture)
     {
-        if (cards == null || missions == null || resources == null) return;
+        onLastDeparture = null;
+        if (!isActiveAndEnabled || !isOpen || deliveredCard != null || card == null ||
+            !card.gameObject.activeInHierarchy) return false;
+        deliveredCard = card;
+        refreshAfterDelivery = refresh;
+        card.SetDelivering();
+
+        int version = ++deliveryVersion;
+        onLastDeparture = () =>
+        {
+            // As moedas de uma entrega anterior podem continuar em voo após reabrir a aba.
+            if (this != null && deliveryVersion == version && deliveredCard == card)
+                AnimateDeliveredCardExit(card);
+        };
+        return true;
+    }
+
+    private void AnimateDeliveredCardExit(ActiveMissionCard card)
+    {
+        if (!isOpen || deliveryMotion != null) return;
+        int index = System.Array.IndexOf(cards, card);
+        if (index < 0 || index >= cardRects.Count || cardRects[index] == null)
+        {
+            FinishDelivery();
+            return;
+        }
+
+        RectTransform departing = cardRects[index];
+        RectTransform viewport = listContent != null ? listContent.parent as RectTransform : null;
+        Transform parent = departing.parent;
+        float right = viewport != null
+            ? parent.InverseTransformPoint(viewport.TransformPoint(new Vector3(viewport.rect.xMax, 0f))).x
+            : parent.InverseTransformPoint(departing.TransformPoint(Vector3.right * departing.rect.width)).x;
+        float left = parent.InverseTransformPoint(departing.TransformPoint(Vector3.right * departing.rect.xMin)).x;
+        float exitX = departing.anchoredPosition.x + Mathf.Max(0f, right - left) + 4f;
+
+        Sequence motion = DOTween.Sequence().SetId(this);
+        deliveryMotion = motion;
+        motion.Append(departing.DOAnchorPosX(exitX, deliveryExitDuration).SetEase(Ease.InCubic));
+        float rise = departing.rect.height + Mathf.Max(0f, cardSpacing);
+        float riseStart = deliveryExitDuration;
+        for (int i = index + 1; i < cardRects.Count; i++)
+        {
+            RectTransform rect = cardRects[i];
+            if (rect == null || !rect.gameObject.activeSelf) continue;
+            rect.DOKill();
+            CanvasGroup group = cardGroups[i];
+            if (group != null)
+            {
+                // O botão mantém seu estado visual até terminar de subir.
+                group.blocksRaycasts = false;
+                if (group.alpha < 1f)
+                    motion.InsertCallback(riseStart, () => group.alpha = 1f);
+            }
+            motion.Insert(riseStart, rect.DOAnchorPosY(cardPositions[i].y + rise, deliveryReflowDuration)
+                .SetEase(Ease.OutCubic));
+        }
+
+        if (viewport != null)
+        {
+            float bottom = Mathf.Max(0f, listContent.rect.height - viewport.rect.height - rise);
+            if (listContent.anchoredPosition.y > bottom)
+            {
+                contentRect?.GetComponent<ScrollRect>()?.StopMovement();
+                motion.Insert(riseStart, listContent.DOAnchorPosY(bottom, deliveryReflowDuration)
+                    .SetEase(Ease.OutCubic));
+            }
+        }
+
+        motion.OnComplete(() =>
+        {
+            deliveryMotion = null;
+            FinishDelivery();
+        });
+    }
+
+    public void FinishDelivery()
+    {
+        if (refreshAfterDelivery == null) return;
+        deliveryVersion++;
+        deliveryMotion?.Kill();
+        deliveryMotion = null;
+        deliveredCard = null;
+        System.Action refresh = refreshAfterDelivery;
+        refreshAfterDelivery = null;
+        RestoreCards();
+        rebindingAfterDelivery = true;
+        try
+        {
+            refresh.Invoke();
+        }
+        finally
+        {
+            rebindingAfterDelivery = false;
+        }
+    }
+
+    public void Refresh(IReadOnlyList<DeliveryMission> missions, DeliveryMissionBoard board)
+    {
+        if (cards == null || missions == null || board == null || refreshAfterDelivery != null) return;
+        ApplySharedCardFormatting();
         int shown = 0;
         float usedHeight = Mathf.Max(0f, firstCardTopPadding);
         for (int i = 0; i < missions.Count && shown < cards.Length; i++)
@@ -310,12 +522,8 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
             ActiveMissionCard card = cards[cardIndex];
             if (card == null) continue;
             card.gameObject.SetActive(true);
-            SaleItem firstItem = mission.requirements != null && mission.requirements.Count > 0 ?
-                mission.requirements[0].item : (SaleItem)(-1);
-            int iconIndex = IconIndex(firstItem);
-            Sprite icon = itemIcons != null && iconIndex >= 0 && iconIndex < itemIcons.Length
-                ? itemIcons[iconIndex] : null;
-            float height = Mathf.Max(cardHeight, card.Bind(mission, resources, icon));
+            float height = Mathf.Max(cardHeight,
+                card.Bind(mission, iconProfiles, board, rebindingAfterDelivery));
             RectTransform rect = card.transform as RectTransform;
             if (rect == null) continue;
             rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
@@ -332,11 +540,4 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
             Mathf.Max(0f, listBottomPadding));
     }
 
-    private static int IconIndex(SaleItem item) => item switch
-    {
-        SaleItem.Wood => 0, SaleItem.Food => 1, SaleItem.CornSeeds => 2,
-        SaleItem.PumpkinSeeds => 3, SaleItem.Fish => 4,
-        SaleItem.Corn => 5, SaleItem.Pumpkin => 6,
-        _ => -1
-    };
 }

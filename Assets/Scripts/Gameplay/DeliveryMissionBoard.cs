@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,6 +12,7 @@ public sealed class DeliveryMission
     public int dueDay;
     public int coinReward;
     public bool accepted;
+    [NonSerialized] public DeliveryMissionTemplate template;
 }
 
 public sealed class DeliveryMissionBoard : MonoBehaviour
@@ -20,7 +20,7 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
     [SerializeField] private ResourceBank resources;
     [SerializeField] private ResourceHud resourceHud;
     [SerializeField] private GameFeedback feedback;
-    [SerializeField] private Text orderText;
+    [SerializeField] private DeliveryOrderCardView orderCard;
     [SerializeField] private Button acceptButton;
     [SerializeField] private Button deliverButton;
     [SerializeField] private Button nextButton;
@@ -38,11 +38,13 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
     [SerializeField, HideInInspector, Range(0, 3)] private int returningOffersPerMarket = 1;
 
     private readonly List<DeliveryMission> missions = new List<DeliveryMission>();
-    private readonly List<DeliveryMission> returningOffers = new List<DeliveryMission>();
+    private readonly HashSet<DeliveryMissionTemplate> refusedTemplates = new();
+    private readonly HashSet<DeliveryMissionTemplate> shownTemplates = new();
     private int currentDay = 1;
     private int selectedIndex;
     private int lastGeneratedDay;
     private bool marketOpen;
+    private bool delivering;
     private int communityDeliveries;
     private int housesRewarded;
 
@@ -64,7 +66,7 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
             houseRewardLimit = balance.houseRewardLimit;
             minimumOffers = balance.minimumOffers;
             maximumOffers = balance.maximumOffers;
-            campaignDays = balance.campaignDays;
+            campaignDays = Mathf.Min(balance.campaignDays, balance.totalDays);
             returningOffersPerMarket = balance.returningOffersPerMarket;
         }
         if (resources != null) resources.Changed += Refresh;
@@ -75,18 +77,22 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
         if (resources != null) resources.Changed -= Refresh;
     }
 
-    public void SetDay(int day, bool isMarketDay)
+    public void SetDay(int day, bool isMarketDay, Func<DeliveryOfferForecast> createForecast)
     {
-        currentDay = day;
         marketOpen = isMarketDay;
-        foreach (DeliveryMission mission in missions)
-            if (!mission.accepted && !returningOffers.Contains(mission)) returningOffers.Add(mission);
-        missions.RemoveAll(m => !m.accepted);
-        int expired = missions.RemoveAll(m => day > m.dueDay);
-        if (expired > 0 && feedback != null) feedback.ShowMessage("Pedidos com prazo encerrado foram removidos.");
+        if (currentDay != day)
+        {
+            currentDay = day;
+            foreach (DeliveryMission mission in missions)
+                if (!mission.accepted) refusedTemplates.Add(mission.template);
+            missions.RemoveAll(m => !m.accepted);
+            int expired = missions.RemoveAll(m => day > m.dueDay);
+            if (expired > 0 && feedback != null)
+                feedback.ShowMessage("Pedidos com prazo encerrado foram removidos.");
+        }
         if (marketOpen && lastGeneratedDay != day)
         {
-            GenerateOffers();
+            GenerateOffers(createForecast());
             lastGeneratedDay = day;
         }
         selectedIndex = Mathf.Clamp(selectedIndex, 0, Mathf.Max(0, missions.Count - 1));
@@ -125,49 +131,89 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
 
     public void DeliverAt(int index)
     {
-        if (index < 0 || index >= missions.Count || resources == null) return;
+        RectTransform origin = deliverButton != null ? deliverButton.transform as RectTransform : null;
+        if (DeliverAt(index, origin)) Refresh();
+    }
+
+    public bool CanDeliver(DeliveryMission mission) =>
+        IsDeliverable(mission) && resources.CanDeliverMission(mission.requirements);
+
+    private bool IsDeliverable(DeliveryMission mission) =>
+        resources != null && mission != null && mission.accepted && currentDay <= mission.dueDay;
+
+    public void DeliverFromCard(ActiveMissionCard card, DeliveryMission mission, RectTransform origin)
+    {
+        if (Time.timeScale <= 0f || delivering || activePanel == null) return;
+        int index = missions.IndexOf(mission);
+        if (index < 0 || !CanDeliver(mission)) return;
+        if (!activePanel.BeginDelivery(card, Refresh, out System.Action onLastDeparture)) return;
+
+        if (DeliverAt(index, origin, onLastDeparture))
+            Refresh();
+        else
+            activePanel.FinishDelivery();
+    }
+
+    private bool DeliverAt(int index, RectTransform origin, System.Action onLastDeparture = null)
+    {
+        if (delivering || index < 0 || index >= missions.Count) return false;
         DeliveryMission mission = missions[index];
-        if (!mission.accepted || currentDay > mission.dueDay) return;
-        if (!resources.TryDeliverMission(mission.requirements))
+        if (!IsDeliverable(mission)) return false;
+
+        delivering = true;
+        try
         {
-            if (feedback != null) feedback.ShowMessage("Ainda faltam itens para a entrega.");
-            return;
-        }
-        resources.AddCoins(mission.coinReward);
-        AudioManager.Play(SoundCue.MissionDelivered);
-        if (resourceHud != null && deliverButton != null)
-            resourceHud.FlyFromRect(ResourceKind.Coins, mission.coinReward,
-                deliverButton.transform as RectTransform);
-        if (feedback != null) feedback.ShowMessage("Entrega concluída! +" + mission.coinReward + " moedas.");
-        missions.RemoveAt(index);
-        if (housesRewarded < houseRewardLimit)
-        {
-            communityDeliveries++;
-            if (communityDeliveries >= DeliveriesForNextHouse() && hand != null &&
-                hand.AddCommunityHouseCard())
+            if (!resources.TryDeliverMission(mission.requirements))
             {
-                communityDeliveries = 0;
-                housesRewarded++;
-                AudioManager.Play(SoundCue.NewHouseCard);
-                if (feedback != null) feedback.ShowMessage("Comunidade: carta de casa recebida!");
+                if (feedback != null) feedback.ShowMessage("Ainda faltam itens para a entrega.");
+                return false;
             }
+
+            missions.RemoveAt(index);
+            if (index < selectedIndex) selectedIndex--;
+            selectedIndex = Mathf.Clamp(selectedIndex, 0, Mathf.Max(0, missions.Count - 1));
+            resources.AddCoins(mission.coinReward);
+            // O HUD captura a posição antes de Refresh reposicionar ou esconder o card.
+            if (resourceHud != null)
+                resourceHud.FlyFromRect(ResourceKind.Coins, mission.coinReward, origin, onLastDeparture, maxIcons: 8);
+            else
+                onLastDeparture?.Invoke();
+            AudioManager.Play(SoundCue.MissionDelivered);
+            if (feedback != null) feedback.ShowMessage("Entrega concluída! +" + mission.coinReward + " moedas.");
+
+            if (housesRewarded < houseRewardLimit)
+            {
+                communityDeliveries++;
+                if (communityDeliveries >= DeliveriesForNextHouse() && hand != null &&
+                    hand.AddCommunityHouseCard())
+                {
+                    communityDeliveries = 0;
+                    housesRewarded++;
+                    AudioManager.Play(SoundCue.NewHouseCard);
+                    if (feedback != null) feedback.ShowMessage("Comunidade: carta de casa recebida!");
+                }
+            }
+            return true;
         }
-        selectedIndex = Mathf.Clamp(selectedIndex, 0, Mathf.Max(0, missions.Count - 1));
-        Refresh();
+        finally
+        {
+            // O banco dispara Changed durante o gasto e durante o crédito.
+            delivering = false;
+        }
     }
 
     private string CommunityReminder()
     {
         if (housesRewarded >= houseRewardLimit)
-            return "Comunidade: todas as casas foram liberadas.";
+            return "Todas as casas foram liberadas.";
 
         int remaining = DeliveriesForNextHouse() - communityDeliveries;
         if (remaining <= 0)
-            return "Comunidade: nova casa aguardando espaço para ser liberada.";
+            return "Nova casa aguardando espaço para ser liberada.";
 
-        return "Comunidade: " + (remaining == 1 ?
-            "falta 1 entrega para uma nova casa." :
-            "faltam " + remaining + " entregas para uma nova casa.");
+        return remaining == 1 ?
+            "Falta 1 entrega para uma nova casa." :
+            "Faltam " + remaining + " entregas para uma nova casa.";
     }
 
     private int DeliveriesForNextHouse() => housesRewarded switch
@@ -177,7 +223,7 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
         _ => thirdHouseDeliveries
     };
 
-    private void GenerateOffers()
+    private void GenerateOffers(DeliveryOfferForecast forecast)
     {
         DeliveryMissionCatalog catalog = Resources.Load<DeliveryMissionCatalog>("DeliveryMissions");
         if (catalog == null || catalog.entries == null)
@@ -185,86 +231,105 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
             Debug.LogError("Catálogo de encomendas não encontrado em Resources/DeliveryMissions.");
             return;
         }
-        var pool = new List<SaleItem>();
+
+        int minimum = Mathf.Clamp(minimumOffers, 1, 5);
+        int maximum = Mathf.Clamp(maximumOffers, minimum, 5);
+        int count = UnityEngine.Random.Range(minimum, maximum + 1);
+        var activeTemplates = new HashSet<DeliveryMissionTemplate>();
+        foreach (DeliveryMission mission in missions)
+            activeTemplates.Add(mission.template);
+        var dailyResources = new HashSet<SaleItem>();
+        var accepted = missions.FindAll(mission => mission.accepted);
+        var candidates = new Dictionary<DeliveryMissionTemplate, DeliveryMission>();
+        var estimates = new Dictionary<DeliveryMissionTemplate, DeliveryOfferForecast.Feasibility>();
         foreach (DeliveryMissionTemplate template in catalog.entries)
-            if (DeliveryMissionCatalog.IsUsable(template) &&
-                !pool.Contains(template.requirements[0].item))
-                pool.Add(template.requirements[0].item);
-        if (pool.Count == 0) return;
-        int count = Mathf.Clamp(UnityEngine.Random.Range(minimumOffers, maximumOffers + 1), 1, pool.Count);
-        int returning = Mathf.Min(returningOffersPerMarket, Mathf.Min(count, returningOffers.Count));
-        for (int i = 0; i < returning; i++)
         {
-            int pick = UnityEngine.Random.Range(0, returningOffers.Count);
-            DeliveryMission offer = returningOffers[pick];
-            returningOffers.RemoveAt(pick);
-            offer.dueDay = Mathf.Min(campaignDays, currentDay + 2);
-            missions.Add(offer);
-            if (offer.requirements.Count > 0) pool.Remove(offer.requirements[0].item);
+            if (!DeliveryMissionCatalog.IsUsable(template) || template.availableFromDay > currentDay ||
+                activeTemplates.Contains(template) || candidates.ContainsKey(template)) continue;
+            var requirements = new List<DeliveryRequirement>(template.requirements.Count);
+            foreach (DeliveryRequirement requirement in template.requirements)
+                requirements.Add(new DeliveryRequirement { item = requirement.item, quantity = requirement.quantity });
+            var mission = new DeliveryMission
+            {
+                template = template,
+                title = template.title,
+                description = template.description,
+                requirements = requirements,
+                dueDay = currentDay + Mathf.Clamp(template.deliveryDays, 0, Mathf.Max(0, campaignDays - currentDay)),
+                coinReward = template.coinReward
+            };
+            candidates.Add(template, mission);
+            estimates.Add(template, forecast.Evaluate(accepted, mission));
         }
-        count = Mathf.Min(count - returning, pool.Count);
+
+        int returns = 0;
         for (int i = 0; i < count; i++)
         {
-            int pick = UnityEngine.Random.Range(0, pool.Count);
-            SaleItem item = pool[pick];
-            pool.RemoveAt(pick);
-            var options = new List<DeliveryMissionTemplate>();
-            foreach (DeliveryMissionTemplate template in catalog.entries)
-                if (DeliveryMissionCatalog.IsUsable(template) &&
-                    template.requirements[0].item == item) options.Add(template);
-            DeliveryMissionTemplate chosen = options[UnityEngine.Random.Range(0, options.Count)];
-            var requirements = new List<DeliveryRequirement>(chosen.requirements.Count);
-            foreach (DeliveryRequirement requirement in chosen.requirements)
-                requirements.Add(new DeliveryRequirement
-                    { item = requirement.item, quantity = requirement.quantity });
-            missions.Add(new DeliveryMission
-            {
-                title = chosen.title,
-                description = chosen.description,
-                requirements = requirements,
-                dueDay = Mathf.Min(campaignDays, currentDay + 2),
-                coinReward = chosen.coinReward
-            });
+            bool canReturn = returns < returningOffersPerMarket;
+            bool largeSlot = i == 1;
+            DeliveryMissionTemplate template = PickTemplate(estimates, activeTemplates, dailyResources,
+                largeSlot, canReturn, preferredCategoryOnly: true) ??
+                PickTemplate(estimates, activeTemplates, dailyResources, largeSlot, canReturn,
+                    preferredCategoryOnly: false);
+            if (template == null) break;
+            if (refusedTemplates.Remove(template)) returns++;
+
+            activeTemplates.Add(template);
+            foreach (DeliveryRequirement requirement in template.requirements)
+                dailyResources.Add(requirement.item);
+            shownTemplates.Add(template);
+            missions.Add(candidates[template]);
         }
+    }
+
+    private DeliveryMissionTemplate PickTemplate(
+        Dictionary<DeliveryMissionTemplate, DeliveryOfferForecast.Feasibility> estimates,
+        HashSet<DeliveryMissionTemplate> activeTemplates, HashSet<SaleItem> dailyResources,
+        bool largeSlot, bool allowReturns, bool preferredCategoryOnly)
+    {
+        DeliveryMissionTemplate next = null;
+        int totalWeight = 0;
+        foreach (var entry in estimates)
+        {
+            DeliveryMissionTemplate template = entry.Key;
+            if (activeTemplates.Contains(template) ||
+                (!allowReturns && refusedTemplates.Contains(template)) ||
+                (preferredCategoryOnly && template.largeOrder != largeSlot)) continue;
+
+            int weight = 4 + (int)entry.Value;
+            bool overlaps = false;
+            foreach (DeliveryRequirement requirement in template.requirements)
+            {
+                if (!dailyResources.Contains(requirement.item)) continue;
+                overlaps = true;
+                break;
+            }
+            if (!overlaps) weight++;
+            if (!shownTemplates.Contains(template)) weight++;
+
+            // Cada pedido elegível entra no sorteio com o próprio peso.
+            totalWeight += weight;
+            if (UnityEngine.Random.Range(0, totalWeight) < weight) next = template;
+        }
+        return next;
     }
 
     private void Refresh()
     {
-        if (resources == null) return;
-        if (activePanel != null) activePanel.Refresh(missions, currentDay, resources);
+        if (resources == null || delivering) return;
+        if (activePanel != null) activePanel.Refresh(missions, this);
         if (missions.Count == 0)
         {
-            if (orderText != null) orderText.text = "Nenhum pedido disponível.\nNovas ofertas chegam com a barraca.\n\n" + CommunityReminder();
+            if (orderCard != null) orderCard.Show(null, CommunityReminder());
             if (acceptButton != null) acceptButton.interactable = false;
             if (deliverButton != null) deliverButton.interactable = false;
             if (nextButton != null) nextButton.interactable = false;
             return;
         }
         DeliveryMission selected = missions[selectedIndex];
-        int daysLeft = selected.dueDay - currentDay + 1;
-        if (orderText != null)
-        {
-            var text = new StringBuilder(selected.title);
-            if (!string.IsNullOrWhiteSpace(selected.description))
-                text.Append('\n').Append(selected.description);
-            text.Append("\nEntregar: ");
-            bool first = true;
-            foreach (DeliveryRequirement requirement in selected.requirements)
-            {
-                if (!first) text.Append("; ");
-                first = false;
-                text.Append(requirement.quantity).Append("x ")
-                    .Append(DeliveryMissionCatalog.ItemName(requirement.item))
-                    .Append(" (tem ").Append(resources.Stock(requirement.item)).Append(')');
-            }
-            text.Append("\nPrazo: ").Append(daysLeft).Append(daysLeft == 1 ? " dia" : " dias")
-                .Append("  ·  +").Append(selected.coinReward).Append(" moedas")
-                .Append("\n\n").Append(CommunityReminder());
-            orderText.text = text.ToString();
-        }
+        if (orderCard != null) orderCard.Show(selected, CommunityReminder());
         if (acceptButton != null) acceptButton.interactable = marketOpen && !selected.accepted;
-        if (deliverButton != null) deliverButton.interactable = selected.accepted &&
-            resources.CanDeliverMission(selected.requirements);
+        if (deliverButton != null) deliverButton.interactable = CanDeliver(selected);
         if (nextButton != null) nextButton.interactable = missions.Count > 1;
     }
 }

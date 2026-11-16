@@ -333,15 +333,19 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     public bool IsReady(int currentDay, SeedCatalog catalog)
     {
         CropSettings settings = catalog != null ? catalog.Get(Crop) : null;
-        int age = currentDay + growthAdjustment - PlantedDay;
+        int age = GrowthAge(currentDay);
         return settings != null && age >= settings.growthDays &&
             age < settings.growthDays + settings.witherDaysAfterMaturity;
     }
+
+    public int GrowthAge(int day) => day + growthAdjustment - PlantedDay;
 
     public List<Plot> ReadyConnectedPlots(int currentDay, SeedCatalog catalog)
     {
         return ConnectedPlots(plot => plot.IsReady(currentDay, catalog));
     }
+
+    public IReadOnlyList<Plot> JoinedPlots => joinedVisual?.Members;
 
     public List<Plot> ConnectedPlotsFor(ActivityKind activity, int currentDay, SeedCatalog catalog)
     {
@@ -380,12 +384,14 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     public int HarvestYield(int currentDay, SeedCatalog catalog)
     {
         CropSettings settings = catalog != null ? catalog.Get(Crop) : null;
-        return settings == null ? 0 : (settings.foodYield +
-            Mathf.Max(0, currentDay + growthAdjustment - mandalaGrowthAdjustment -
-                PlantedDay - settings.growthDays) *
-            settings.bonusYieldPerExtraDay) * (fertilized ? 2 : 1) +
-            (MandalaSynergy.Instance != null ?
-                MandalaSynergy.Instance.ExtraCropYield(this) : 0);
+        if (settings == null) return 0;
+        int extraDays = Mathf.Max(0, currentDay + growthAdjustment - mandalaGrowthAdjustment -
+            PlantedDay - settings.growthDays);
+        int baseYield = settings.foodYield + extraDays * settings.bonusYieldPerExtraDay;
+        GameBalance balance = GameBalance.Current;
+        int fertilizerBonus = fertilized ? (balance != null ? balance.fertilizerHarvestBonus : baseYield) : 0;
+        int synergy = MandalaSynergy.Instance != null ? MandalaSynergy.Instance.ExtraCropYield(this) : 0;
+        return baseYield + fertilizerBonus + synergy;
     }
 
     public void RefreshGrowth(int currentDay, SeedCatalog catalog)
@@ -395,7 +401,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             return;
         CropSettings settings = catalog != null ? catalog.Get(Crop) : null;
         int growthDays = settings != null ? settings.growthDays : 2;
-        int age = currentDay + growthAdjustment - PlantedDay;
+        int age = GrowthAge(currentDay);
         if (settings != null && age >= growthDays + settings.witherDaysAfterMaturity)
         {
             Harvest();

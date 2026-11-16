@@ -65,7 +65,7 @@ public sealed class InventoryTrading : MonoBehaviour
 
     public bool TrySellBatch(int[] quantities)
     {
-        if (merchant == null || !merchant.IsAvailable || !merchant.IsOpen || resources == null)
+        if (merchant == null || !merchant.CanTrade || !merchant.IsOpen || resources == null)
         {
             if (feedback != null) feedback.ShowMessage("Visite a barraca aberta para vender.");
             return false;
@@ -92,6 +92,10 @@ public sealed class InventoryTrading : MonoBehaviour
     }
 
     public bool TryGetRecipe(int fish, int corn, int pumpkin, int jerimum, int milk, int eggs,
+        bool plus, out string recipeName, out int output) =>
+        EvaluateRecipe(fish, corn, pumpkin, jerimum, milk, eggs, plus, out recipeName, out output);
+
+    public static bool EvaluateRecipe(int fish, int corn, int pumpkin, int jerimum, int milk, int eggs,
         bool plus, out string recipeName, out int output)
     {
         recipeName = null;
@@ -109,7 +113,15 @@ public sealed class InventoryTrading : MonoBehaviour
         if (amount < 2) return false;
         recipeName = types == 1 ? "Alimentos iguais" : "Alimentos diferentes";
         int baseOutput = types == 1 ? amount - 1 : amount;
-        output = baseOutput + (plus ? amount - 1 : 0);
+        GameBalance balance = GameBalance.Current;
+        if (balance == null)
+            output = baseOutput + (plus ? amount - 1 : 0);
+        else
+        {
+            int portions = types == 1 ? 1 : amount - 1;
+            output = Mathf.Min(portions, Mathf.Max(1, balance.maxPreparedFoodPerAction)) +
+                (plus ? Mathf.Max(0, balance.foodPlusBonus) : 0);
+        }
         return true;
     }
 }

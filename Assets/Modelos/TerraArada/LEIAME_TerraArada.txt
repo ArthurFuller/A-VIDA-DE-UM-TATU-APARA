@@ -1,0 +1,33 @@
+CANTEIRO DE TERRA ARADA — estilo cartoon + xilogravura (Unity 6 / URP)
+=========================================================================
+
+O QUE TEM NO PACOTE
+  Assets/Shaders/XiloCartoon/TerraArada.shader        -> o shader "Sertao/Terra Arada"
+  Assets/Modelos/TerraArada/TerraArada.prefab          -> canteiro pronto: é só arrastar pra cena
+  Assets/Modelos/TerraArada/Materiais/M_TerraArada.mat -> o material
+  Assets/Modelos/TerraArada/Modelo/Plano_TerraArada    -> plano de 6 x 6 m bem subdividido
+
+COMO USAR
+  1. Arraste o TerraArada.prefab pra cena, em cima do chão de areia.
+  2. Suba ele 1 ou 2 cm acima do chão (Y = 0.02) pra não piscar.
+  3. Escale à vontade. O canteiro fica no meio do plano e a borda
+     some na areia sozinha (o resto do plano é transparente).
+
+USAR NUM PLANO SEU
+  - Crie um material com o shader "Sertao/Terra Arada" e jogue no plano.
+  - Plano simples (poucos polígonos): DESLIGUE "Deslocar Vertices".
+    O relevo continua aparecendo pela luz e sombra.
+  - Plano subdividido: deixe "Deslocar Vertices" ligado e a leira sobe de verdade.
+
+VÁRIOS CANTEIROS DIFERENTES
+  Duplique o material e mude a "Semente": cada valor dá um formato novo.
+
+PRINCIPAIS AJUSTES (no material)
+  Forma .......... Tamanho, Achatamento (oval), Contorno Torto, Borda que Some na Areia
+  Leiras ......... Quantidade, Ângulo, Curvatura, Altura (em metros), Torrões
+  Cores .......... Fundo do Sulco, Topo da Leira, Terra Solta (+ textura opcional)
+  Cartoon ........ Cor e limite da sombra, força da sombra das árvores
+  Xilogravura .... Traço no fundo do sulco, falhas, hachura na sombra
+  Borda .......... "Borda Pontilhada" troca a transparência por pontinhos
+
+Não precisa configurar nada no projeto: funciona em qualquer projeto URP.
