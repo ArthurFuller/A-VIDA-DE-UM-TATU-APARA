@@ -498,7 +498,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
 
     public void OnPointerEnter(PointerEventData eventData)
     {
-        if (dragging || hovered || returning) return;
+        if (dragging || hovered || returning || Hand != null && Hand.IsDraggingCard) return;
         if (activity != ActivityKind.BuySeeds && Hand != null && Hand.ContainsCard(this)) return;
         if (activity != ActivityKind.BuySeeds && Hand != null && Hand.IsSelectionLocked) return;
         hovered = true;

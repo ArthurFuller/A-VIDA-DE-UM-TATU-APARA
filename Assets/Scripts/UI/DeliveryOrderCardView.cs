@@ -46,7 +46,7 @@ public sealed class DeliveryOrderCardView : MonoBehaviour, ICanvasElement
     private readonly float[] quantityOffsetsX = new float[MaxCenteredItems];
     private int visibleItemCount;
     private bool centeringDirty = true;
-    private float singleIconOffsetY;
+    private readonly float[] iconOffsetsY = new float[MaxCenteredItems];
     public GridLayoutGroup ItemLayout => itemLayout;
 
     private void Awake()
@@ -79,7 +79,7 @@ public sealed class DeliveryOrderCardView : MonoBehaviour, ICanvasElement
     public void Show(DeliveryMission mission, string communityText)
     {
         CacheItems();
-        RestoreSingleIconY();
+        RestoreIconPositions();
         RestoreQuantityPositions();
         shownMission = mission;
         if (title != null) title.text = mission != null ? mission.title : "Nenhum pedido disponível";
@@ -111,12 +111,16 @@ public sealed class DeliveryOrderCardView : MonoBehaviour, ICanvasElement
         QueueCentering();
     }
 
-    private void RestoreSingleIconY()
+    private void RestoreIconPositions()
     {
-        if (items.Count == 0 || singleIconOffsetY == 0f) return;
-        Image icon = items[0].GetComponentInChildren<Image>(true);
-        if (icon != null) icon.rectTransform.anchoredPosition -= Vector2.up * singleIconOffsetY;
-        singleIconOffsetY = 0f;
+        for (int i = 0; i < items.Count && i < MaxCenteredItems; i++)
+        {
+            float offset = iconOffsetsY[i];
+            if (offset == 0f) continue;
+            Image icon = items[i].GetComponentInChildren<Image>(true);
+            if (icon != null) icon.rectTransform.anchoredPosition -= Vector2.up * offset;
+            iconOffsetsY[i] = 0f;
+        }
     }
 
     private void RestoreQuantityPositions()
@@ -162,49 +166,32 @@ public sealed class DeliveryOrderCardView : MonoBehaviour, ICanvasElement
             if (!gridMoved) return;
         }
 
-        RestoreSingleIconY();
+        RestoreIconPositions();
         RestoreQuantityPositions();
-        if (Application.isPlaying && count == 1) AlignSingleIconY(items[0]);
-        // Mantém o passo original da grade antes de aproximar os números dos ícones.
-        float step = count > 1 ? itemLayout.cellSize.x + itemLayout.spacing.x +
-            QuantityOffsetX(items[1]) - QuantityOffsetX(items[0]) : 0f;
+        float totalWidth = 0f;
         for (int i = 0; i < count; i++)
-            PlaceAndMeasureItem(i, out itemCenters[i], out itemWidths[i]);
-
-        float min = -itemWidths[0] * 0.5f;
-        float max = itemWidths[0] * 0.5f;
-        if (count > 1)
         {
-            for (int i = 1; i < count; i++)
-                step = Mathf.Max(step, MinimumItemGap + (itemWidths[i - 1] + itemWidths[i]) * 0.5f);
-            for (int i = 1; i < count; i++)
-            {
-                float center = i * step;
-                min = Mathf.Min(min, center - itemWidths[i] * 0.5f);
-                max = Mathf.Max(max, center + itemWidths[i] * 0.5f);
-            }
+            AlignIconToResourceLine(i);
+            PlaceAndMeasureItem(i, out itemCenters[i], out itemWidths[i]);
+            totalWidth += itemWidths[i];
         }
 
-        RectTransform window = (RectTransform)transform;
-        float cardCenterX = itemsRoot.InverseTransformPoint(window.TransformPoint(window.rect.center)).x;
-        float origin = cardCenterX - (min + max) * 0.5f;
+        float gap = Mathf.Max(MinimumItemGap, itemLayout.cellSize.x / 3f + itemLayout.spacing.x);
+        if (count > 1)
+            gap = Mathf.Min(gap, Mathf.Max(0f, (itemsRoot.rect.width - totalWidth) / (count - 1)));
+        RectTransform card = (RectTransform)transform;
+        float centerX = itemsRoot.InverseTransformPoint(card.TransformPoint(card.rect.center)).x;
+        float left = centerX - (totalWidth + gap * (count - 1)) * 0.5f;
         for (int i = 0; i < count; i++)
         {
             RectTransform row = items[i];
             Vector2 position = row.anchoredPosition;
-            position.x += origin + i * step - itemCenters[i];
+            position.x += left + itemWidths[i] * 0.5f - itemCenters[i];
             row.anchoredPosition = position;
             centeredRowX[i] = position.x;
+            left += itemWidths[i] + gap;
         }
         centeringDirty = false;
-    }
-
-    private float QuantityOffsetX(RectTransform row)
-    {
-        Text quantity = row.GetComponentInChildren<Text>(true);
-        if (quantity == null) return 0f;
-        Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(itemsRoot, quantity.rectTransform);
-        return bounds.min.x - itemsRoot.InverseTransformPoint(row.position).x;
     }
 
     private void PlaceAndMeasureItem(int index, out float center, out float width)
@@ -253,16 +240,22 @@ public sealed class DeliveryOrderCardView : MonoBehaviour, ICanvasElement
         width = right - left;
     }
 
-    private void AlignSingleIconY(RectTransform row)
+    private void AlignIconToResourceLine(int index)
     {
+        RectTransform row = items[index];
         Image image = row.GetComponentInChildren<Image>(true);
         Text quantity = row.GetComponentInChildren<Text>(true);
         if (image == null || !image.enabled || image.sprite == null || quantity == null) return;
         Bounds icon = VisibleIconBounds(row, image);
         Bounds number = RectTransformUtility.CalculateRelativeRectTransformBounds(row, quantity.rectTransform);
         float lineY = number.center.y + number.extents.y * 0.5f;
-        singleIconOffsetY = lineY - icon.center.y;
-        image.rectTransform.anchoredPosition += Vector2.up * singleIconOffsetY;
+        // Mantém pequenos ajustes manuais e traz os ícones fora da linha para a faixa dos números.
+        const float allowedOffset = 3f;
+        float newY = Mathf.Clamp(icon.center.y, lineY - allowedOffset, lineY + allowedOffset);
+        Vector3 offset = row.TransformVector(Vector3.up * (newY - icon.center.y));
+        float offsetY = image.rectTransform.parent.InverseTransformVector(offset).y;
+        iconOffsetsY[index] = offsetY;
+        image.rectTransform.anchoredPosition += Vector2.up * offsetY;
     }
 
     private static Bounds VisibleIconBounds(RectTransform row, Image image)
@@ -330,9 +323,9 @@ public sealed class DeliveryOrderCardView : MonoBehaviour, ICanvasElement
         if (itemsRoot == null || itemsRoot.childCount < 2) return;
         CacheItems();
         centeringDirty = true;
+        RestoreIconPositions();
         if (Application.isPlaying)
         {
-            RestoreSingleIconY();
             int count = shownMission?.requirements?.Count ?? 0;
             for (int i = 0; i < count && i < items.Count; i++)
                 ApplyIcon(items[i], shownMission.requirements[i].item, i);
@@ -362,7 +355,7 @@ public sealed class DeliveryOrderCardView : MonoBehaviour, ICanvasElement
         {
             if (rect.parent != items[i]) continue;
             if (rect.GetComponent<Text>() != null) return Vector2.right * quantityOffsetsX[i];
-            if (i == 0 && rect.GetComponent<Image>() != null) return Vector2.up * singleIconOffsetY;
+            if (rect.GetComponent<Image>() != null) return Vector2.up * iconOffsetsY[i];
         }
         return Vector2.zero;
     }
@@ -390,12 +383,12 @@ public sealed class DeliveryOrderCardView : MonoBehaviour, ICanvasElement
         else if (index == 1)
         {
             icon.rightSize = image.rectTransform.sizeDelta;
-            icon.rightPosition = image.rectTransform.anchoredPosition;
+            icon.rightPosition = image.rectTransform.anchoredPosition - EditorItemOffset(image.rectTransform);
         }
         else
         {
             icon.thirdSize = image.rectTransform.sizeDelta;
-            icon.thirdPosition = image.rectTransform.anchoredPosition;
+            icon.thirdPosition = image.rectTransform.anchoredPosition - EditorItemOffset(image.rectTransform);
         }
     }
 #endif

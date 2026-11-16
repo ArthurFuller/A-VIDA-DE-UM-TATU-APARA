@@ -802,7 +802,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
     {
         if (selectionLocked) return;
         pointerInside = true;
-        SetHover(CardAt(eventData.position, eventData.enterEventCamera));
+        if (!IsDraggingCard) SetHover(CardAt(eventData.position, eventData.enterEventCamera));
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -820,7 +820,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
 
     private void SetHover(ActivityCardDrag card)
     {
-        if (selectionLocked || card != null && (card.IsDragging || card.IsReturning)) return;
+        if (selectionLocked || IsDraggingCard || card != null && card.IsReturning) return;
         if (card == hovered) return;
         ClearHover(false);
         hovered = card;
@@ -928,16 +928,15 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
 
     public void UpdateDucked(Vector2 screenPosition, Camera eventCamera)
     {
-        if (selectionLocked) return;
-        bool outside = !RectTransformUtility.RectangleContainsScreenPoint(DragBoundary,
-            screenPosition, eventCamera);
-        if (outside == ducked) return;
-        ducked = outside;
+        if (selectionLocked || ducked || RectTransformUtility.RectangleContainsScreenPoint(
+                DragBoundary, screenPosition, eventCamera)) return;
+        ducked = true;
         Layout(true, true);
     }
 
     public void EndExternalDrag()
     {
+        if (dragging != null && !dragging.IsDragging) dragging = null;
         if (selectionLocked)
         {
             ducked = true;

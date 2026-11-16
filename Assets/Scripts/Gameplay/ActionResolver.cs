@@ -82,6 +82,7 @@ public sealed class ActionResolver : MonoBehaviour
     private WorkerAssignment pendingPlotWorker;
     private ActivityCardDrag pendingPlotCard;
     private ActivityKind pendingPlotAction;
+    private readonly System.Collections.Generic.HashSet<Plot> plotsBeingPlowed = new();
     private int busyWorkers;
     private bool housePreviewBusy;
     private int replayAnimations;
@@ -91,6 +92,7 @@ public sealed class ActionResolver : MonoBehaviour
     private GatheringTask[] forestTasks;
     private GatheringTask[] fishingTasks;
     private GatheringTask activeMinigame;
+    private SertaoCoinToss coinToss;
     private readonly System.Collections.Generic.Dictionary<WorkerAssignment, Tween> movements = new();
     private readonly System.Collections.Generic.HashSet<WorkerAssignment> busyMovements = new();
     private readonly System.Collections.Generic.HashSet<WorkerAssignment> returningHome = new();
@@ -160,6 +162,7 @@ public sealed class ActionResolver : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (coinToss != null) Destroy(coinToss.gameObject);
         if (forestVisitButton != null)
             forestVisitButton.onClick.RemoveListener(VisitForestWorker);
         if (fishingVisitButton != null)
@@ -217,7 +220,7 @@ public sealed class ActionResolver : MonoBehaviour
     private void TryAssignInternal(WorkerAssignment worker, ActivityKind activity,
         string activityName, ActivityCardDrag card, bool replayAnimationComplete)
     {
-        if (dayCycle == null || !dayCycle.CanAcceptActions)
+        if (dayCycle == null || !dayCycle.CanAcceptActions || SertaoCoinToss.IsOpen)
             return;
         if (replayAnimations > 0 && !replayAnimationComplete) return;
         if (pendingFoodWorker != null)
@@ -308,35 +311,7 @@ public sealed class ActionResolver : MonoBehaviour
         }
         if (activity == ActivityKind.Gamble)
         {
-            if (resources == null || (long)resources.Coins - gambleStake < int.MinValue)
-            {
-                feedback.ShowMessage("Aposta acima do limite de moedas.");
-                return;
-            }
-            CommitAction(worker, activity, activityName, card);
-            worker.SetStatus("lançando moeda");
-            feedback.ShowMessage("Moeda no ar...");
-            AudioManager.Play(SoundCue.GambleSpin);
-            busyWorkers++;
-            Sequence toss = DOTween.Sequence();
-            toss.AppendInterval(coinTossDuration);
-            toss.OnComplete(() =>
-            {
-                busyWorkers--;
-                bool won = Random.value < 0.5f;
-                if (won)
-                {
-                    resources.AddCoins(gambleStake);
-                    if (resourceHud != null) resourceHud.FlyFromWorld(ResourceKind.Coins,
-                        gambleStake, worker.transform.position + Vector3.up);
-                }
-                else resources.TrySpendCoins(gambleStake);
-                worker.SetStatus(won ? "aposta vencida" : "aposta perdida");
-                AudioManager.Play(won ? SoundCue.GambleWin : SoundCue.GambleLose);
-                feedback.ShowMessage(won ? "Jogo do Bicho: +" + gambleStake + " moedas líquidas." :
-                    "Jogo do Bicho: -" + gambleStake + " moedas.");
-                SendWorkerHome(worker);
-            });
+            StartGamble(worker, activityName, card);
             return;
         }
         if (activity == ActivityKind.Rest)
@@ -393,6 +368,45 @@ public sealed class ActionResolver : MonoBehaviour
         foreach (GatheringTask task in tasks)
             if (task.Worker == null) return task;
         return null;
+    }
+
+    private void StartGamble(WorkerAssignment worker, string activityName, ActivityCardDrag card)
+    {
+        if (activeMinigame != null)
+        {
+            feedback.ShowMessage("Conclua o minigame atual antes de apostar.");
+            return;
+        }
+        if (resources == null || (long)resources.Coins - gambleStake < int.MinValue)
+        {
+            feedback.ShowMessage("Aposta acima do limite de moedas.");
+            return;
+        }
+
+        int stake = gambleStake;
+        coinToss = SertaoCoinToss.Open(gameObject.scene, stake, coinTossDuration,
+            () => worker.SetStatus("lançando moeda"), won =>
+            {
+                coinToss = null;
+                busyWorkers--;
+                if (won)
+                {
+                    resources.AddCoins(stake);
+                    if (resourceHud != null) resourceHud.FlyFromWorld(ResourceKind.Coins,
+                        stake, worker.transform.position + Vector3.up);
+                }
+                else resources.TrySpendCoins(stake);
+                worker.SetStatus(won ? "aposta vencida" : "aposta perdida");
+                SendWorkerHome(worker);
+            });
+        if (coinToss == null)
+        {
+            feedback.ShowMessage("Cara ou coroa indisponível.");
+            return;
+        }
+        busyWorkers++;
+        CommitAction(worker, ActivityKind.Gamble, activityName, card);
+        worker.SetStatus("aguardando cara ou coroa");
     }
 
     private void RecordCard(ActivityKind activity, WorkerAssignment worker, ActivityCardDrag card)
@@ -456,12 +470,16 @@ public sealed class ActionResolver : MonoBehaviour
         feedback.ShowMessage("Escolha cancelada. A carta voltou para a mão.");
     }
 
+    private static bool IsPlanting(ActivityKind activity) =>
+        activity is ActivityKind.PlantCorn or ActivityKind.PlantPumpkin or ActivityKind.PlantJerimum;
+
     private void SelectPlot(WorkerAssignment worker, ActivityKind activity, string activityName,
         ActivityCardDrag card)
     {
         bool available = activity == ActivityKind.BuildHouse ? HouseSite.HasAvailable() :
             Plot.HasAvailable(activity, dayCycle.CurrentDay, seedCatalog);
-        if (!available)
+        bool canWaitForPlowing = IsPlanting(activity) && plotsBeingPlowed.Count > 0;
+        if (!available && !canWaitForPlowing)
         {
             feedback.ShowMessage("Não há alvo disponível para essa carta.");
             card?.PlayRejectedReplay();
@@ -483,7 +501,8 @@ public sealed class ActionResolver : MonoBehaviour
         worker.Select();
         bool buildingHouse = activity == ActivityKind.BuildHouse;
         worker.SetStatus(buildingHouse ? "escolha um lote" : "escolha um terreno");
-        feedback.ShowMessage("Clique no " + (buildingHouse ? "lote" : "terreno") + " para " +
+        feedback.ShowMessage(!available ? "Aguarde o término do arado e escolha o terreno." :
+            "Clique no " + (buildingHouse ? "lote" : "terreno") + " para " +
             activityName.ToLowerInvariant() + ".");
     }
 
@@ -723,6 +742,11 @@ public sealed class ActionResolver : MonoBehaviour
 
     private void PlowPlot(Plot plot)
     {
+        if (plotsBeingPlowed.Contains(plot))
+        {
+            feedback.ShowMessage("Esse terreno já está sendo arado.");
+            return;
+        }
         if (plot.IsPlowed || plot.IsFenced || plot.Animal != AnimalKind.None)
         {
             feedback.ShowMessage("Escolha um terreno livre para arar.");
@@ -730,10 +754,19 @@ public sealed class ActionResolver : MonoBehaviour
         }
         ActivityCardDrag card = pendingPlotCard;
         WorkerAssignment worker = TakePendingWorker();
+        plotsBeingPlowed.Add(plot);
         CommitAction(worker, ActivityKind.Plow, "arando", card);
         MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
+            plotsBeingPlowed.Remove(plot);
+            if (plot == null)
+            {
+                SendWorkerHome(worker);
+                return;
+            }
             plot.Plow();
+            if (pendingPlotWorker != null && IsPlanting(pendingPlotAction) && dayCycle != null)
+                Plot.ShowAvailable(pendingPlotAction, dayCycle.CurrentDay, seedCatalog);
             AudioManager.Play(SoundCue.Plow);
             PlotsPlowedToday++;
             worker.SetStatus("terreno arado");
@@ -888,6 +921,7 @@ public sealed class ActionResolver : MonoBehaviour
 
     public void BeginNextDay()
     {
+        plotsBeingPlowed.Clear();
         if (forestTrees != null) forestTrees.ResetTrees();
         ClearPendingPlot();
         pendingFoodWorker = null;
@@ -1120,7 +1154,7 @@ public sealed class ActionResolver : MonoBehaviour
         }
         UpdateVisitButton(task);
         if (task.Arrived && task.StillTime >= arrivalStillTime && activeMinigame == null &&
-            communityCamera.IsFollowing(task.Worker.transform) && communityCamera.IsFollowReady)
+            !SertaoCoinToss.IsOpen && communityCamera.IsFollowing(task.Worker.transform) && communityCamera.IsFollowReady)
             BeginGatheringGame(task);
     }
 

@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fd18e14d8e304a719e41652a0dd9881e, type: 3}
+  m_Name: SertaoPresentationAssets
+  m_EditorClassIdentifier: Assembly-CSharp::SertaoPresentationAssets
+  milho: {fileID: 3937069329611923529, guid: d1b7b94e52c16e64f83fc6b880f03e7c, type: 3}
+  macaxeira: {fileID: 9214138908191903375, guid: 0d3e8cb4323f37d4cbca32d83d987e72, type: 3}
+  jerimum: {fileID: 5883917634054200727, guid: 66e8c8515359230468a76c06c5d0db0e, type: 3}
+  galinha:
+  - {fileID: 1546707390, guid: a75a2b83bcf26e247b3b95e9d54866ae, type: 3}
+  - {fileID: 486104665, guid: a75a2b83bcf26e247b3b95e9d54866ae, type: 3}
+  - {fileID: -1149784830, guid: a75a2b83bcf26e247b3b95e9d54866ae, type: 3}
+  - {fileID: -1105223933, guid: a75a2b83bcf26e247b3b95e9d54866ae, type: 3}
+  - {fileID: -626687516, guid: a75a2b83bcf26e247b3b95e9d54866ae, type: 3}
+  - {fileID: -2006775330, guid: a75a2b83bcf26e247b3b95e9d54866ae, type: 3}
+  - {fileID: 920093936, guid: a75a2b83bcf26e247b3b95e9d54866ae, type: 3}
+  - {fileID: -1921314545, guid: a75a2b83bcf26e247b3b95e9d54866ae, type: 3}
+  - {fileID: 623821426, guid: a75a2b83bcf26e247b3b95e9d54866ae, type: 3}
+  - {fileID: -695425696, guid: a75a2b83bcf26e247b3b95e9d54866ae, type: 3}
+  vaca:
+  - {fileID: 865879564, guid: ab1c817f1fcf1494994355337841aa22, type: 3}
+  - {fileID: -339368613, guid: ab1c817f1fcf1494994355337841aa22, type: 3}
+  - {fileID: -1397978016, guid: ab1c817f1fcf1494994355337841aa22, type: 3}
+  - {fileID: -666923721, guid: ab1c817f1fcf1494994355337841aa22, type: 3}
+  - {fileID: -185059952, guid: ab1c817f1fcf1494994355337841aa22, type: 3}
+  - {fileID: 512978592, guid: ab1c817f1fcf1494994355337841aa22, type: 3}
+  - {fileID: -188406005, guid: ab1c817f1fcf1494994355337841aa22, type: 3}
+  - {fileID: 1507349878, guid: ab1c817f1fcf1494994355337841aa22, type: 3}
+  - {fileID: -1114699090, guid: ab1c817f1fcf1494994355337841aa22, type: 3}
+  - {fileID: -1872013072, guid: ab1c817f1fcf1494994355337841aa22, type: 3}
+  cara: {fileID: 2800000, guid: 904274e8ea0297442aa834fd5261efed, type: 3}
+  coroa: {fileID: 2800000, guid: 82b3d0868aca17a43b46532f4929f2a9, type: 3}
+  fonte: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}

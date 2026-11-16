@@ -77,7 +77,7 @@ MonoBehaviour:
   fenceWoodCost: 3
   fenceCoinCost: 5
   foodCoinCost: 4
-  marketDays: 01000000030000000500000007000000090000000a0000000c000000
+  marketDays: 0100000002000000030000000400000005000000060000000700000008000000090000000a0000000b0000000c000000
   deliveriesPerHouse: 2
   secondHouseDeliveries: 3
   thirdHouseDeliveries: 4

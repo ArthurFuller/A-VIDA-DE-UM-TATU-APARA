@@ -54,6 +54,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     private Material selectionMaterial;
     private bool pointerOver;
     private Transform animalVisual;
+    private Transform cropModel;
     private Renderer growthFillRenderer;
     private Color growingFillColor;
     private MaterialPropertyBlock growthFillBlock;
@@ -122,6 +123,17 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         {
             surfaceBounds = surfaceRenderer.bounds;
             workClearance = surfaceBounds.extents.z + 0.5f;
+        }
+
+        if (growthBar != null && surfaceRenderer != null)
+        {
+            Transform bar = growthBar.transform;
+            Vector3 position = bar.localPosition;
+            // Deixa a barra baixa, na areia em frente à borda do canteiro.
+            float halfDepth = surfaceBounds.extents.z / Mathf.Max(0.001f, Mathf.Abs(transform.lossyScale.z));
+            position.z = Mathf.Min(position.z, -halfDepth - 0.14f);
+            position.y = Mathf.Min(position.y, 0.10f);
+            bar.localPosition = position;
         }
         if (fenceParts != null)
         {
@@ -331,9 +343,11 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         mandalaGrowthAdjustment = 0;
         lastMandalaGrowthDay = -1;
         fertilized = false;
-        if (cornVisual != null) cornVisual.SetActive(crop == CropType.Corn);
-        if (pumpkinVisual != null) pumpkinVisual.SetActive(crop == CropType.Pumpkin || crop == CropType.Jerimum);
-        TintRootVisual(crop);
+        var art = SertaoPresentationAssets.Current;
+        cropModel = art != null ? art.CreateCrop(crop, transform, surfaceBounds) : null;
+        if (cornVisual != null) cornVisual.SetActive(cropModel == null && crop == CropType.Corn);
+        if (pumpkinVisual != null) pumpkinVisual.SetActive(cropModel == null && crop != CropType.Corn);
+        if (cropModel == null) TintRootVisual(crop);
         if (growthBar != null) growthBar.SetActive(true);
         RefreshGrowth(currentDay, catalog);
         RefreshJoinedPlots();
@@ -420,8 +434,9 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             Harvest();
             return;
         }
-        float progress = Mathf.Clamp01((float)age / growthDays);
-        if (visual != null)
+        float progress = Mathf.Clamp01((float)age / Mathf.Max(1, growthDays));
+        if (cropModel != null) SertaoPresentationAssets.AnimateCropGrowth(cropModel, progress);
+        else if (visual != null)
         {
             visual.transform.DOKill();
             visual.transform.DOScale(new Vector3(1f, Mathf.Lerp(0.45f, 1f, progress), 1f), 0.35f);
@@ -455,6 +470,13 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         fertilized = false;
         mandalaGrowthAdjustment = 0;
         lastMandalaGrowthDay = -1;
+        if (cropModel != null)
+        {
+            cropModel.DOKill();
+            cropModel.gameObject.SetActive(false);
+            Destroy(cropModel.gameObject);
+            cropModel = null;
+        }
         if (cornVisual != null) cornVisual.SetActive(false);
         if (pumpkinVisual != null) pumpkinVisual.SetActive(false);
         if (growthBar != null) growthBar.SetActive(false);
@@ -645,8 +667,13 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         Animal = kind;
         var root = new GameObject(kind == AnimalKind.Cow ? "Vaca" : "Galinha");
         root.transform.SetParent(transform, false);
+        root.layer = gameObject.layer;
         animalVisual = root.transform;
-        if (kind == AnimalKind.Cow)
+        var art = SertaoPresentationAssets.Current;
+        Sprite[] frames = art != null ? art.AnimalFrames(kind) : null;
+        if (frames != null && frames.Length > 0 && frames[0] != null)
+            root.AddComponent<SertaoAnimalIdle>().Setup(kind, frames);
+        else if (kind == AnimalKind.Cow)
         {
             AddAnimalPart(root.transform, "Corpo", new Vector3(0f, 0.43f, 0f),
                 new Vector3(0.62f, 0.38f, 0.46f), new Color(0.92f, 0.9f, 0.8f));

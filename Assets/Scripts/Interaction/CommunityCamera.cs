@@ -107,7 +107,7 @@ public sealed class CommunityCamera : MonoBehaviour
 
     private void Update()
     {
-        if (heldView || Time.timeScale == 0f) return;
+        if (heldView || Time.timeScale == 0f || SertaoCoinToss.IsOpen) return;
         Keyboard keyboard = Keyboard.current;
         Vector2 movement = Vector2.zero;
         float zoom = 0f;
