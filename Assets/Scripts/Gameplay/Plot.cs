@@ -58,6 +58,9 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     private Color growingFillColor;
     private MaterialPropertyBlock growthFillBlock;
     private Vector3 plowedVisualHome;
+    private MandalaPlowedGround mandalaGround;
+    internal Bounds PlowedGroundBounds => surfaceBounds;
+    internal bool UsesPlowedGround => mandalaGround != null && IsPlowed && !isWater && !IsFenced;
     private static readonly List<Plot> allPlots = new List<Plot>();
     private static readonly Dictionary<string, JoinedVisual> joinedVisuals =
         new Dictionary<string, JoinedVisual>();
@@ -138,10 +141,15 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         }
     }
 
-    private void OnEnable() => allPlots.Add(this);
+    private void OnEnable()
+    {
+        allPlots.Add(this);
+        if (mandalaGround != null) mandalaGround.Invalidate();
+    }
     private void OnDisable()
     {
         allPlots.Remove(this);
+        if (mandalaGround != null) mandalaGround.Invalidate();
         if (allPlots.Count == 0)
         {
             foreach (JoinedVisual joined in joinedVisuals.Values) joined.Dispose();
@@ -296,8 +304,12 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         if (isWater || IsPlowed || IsFenced || Animal != AnimalKind.None)
             return;
         IsPlowed = true;
-        if (surfaceRenderer != null && plowedMaterial != null)
-            surfaceRenderer.sharedMaterial = plowedMaterial;
+        if (surfaceRenderer != null)
+        {
+            mandalaGround = MandalaPlowedGround.GetOrCreate(this, allPlots);
+            if (mandalaGround != null) mandalaGround.Invalidate();
+            else if (plowedMaterial != null) surfaceRenderer.sharedMaterial = plowedMaterial;
+        }
         RefreshSurfaceVisual();
         if (plowedVisual != null && plowedVisual.activeSelf)
         {
@@ -325,6 +337,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         if (growthBar != null) growthBar.SetActive(true);
         RefreshGrowth(currentDay, catalog);
         RefreshJoinedPlots();
+        if (mandalaGround != null) mandalaGround.Invalidate();
         StateChanged?.Invoke();
         if (MandalaSynergy.Instance != null)
             MandalaSynergy.Instance.ApplyGrowthBonuses(currentDay, catalog);
@@ -446,6 +459,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         if (pumpkinVisual != null) pumpkinVisual.SetActive(false);
         if (growthBar != null) growthBar.SetActive(false);
         RefreshJoinedPlots();
+        if (mandalaGround != null) mandalaGround.Invalidate();
         StateChanged?.Invoke();
         return harvested;
     }
@@ -700,12 +714,12 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     // O modelo detalhado é somente visual; toda lógica continua no Solo original.
     private void RefreshSurfaceVisual()
     {
-        bool showPlowed = plowedVisual != null && IsPlowed &&
+        bool showPlowed = plowedVisual != null && IsPlowed && !UsesPlowedGround &&
             (joinedVisual == null || joinedVisual.UsesDetailedPlowed);
         if (plowedVisual != null && plowedVisual.activeSelf != showPlowed)
             plowedVisual.SetActive(showPlowed);
         if (surfaceRenderer != null)
-            surfaceRenderer.enabled = joinedVisual == null && !showPlowed;
+            surfaceRenderer.enabled = joinedVisual == null && !showPlowed && !UsesPlowedGround;
     }
 
     private static void RefreshJoinedPlots()
@@ -764,6 +778,9 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
                 !plot.fenceInitialized && plot.fenceParts != null)
                 plot.FormFencePerimeter();
     }
+
+    internal bool CanJoinPlowedGround(Plot other) => UsesPlowedGround && other.UsesPlowedGround &&
+        mandalaGround == other.mandalaGround && SameResource(this, other) && Adjacent(this, other);
 
     private static bool SameResource(Plot a, Plot b) =>
         (!a.IsFenced && !b.IsFenced && a.Crop != CropType.None && a.Crop == b.Crop) ||
@@ -851,7 +868,9 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             MeshRenderer surface = root.GetComponent<MeshRenderer>();
             surface.sharedMaterial = connected[0].surfaceRenderer.sharedMaterial;
             root.GetComponent<MeshCollider>().sharedMesh = surfaceMesh;
-            if (UsesDetailedPlowed)
+            bool usesMandalaGround = !IsAnimalGroup && connected.TrueForAll(plot => plot.UsesPlowedGround);
+            if (usesMandalaGround) surface.enabled = false;
+            else if (UsesDetailedPlowed)
             {
                 // Os modelos individuais mantêm o relevo. Só as faixas entre slots
                 // recebem uma superfície visível, animada junto da área unificada.
@@ -889,15 +908,18 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
                 foreach (Plot plot in members) plot.HideOriginalFenceParts();
                 BuildFence(border, center);
             }
-            root.transform.localScale = new Vector3(0.975f, 1f, 0.975f);
-            DOTween.Sequence().SetTarget(root.transform)
-                .Append(root.transform.DOScale(Vector3.one, 0.35f).SetEase(Ease.OutCubic))
-                .Append(root.transform.DOPunchScale(new Vector3(0.055f, 0f, 0.055f),
-                    0.26f, 4));
-            if (UsesDetailedPlowed)
-                foreach (Plot plot in members)
-                    plot.plowedVisual.transform.DOPunchScale(
-                        new Vector3(0.045f, 0f, 0.045f), 0.42f, 3);
+            if (!usesMandalaGround)
+            {
+                root.transform.localScale = new Vector3(0.975f, 1f, 0.975f);
+                DOTween.Sequence().SetTarget(root.transform)
+                    .Append(root.transform.DOScale(Vector3.one, 0.35f).SetEase(Ease.OutCubic))
+                    .Append(root.transform.DOPunchScale(new Vector3(0.055f, 0f, 0.055f),
+                        0.26f, 4));
+                if (UsesDetailedPlowed)
+                    foreach (Plot plot in members)
+                        plot.plowedVisual.transform.DOPunchScale(
+                            new Vector3(0.045f, 0f, 0.045f), 0.42f, 3);
+            }
         }
 
         public void SetHighlight(bool visible)

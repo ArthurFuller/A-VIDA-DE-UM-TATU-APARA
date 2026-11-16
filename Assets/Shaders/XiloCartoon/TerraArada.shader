@@ -57,6 +57,12 @@ Shader "Sertao/Terra Arada"
         [Header(Borda)]
         [Toggle] _Pontilhado ("Borda Pontilhada (em vez de transparente)", Float) = 0
         _TamanhoPonto ("Tamanho do Pontilhado", Range(5, 120)) = 45
+
+        [HideInInspector] _MandalaGround ("Solo da Mandala", Float) = 0
+        [HideInInspector] _GroundMaskFrom ("Máscara anterior", 2D) = "black" {}
+        [HideInInspector] _GroundMaskTo ("Máscara atual", 2D) = "black" {}
+        [HideInInspector] _GroundMaskTransform ("UV da máscara", Vector) = (1, 1, 0, 0)
+        [HideInInspector] _GroundBlend ("Transição", Range(0, 1)) = 1
     }
 
     SubShader
@@ -74,7 +80,12 @@ Shader "Sertao/Terra Arada"
             float _LimiteSombra, _SuavidadeSombra, _ForcaSombraProjetada, _InfluenciaLuz;
             float _TracoSulco, _EspessuraSulco, _Falhas, _Hachura, _HachurasPorMetro, _EspessuraHachura, _AnguloHachura;
             float _Pontilhado, _TamanhoPonto;
+            float4 _GroundMaskTransform;
+            float _MandalaGround, _GroundBlend;
         CBUFFER_END
+
+        TEXTURE2D(_GroundMaskFrom); SAMPLER(sampler_GroundMaskFrom);
+        TEXTURE2D(_GroundMaskTo); SAMPLER(sampler_GroundMaskTo);
 
         float Hash21(float2 p) { p = frac(p * float2(123.34, 456.21)); p += dot(p, p + 45.32); return frac(p.x * p.y); }
         float Ruido(float2 p)
@@ -90,6 +101,24 @@ Shader "Sertao/Terra Arada"
         // m = 1 dentro do canteiro (cai suave na borda); solta = faixa de terra solta em volta
         void Mascara(float2 uv, out float m, out float solta)
         {
+            if (_MandalaGround > 0.5)
+            {
+                float2 maskUV = uv * _GroundMaskTransform.xy + _GroundMaskTransform.zw;
+                float after = SAMPLE_TEXTURE2D_LOD(_GroundMaskTo, sampler_GroundMaskTo, maskUV, 0).r;
+                float field = after;
+                if (_GroundBlend < 1.0)
+                {
+                    float before = SAMPLE_TEXTURE2D_LOD(_GroundMaskFrom, sampler_GroundMaskFrom, maskUV, 0).r;
+                    field = lerp(before, after, _GroundBlend);
+                }
+                // Vermelho codifica distância com sinal no intervalo de -0.5 m a 0.5 m.
+                float d = field - 0.5;
+                m = smoothstep(0.0, max(0.005, _Suavidade * 0.72), d);
+                solta = smoothstep(-max(0.001, _FaixaSolta * 0.72), 0.0, d) * (1.0 - m);
+                solta *= step(0.0001, _FaixaSolta) * smoothstep(0.25, 0.65, Fbm(uv * 18.0 + Sem() * 2.0));
+                return;
+            }
+
             float2 P = uv * 2.0 - 1.0;
             float2 s = Sem();
             float ang = atan2(P.y, P.x);
@@ -110,7 +139,8 @@ Shader "Sertao/Terra Arada"
             float a = radians(_AnguloLeiras), c = cos(a), sn = sin(a);
             float u = P.x * c + P.y * sn;
             v = -P.x * sn + P.y * c;
-            u += _Curvatura * 0.5 * v * v + (Fbm(P * 4.0 + Sem() * 3.0) - 0.5) * 0.15 * _Tortura;
+            float curva = _MandalaGround > 0.5 ? 1.0 - cos(v * 1.7) : v * v;
+            u += _Curvatura * 0.5 * curva + (Fbm(P * 4.0 + Sem() * 3.0) - 0.5) * 0.15 * _Tortura;
             x = u * _QuantidadeLeiras * 0.5;
         }
 
@@ -235,7 +265,8 @@ Shader "Sertao/Terra Arada"
                 // ---------- transparência da borda ----------
                 float alfa = max(m, solta * 0.85);
                 float2 P = uv * 2.0 - 1.0;
-                alfa *= smoothstep(1.0, 0.92, max(abs(P.x), abs(P.y)));      // nunca corta reto na borda do plano
+                if (_MandalaGround < 0.5)
+                    alfa *= 1.0 - smoothstep(0.92, 1.0, max(abs(P.x), abs(P.y)));
                 if (_Pontilhado > 0.5)
                 {
                     float pts = Ruido(W.xz * _TamanhoPonto);
