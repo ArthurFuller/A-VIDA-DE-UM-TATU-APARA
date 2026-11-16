@@ -27,6 +27,8 @@ public sealed class EventCardView : MonoBehaviour
     private Vector2 originalCardSize;
     private Vector2 originalRevealPosition;
     private RectTransform descriptionRect;
+    private Image backdropImage;
+    private Color backdropColor;
     private Image cardImage;
     private Color frontColor;
     private Sprite originalSprite;
@@ -40,6 +42,11 @@ public sealed class EventCardView : MonoBehaviour
 
     private void Awake()
     {
+        if (backdrop != null)
+        {
+            backdropImage = backdrop.GetComponent<Image>();
+            if (backdropImage != null) backdropColor = backdropImage.color;
+        }
         if (card != null)
         {
             originalCardSize = card.sizeDelta;
@@ -85,9 +92,12 @@ public sealed class EventCardView : MonoBehaviour
             (descriptionRect.pivot.y - 0.5f) * descriptionRect.rect.height);
     }
 
-    public void Show(string title, string description, Sprite art = null)
+    public void Show(string title, string description, Sprite art = null,
+        Color? previousBackdrop = null)
     {
         if (card == null || backdrop == null) return;
+        // The overlay can start inactive in the scene. Run Awake before setting up the card.
+        if (!backdrop.gameObject.activeSelf) backdrop.gameObject.SetActive(true);
         IsOpen = true;
         pendingDescription = description;
         flipped = false;
@@ -135,6 +145,13 @@ public sealed class EventCardView : MonoBehaviour
         card.anchoredPosition = homePosition + Vector2.up * entranceOffset;
         card.localScale = Vector3.one;
         card.localRotation = Quaternion.identity;
+        if (backdropImage != null)
+        {
+            backdropImage.DOKill();
+            backdropImage.color = previousBackdrop ?? backdropColor;
+            if (previousBackdrop.HasValue)
+                backdropImage.DOColor(backdropColor, entranceDuration).SetEase(Ease.OutCubic);
+        }
         card.DOAnchorPos(homePosition, entranceDuration).SetEase(Ease.OutCubic)
             .OnComplete(() => card.DORotate(new Vector3(0, 0, swingDegrees), 0.12f)
                 .SetLoops(2, LoopType.Yoyo).OnComplete(() => card.localRotation = Quaternion.identity));
@@ -178,6 +195,7 @@ public sealed class EventCardView : MonoBehaviour
         if (descriptionGroup != null) descriptionGroup.DOKill();
         if (descriptionRect != null) descriptionRect.DOKill();
         if (card != null) card.DOKill();
+        if (backdropImage != null) backdropImage.DOKill();
         if (backdrop != null) backdrop.DOFade(0, 0.2f).OnComplete(() =>
         {
             HideImmediate();

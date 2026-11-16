@@ -76,7 +76,32 @@ public static class HouseRoutePlaySave
         foreach (HouseSite site in UnityEngine.Object.FindObjectsByType<HouseSite>(
             FindObjectsInactive.Include, FindObjectsSortMode.None))
             if (site.gameObject.scene.path == scenePath)
-                Add(poses, site, "homeMarker", "outsideMarker", "doorwayMarker");
+            {
+                Add(poses, site, "homeMarker", "outsideMarker", "doorwayMarker",
+                    "constructionWorkPoint");
+                AddArray(poses, site, "constructionWaypoints");
+                AddNestedArrays(poses, site, "workerConstructionRoutes", "waypoints");
+                AddScale(scales, site, "constructionTravelSpeed");
+            }
+        foreach (Plot plot in UnityEngine.Object.FindObjectsByType<Plot>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None))
+            if (plot.gameObject.scene.path == scenePath)
+            {
+                Add(poses, plot, "workPoint");
+                AddArray(poses, plot, "workWaypoints");
+                AddScale(scales, plot, "workTravelSpeed");
+            }
+        foreach (ActionResolver resolver in UnityEngine.Object.FindObjectsByType<ActionResolver>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (resolver.gameObject.scene.path != scenePath) continue;
+            AddArray(poses, resolver, "forestWaypoints");
+            AddArray(poses, resolver, "fishingWaypoints");
+            Add(poses, resolver, "workerRoutePointA", "workerRoutePointB");
+            AddScale(scales, resolver, "movementSpeed");
+            AddScale(scales, resolver, "forestTravelSpeed");
+            AddScale(scales, resolver, "fishingTravelSpeed");
+        }
         foreach (HouseInteriorTest test in UnityEngine.Object.FindObjectsByType<HouseInteriorTest>(
             FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
@@ -97,9 +122,36 @@ public static class HouseRoutePlaySave
         {
             SerializedProperty property = source.FindProperty(fieldName);
             Transform marker = property != null ? property.objectReferenceValue as Transform : null;
-            if (marker == null || poses.ContainsKey(marker.name)) continue;
-            poses.Add(marker.name, new MarkerPose { name = marker.name,
-                localPosition = marker.localPosition, localEulerAngles = marker.localEulerAngles });
+            AddMarker(poses, marker);
+        }
+    }
+
+    private static void AddMarker(Dictionary<string, MarkerPose> poses, Transform marker)
+    {
+        if (marker == null || poses.ContainsKey(marker.name)) return;
+        poses.Add(marker.name, new MarkerPose { name = marker.name,
+            localPosition = marker.localPosition, localEulerAngles = marker.localEulerAngles });
+    }
+
+    private static void AddArray(Dictionary<string, MarkerPose> poses, MonoBehaviour owner, string fieldName)
+    {
+        SerializedProperty waypoints = new SerializedObject(owner).FindProperty(fieldName);
+        if (waypoints == null) return;
+        for (int i = 0; i < waypoints.arraySize; i++)
+            AddMarker(poses, waypoints.GetArrayElementAtIndex(i).objectReferenceValue as Transform);
+    }
+
+    private static void AddNestedArrays(Dictionary<string, MarkerPose> poses, MonoBehaviour owner,
+        string arrayName, string nestedName)
+    {
+        SerializedProperty groups = new SerializedObject(owner).FindProperty(arrayName);
+        if (groups == null) return;
+        for (int group = 0; group < groups.arraySize; group++)
+        {
+            SerializedProperty points = groups.GetArrayElementAtIndex(group).FindPropertyRelative(nestedName);
+            if (points == null) continue;
+            for (int i = 0; i < points.arraySize; i++)
+                AddMarker(poses, points.GetArrayElementAtIndex(i).objectReferenceValue as Transform);
         }
     }
 

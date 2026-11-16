@@ -9,6 +9,8 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
     [SerializeField] private GameObject selectionMarker;
     [SerializeField] private Text statusText;
     [SerializeField] private string workerName = "Trabalhador";
+    [SerializeField, Range(1, 5), Tooltip("Casa de origem usada para escolher o trajeto do funcionário.")]
+    private int originHouseNumber = 1;
     [SerializeField] private ActionResolver actionResolver;
     [SerializeField] private WorkProgress workProgress;
     [SerializeField] private ParticleSystem comadreDizzyPrefab;
@@ -21,13 +23,11 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
     [SerializeField, Range(0, 10), InspectorName("Prévia de pontos de ação"),
         Tooltip("Mostra esta quantidade de pontos para ajustar o visual. Zero usa as ações reais; a prévia não concede ações.")]
     private int previewActionPoints;
-    [Header("Teste visual 2D")]
-    [SerializeField] private Sprite testSprite;
+    [Header("Visual 2D")]
+    [SerializeField] private Animator spriteAnimator;
     [SerializeField, Min(0.1f)] private float testSpriteHeight = 1.9f;
     [SerializeField] private Vector3 spriteOffset = new Vector3(0f, 0.8f, 0f);
     [Header("Animação do trabalhador")]
-    [SerializeField] private Sprite[] idleFrames;
-    [SerializeField] private Sprite[] runFrames;
     [SerializeField, Min(1f)] private float idleFps = 8f;
     [SerializeField, Min(1f)] private float runFps = 12f;
     [Header("Percurso da casa (ajustável em Play Mode)")]
@@ -50,6 +50,8 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
     public int ProductionReduction { get; private set; }
     public WorkProgress Progress => workProgress;
     public string DisplayName => workerName;
+    public int OriginHouseNumber => originHouseNumber;
+    public Transform HomeMarker => homeMarker;
     public int AssignmentVersion => actionResolver != null ? actionResolver.AssignmentVersion : 0;
 
     private int nextDayProductionReduction;
@@ -67,9 +69,13 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
     private Camera spriteCamera;
     private Vector3 initialHomePosition;
     private Vector3 previousPosition;
-    private float animationTime;
-    private int animationFrame;
-    private bool wasMoving;
+    private bool isWorking;
+    private enum AnimationState { Idle, Run, Work }
+    private static readonly int StateParameter = Animator.StringToHash("State");
+    private static readonly int IdleSpeedParameter = Animator.StringToHash("IdleSpeed");
+    private static readonly int RunSpeedParameter = Animator.StringToHash("RunSpeed");
+    private const float IdleClipFps = 8f;
+    private const float RunClipFps = 24f;
 
     private void Awake()
     {
@@ -78,7 +84,12 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
         initialHomePosition = transform.position;
         previousPosition = transform.position;
         spriteCamera = Camera.main;
-        SetupTestSprite();
+        if (spriteAnimator != null && spriteAnimator.TryGetComponent(out spriteRenderer))
+        {
+            spriteVisual = spriteRenderer.transform;
+            spriteRenderer.flipX = false;
+            RefreshSpriteAppearance();
+        }
         if (comadreDizzyPrefab != null)
         {
             comadreDizzy = Instantiate(comadreDizzyPrefab, transform, false);
@@ -107,37 +118,23 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
         }
     }
 
-    private void SetupTestSprite()
-    {
-        Sprite firstFrame = idleFrames != null && idleFrames.Length > 0 ? idleFrames[0] : testSprite;
-        if (firstFrame == null) return;
-        Transform body = transform.Find("Corpo");
-        Transform head = transform.Find("Cabeça");
-        if (body != null) body.gameObject.SetActive(false);
-        if (head != null) head.gameObject.SetActive(false);
-
-        spriteVisual = transform.Find("Visual 2D - teste");
-        if (spriteVisual == null)
-        {
-            spriteVisual = new GameObject("Visual 2D - teste", typeof(SpriteRenderer)).transform;
-            spriteVisual.SetParent(transform, false);
-        }
-        spriteRenderer = spriteVisual.GetComponent<SpriteRenderer>();
-        spriteRenderer.sprite = firstFrame;
-        spriteRenderer.spriteSortPoint = SpriteSortPoint.Pivot;
-        spriteRenderer.sortingOrder = 100;
-        RefreshSpriteAppearance();
-    }
-
     public void RefreshSpriteAppearance()
     {
         if (spriteVisual == null) return;
         if (spriteRenderer == null || spriteRenderer.sprite == null) return;
         spriteVisual.localPosition = spriteOffset;
         spriteVisual.localScale = Vector3.one * (testSpriteHeight / spriteRenderer.sprite.bounds.size.y);
+        spriteAnimator.SetFloat(IdleSpeedParameter, Mathf.Max(1f, idleFps) / IdleClipFps);
+        spriteAnimator.SetFloat(RunSpeedParameter, Mathf.Max(1f, runFps) / RunClipFps);
     }
 
-    public void FaceTowards(Vector3 destination) => UpdateFacing(destination - transform.position);
+    public void FaceTowards(Vector3 destination)
+    {
+        previousPosition = transform.position;
+        UpdateFacing(destination - transform.position);
+    }
+
+    public void SetWorking(bool value) => isWorking = value;
 
     public void RestoreHomeFacing()
     {
@@ -164,26 +161,14 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
     {
         Vector3 movement = transform.position - previousPosition;
         previousPosition = transform.position;
-        bool moving = Time.deltaTime > 0f && movement.sqrMagnitude > 0.0025f * Time.deltaTime * Time.deltaTime;
-        Sprite[] frames = moving ? runFrames : idleFrames;
-        if (frames == null || frames.Length == 0) return;
-
+        float deltaTime = Time.deltaTime;
+        if (deltaTime <= 0f) return;
+        bool moving = movement.sqrMagnitude > 0.0025f * deltaTime * deltaTime;
         if (moving) UpdateFacing(movement);
-        if (moving != wasMoving)
-        {
-            wasMoving = moving;
-            animationTime = 0f;
-            animationFrame = 0;
-        }
-        animationTime += Time.deltaTime;
-        float frameDuration = 1f / Mathf.Max(1f, moving ? runFps : idleFps);
-        while (animationTime >= frameDuration)
-        {
-            animationTime -= frameDuration;
-            animationFrame = (animationFrame + 1) % frames.Length;
-        }
-        if (spriteRenderer != null && spriteRenderer.sprite != frames[animationFrame])
-            spriteRenderer.sprite = frames[animationFrame];
+        AnimationState state = AnimationState.Idle;
+        if (moving) state = AnimationState.Run;
+        else if (isWorking) state = AnimationState.Work;
+        spriteAnimator.SetInteger(StateParameter, (int)state);
     }
 
     private void OnDestroy()
@@ -318,6 +303,8 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
         outsideMarker = outside;
         doorwayMarker = doorway;
     }
+
+    public void SetOriginHouseNumber(int number) => originHouseNumber = number;
 
     public void JoinDuringDay()
     {

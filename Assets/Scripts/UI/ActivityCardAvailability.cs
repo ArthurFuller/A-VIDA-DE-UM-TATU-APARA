@@ -722,47 +722,46 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
 
     public bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera)
     {
-        if (entranceSuspended || selectionLocked || shown.Count == 0) return false;
-        for (int i = 0; i < shown.Count; i++)
-            if (!shown[i].IsReturning && ContainsCard(i, screenPoint, eventCamera)) return true;
-        return false;
+        return CardAt(screenPoint, eventCamera) != null;
     }
 
     private ActivityCardDrag CardAt(Vector2 screenPoint, Camera eventCamera)
     {
-        RectTransform area = (RectTransform)transform.parent;
+        if (entranceSuspended || selectionLocked || followHidden || shown.Count == 0) return null;
+        RectTransform area = DragBoundary;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(area, screenPoint, eventCamera, out Vector2 point))
             return null;
-        float x = point.x - area.rect.center.x;
+        if (!area.rect.Contains(point)) return null;
+        point -= new Vector2(area.rect.center.x, area.rect.yMin);
         ActivityCardDrag result = null;
         float nearest = float.MaxValue;
         for (int i = 0; i < shown.Count; i++)
         {
-            if (shown[i].IsReturning || shown[i].IsDragging) continue;
-            if (!ContainsCard(i, screenPoint, eventCamera)) continue;
-            float distance = Mathf.Abs(x - CardPosition(i).x);
+            ActivityCardDrag card = shown[i];
+            if (!CanPointAt(card)) continue;
+            RectTransform rect = (RectTransform)card.transform;
+            Rect visible = VisibleRect(rect, card.GetComponent<Image>());
+            Vector2 rest = CardPosition(i);
+            Vector2 local = Quaternion.Euler(0f, 0f, -CardAngle(rest.x)) *
+                (point - rest) / normalScale;
+            if (!visible.Contains(local)) continue;
+            float distance = Mathf.Abs(point.x - rest.x);
             if (distance >= nearest) continue;
             nearest = distance;
-            result = shown[i];
+            result = card;
         }
-        return result;
+        if (result != null || !CanPointAt(hovered)) return result;
+        int hoveredIndex = shown.IndexOf(hovered);
+        if (hoveredIndex < 0) return null;
+        // The destination also holds hover while the pointer follows the card upwards.
+        RectTransform raised = (RectTransform)hovered.transform;
+        Vector2 destination = HoverPosition(raised, hoveredIndex, out float scale);
+        return VisibleRect(raised, hovered.GetComponent<Image>())
+            .Contains((point - destination) / scale) ? hovered : null;
     }
 
-    private bool ContainsCard(int index, Vector2 screenPoint, Camera eventCamera)
-    {
-        RectTransform rect = shown[index].GetComponent<RectTransform>();
-        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rect, screenPoint, eventCamera,
-                out Vector2 current)) return false;
-        Rect visible = VisibleRect(rect, shown[index].GetComponent<Image>());
-        if (visible.Contains(current)) return true;
-
-        RectTransform parent = (RectTransform)rect.parent;
-        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, screenPoint, eventCamera,
-                out Vector2 point)) return false;
-        Vector2 baseline = Quaternion.Euler(0f, 0f, -CardAngle(CardPosition(index).x)) *
-            (point - CardPosition(index)) / normalScale;
-        return visible.Contains(baseline);
-    }
+    private static bool CanPointAt(ActivityCardDrag card) =>
+        card != null && card.gameObject.activeInHierarchy && !card.IsReturning && !card.IsDragging;
 
     private static Rect VisibleRect(RectTransform rect, Image image)
     {
@@ -806,17 +805,23 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         rect.SetAsLastSibling();
         int index = shown.IndexOf(hovered);
         MoveNeighbours(index, true);
+        Vector2 position = HoverPosition(rect, index, out float scale);
+        AnimateCard(rect, position, scale, 0f, false);
+    }
+
+    private Vector2 HoverPosition(RectTransform rect, int index, out float scale)
+    {
         float padding = containerPadding;
-        float scale = normalScale * Mathf.Min(hoverScale,
+        scale = normalScale * Mathf.Min(hoverScale,
             (availableWidth - 2f * padding) / (rect.rect.width * normalScale),
             (availableHeight - 2f * padding) / (rect.rect.height * normalScale));
         float top = Mathf.Max(padding + rect.rect.height * scale,
             Mathf.Min(availableHeight - padding,
-                CardPosition(index).y + rect.rect.height * normalScale + hoverLift));
+                edgeY + fanRise + maxCardHeight * normalScale + hoverLift));
         float x = Mathf.Clamp(CardPosition(index).x,
             -availableWidth * 0.5f + padding + rect.rect.width * scale * 0.5f,
             availableWidth * 0.5f - padding - rect.rect.width * scale * 0.5f);
-        AnimateCard(rect, new Vector2(x, top - rect.rect.height * scale), scale, 0f, false);
+        return new Vector2(x, top - rect.rect.height * scale);
     }
 
     private void ClearHover(bool immediate)

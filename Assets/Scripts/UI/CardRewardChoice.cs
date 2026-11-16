@@ -296,6 +296,7 @@ public sealed class CardRewardChoice : MonoBehaviour
             onCompleted?.Invoke();
             return;
         }
+        if (!gameObject.activeSelf) gameObject.SetActive(true);
         for (int i = 0; i < 2; i++)
         {
             rerolled[i] = false;

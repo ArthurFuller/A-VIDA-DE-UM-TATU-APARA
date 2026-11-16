@@ -1,0 +1,90 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d33ce4d495be41079f84e40de167fb23, type: 3}
+  m_Name: DeliveryMissions
+  m_EditorClassIdentifier: Assembly-CSharp::DeliveryMissionCatalog
+  entries:
+  - title: Reparos na comunidade
+    description: 
+    requirements:
+    - item: 0
+      quantity: 2
+    coinReward: 5
+  - title: "Lenha para as fam\xEDlias"
+    description: "Outras comunidades pr\xF3ximas precisam de madeira para construir
+      as casas das fam\xEDlias"
+    requirements:
+    - item: 0
+      quantity: 3
+    coinReward: 6
+  - title: Madeira para o abrigo
+    description: 
+    requirements:
+    - item: 0
+      quantity: 2
+    coinReward: 5
+  - title: Alimentos para a feira
+    description: 
+    requirements:
+    - item: 4
+      quantity: 3
+    coinReward: 6
+  - title: "Provis\xF5es da comunidade"
+    description: O mercador quer oferecer moedas em troca de uma variedade de suprimentos
+    requirements:
+    - item: 1
+      quantity: 4
+    - item: 2
+      quantity: 2
+    coinReward: 7
+  - title: Comida para os viajantes
+    description: 
+    requirements:
+    - item: 4
+      quantity: 3
+    coinReward: 6
+  - title: Peixes para a comunidade
+    description: 
+    requirements:
+    - item: 1
+      quantity: 2
+    coinReward: 5
+  - title: Encomenda de peixe
+    description: 
+    requirements:
+    - item: 1
+      quantity: 3
+    coinReward: 6
+  - title: Milho para a feira
+    description: 
+    requirements:
+    - item: 2
+      quantity: 2
+    coinReward: 5
+  - title: Colheita encomendada
+    description: 
+    requirements:
+    - item: 2
+      quantity: 3
+    coinReward: 6
+  - title: Macaxeira da comunidade
+    description: 
+    requirements:
+    - item: 3
+      quantity: 2
+    coinReward: 5
+  - title: Macaxeira para a feira
+    description: 
+    requirements:
+    - item: 3
+      quantity: 3
+    coinReward: 6

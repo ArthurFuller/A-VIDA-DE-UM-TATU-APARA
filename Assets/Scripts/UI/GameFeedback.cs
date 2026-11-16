@@ -1,3 +1,4 @@
+using System;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -16,6 +17,7 @@ public sealed class GameFeedback : MonoBehaviour
     [SerializeField, Min(0)] private float feedbackPunchScale = 0.08f;
 
     private Sequence summaryRevealSequence;
+    private Sequence summaryExitSequence;
     private Vector2 summaryHome;
     private Image summaryBackdrop;
     private Color summaryBackdropColor;
@@ -34,6 +36,12 @@ public sealed class GameFeedback : MonoBehaviour
         }
     }
 
+    private void OnDestroy()
+    {
+        summaryRevealSequence?.Kill();
+        summaryExitSequence?.Kill();
+    }
+
     public void ShowMessage(string message)
     {
         if (messageText == null)
@@ -49,6 +57,8 @@ public sealed class GameFeedback : MonoBehaviour
     {
         if (summaryGroup == null || summaryText == null)
             return;
+        if (!summaryGroup.gameObject.activeSelf) summaryGroup.gameObject.SetActive(true);
+        summaryExitSequence?.Kill();
         summaryRevealSequence?.Kill();
         summaryText.text = string.Empty;
         summaryGroup.DOKill();
@@ -89,22 +99,56 @@ public sealed class GameFeedback : MonoBehaviour
         }
     }
 
-    public void HideSummary()
+    public void HideSummary(Func<Color?, bool> openNextScreen)
     {
-        if (summaryGroup == null)
+        if (summaryGroup == null || !summaryGroup.gameObject.activeInHierarchy)
+        {
+            openNextScreen(null);
             return;
-        IsSummaryTransitioning = false;
+        }
+        if (summaryExitSequence != null && summaryExitSequence.IsActive()) return;
+
+        IsSummaryTransitioning = true;
         summaryRevealSequence?.Kill();
         summaryGroup.DOKill();
-        summaryGroup.blocksRaycasts = false;
         summaryGroup.interactable = false;
-        summaryGroup.DOFade(0, summaryFadeDuration);
+        if (summaryBackdrop != null) summaryBackdrop.DOKill();
+
+        summaryExitSequence = DOTween.Sequence().SetTarget(this);
         if (summaryPanel != null)
         {
             summaryPanel.DOKill();
-            summaryPanel.DOAnchorPosX(summaryHome.x - summarySlideDistance,
-                summaryFadeDuration).SetEase(Ease.InCubic)
-                .OnComplete(() => summaryPanel.anchoredPosition = summaryHome);
+            RectTransform viewport = summaryPanel.parent as RectTransform;
+            float distance = summaryPanel.rect.width + summarySlideDistance;
+            if (viewport != null)
+            {
+                Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(
+                    viewport, summaryPanel);
+                distance = Mathf.Max(0f, bounds.max.x - viewport.rect.xMin) +
+                    summarySlideDistance;
+            }
+            summaryExitSequence.Append(summaryPanel.DOAnchorPosX(
+                summaryPanel.anchoredPosition.x - distance, summaryTransitionDuration)
+                .SetEase(Ease.InOutSine));
         }
+        if (summaryPanel == null)
+            summaryExitSequence.Append(summaryGroup.DOFade(0f, summaryFadeDuration));
+
+        summaryExitSequence.OnComplete(() =>
+        {
+            summaryExitSequence = null;
+            Color? backdropAtExit = null;
+            if (summaryBackdrop != null && summaryGroup.alpha > 0f)
+            {
+                Color color = summaryBackdrop.color;
+                color.a *= summaryGroup.alpha;
+                backdropAtExit = color;
+            }
+            bool hasNextScreen = openNextScreen(backdropAtExit);
+            summaryGroup.blocksRaycasts = false;
+            if (hasNextScreen) summaryGroup.alpha = 0f;
+            else if (summaryGroup.alpha > 0f) summaryGroup.DOFade(0f, summaryFadeDuration);
+            IsSummaryTransitioning = false;
+        });
     }
 }

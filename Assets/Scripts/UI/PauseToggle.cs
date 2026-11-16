@@ -41,6 +41,8 @@ public sealed class PauseToggle : MonoBehaviour
     private Vector2[] buttonHomes;
     private Vector2 panelHome;
     private Vector2 optionsHome;
+    private RectMask2D buttonMask;
+    private GS2FrontEnd.PageItems optionsItems;
     private bool paused;
     private bool busy;
     private Image backdrop;
@@ -78,10 +80,16 @@ public sealed class PauseToggle : MonoBehaviour
             return;
         }
 
+        if (settingsButton.targetGraphic is Image settingsImage && settingsImage.sprite != null &&
+            settingsImage.sprite.texture.isReadable)
+            settingsImage.alphaHitTestMinimumThreshold = 0.1f;
+
         backdrop = pauseOverlay.GetComponent<Image>();
         if (backdrop != null) backdropColor = backdrop.color;
         panelHome = panel.anchoredPosition;
         optionsHome = optionsPage.anchoredPosition;
+        buttonMask = buttonViewport.GetComponent<RectMask2D>();
+        optionsItems = GS2FrontEnd.CaptureItems(optionsPage);
         menuActions = new[] { resumeButton, settingsButton, exitButton };
         menuButtons = new RectTransform[menuActions.Length];
         buttonHomes = new Vector2[menuActions.Length];
@@ -143,12 +151,13 @@ public sealed class PauseToggle : MonoBehaviour
         motion?.Kill();
         motion = DOTween.Sequence().SetUpdate(true);
         motion.Append(panel.DOAnchorPos(panelHome, panelEnterDuration).SetEase(Ease.OutBack, 1.12f));
+        float innerBottom = buttonViewport.rect.yMin + (buttonMask != null ? buttonMask.padding.y : 0f);
         for (int i = 0; i < menuButtons.Length; i++)
         {
             RectTransform item = menuButtons[i];
-            // O RectMask2D do viewport esconde os botoes ate entrarem na moldura.
-            item.anchoredPosition = new Vector2(buttonHomes[i].x,
-                buttonViewport.rect.yMin - item.rect.yMax - 12f);
+            item.anchoredPosition = buttonHomes[i];
+            Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(buttonViewport, item);
+            item.anchoredPosition += Vector2.down * (bounds.max.y - innerBottom + 12f);
             motion.Insert(panelEnterDuration + i * buttonWaveInterval,
                 item.DOAnchorPos(buttonHomes[i], buttonEnterDuration).SetEase(Ease.OutBack));
         }
@@ -208,34 +217,35 @@ public sealed class PauseToggle : MonoBehaviour
         pauseGroup.blocksRaycasts = false;
         if (optionsGroup != null) optionsGroup.blocksRaycasts = false;
 
-        to.gameObject.SetActive(true);
         Canvas.ForceUpdateCanvases();
         RectTransform overlayRect = pauseOverlay.transform as RectTransform;
         float width = overlayRect != null ? overlayRect.rect.width : 900f;
         float distance = Mathf.Max(width + 8f,
             (panel.rect.width + optionsPage.rect.width) * 0.5f + 20f);
-        float direction = back ? 1f : -1f;
+        Vector2 travel = Vector2.right * (back ? distance : -distance);
         Vector2 fromHome = from == panel ? panelHome : optionsHome;
         Vector2 toHome = to == panel ? panelHome : optionsHome;
         from.anchoredPosition = fromHome;
-        to.anchoredPosition = toHome + Vector2.right * (-direction * distance);
+        to.anchoredPosition = toHome - travel;
         if (toGroup != null) toGroup.alpha = 1f;
 
-        // UM unico tween move os dois paineis juntos e sem cruzamento.
-        float progress = 0f;
-        motion = DOTween.Sequence().SetUpdate(true);
-        motion.Append(DOTween.To(() => progress, value =>
-        {
-            progress = value;
-            Vector2 delta = Vector2.right * (direction * distance * value);
-            from.anchoredPosition = fromHome + delta;
-            to.anchoredPosition = toHome - Vector2.right * (direction * distance) + delta;
-        }, 1f, optionsSlideDuration).SetEase(Ease.InOutCubic));
-        motion.OnComplete(() =>
+        motion = DOTween.Sequence().SetUpdate(UpdateType.Normal, true)
+            .Append(from.DOAnchorPos(fromHome + travel, optionsSlideDuration)
+                .SetEase(Ease.InOutCubic))
+            .Join(to.DOAnchorPos(toHome, optionsSlideDuration)
+                .SetEase(Ease.InOutCubic));
+        if (next == Page.Options)
+            GS2FrontEnd.AnimateWave(optionsItems, distance, motion, optionsSlideDuration);
+        to.gameObject.SetActive(true);
+
+        motion.InsertCallback(optionsSlideDuration, () =>
         {
             to.anchoredPosition = toHome;
             from.gameObject.SetActive(false);
             from.anchoredPosition = fromHome;
+        });
+        motion.OnComplete(() =>
+        {
             if (toGroup != null) toGroup.blocksRaycasts = true;
             current = next;
             busy = false;

@@ -1,16 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
-
-public enum DeliveryItem { Wood, Food, CornSeeds, PumpkinSeeds, Fish, Corn, Pumpkin }
 
 [Serializable]
 public sealed class DeliveryMission
 {
     public string title;
-    public DeliveryItem item;
-    public int quantity;
+    public string description;
+    public List<DeliveryRequirement> requirements = new();
     public int dueDay;
     public int coinReward;
     public bool accepted;
@@ -29,12 +28,14 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
     [SerializeField] private ShopTabs shopTabs;
     [Header("Comunidade")]
     [SerializeField] private ActivityCardAvailability hand;
-    [SerializeField, Min(1)] private int deliveriesPerHouse = 2;
-    [SerializeField, Range(1, 3)] private int houseRewardLimit = 3;
-    [SerializeField, Range(1, 5)] private int minimumOffers = 2;
-    [SerializeField, Range(1, 5)] private int maximumOffers = 3;
-    [SerializeField, Min(1)] private int campaignDays = 12;
-    [SerializeField, Range(0, 3)] private int returningOffersPerMarket = 1;
+    [SerializeField, HideInInspector, Min(1)] private int deliveriesPerHouse = 2;
+    [SerializeField, HideInInspector, Min(1)] private int secondHouseDeliveries = 3;
+    [SerializeField, HideInInspector, Min(1)] private int thirdHouseDeliveries = 4;
+    [SerializeField, HideInInspector, Range(1, 3)] private int houseRewardLimit = 3;
+    [SerializeField, HideInInspector, Range(1, 5)] private int minimumOffers = 2;
+    [SerializeField, HideInInspector, Range(1, 5)] private int maximumOffers = 3;
+    [SerializeField, HideInInspector, Min(1)] private int campaignDays = 12;
+    [SerializeField, HideInInspector, Range(0, 3)] private int returningOffersPerMarket = 1;
 
     private readonly List<DeliveryMission> missions = new List<DeliveryMission>();
     private readonly List<DeliveryMission> returningOffers = new List<DeliveryMission>();
@@ -54,6 +55,18 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
 
     private void OnEnable()
     {
+        GameBalance balance = GameBalance.Current;
+        if (balance != null)
+        {
+            deliveriesPerHouse = balance.deliveriesPerHouse;
+            secondHouseDeliveries = balance.secondHouseDeliveries;
+            thirdHouseDeliveries = balance.thirdHouseDeliveries;
+            houseRewardLimit = balance.houseRewardLimit;
+            minimumOffers = balance.minimumOffers;
+            maximumOffers = balance.maximumOffers;
+            campaignDays = balance.campaignDays;
+            returningOffersPerMarket = balance.returningOffersPerMarket;
+        }
         if (resources != null) resources.Changed += Refresh;
     }
 
@@ -115,18 +128,7 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
         if (index < 0 || index >= missions.Count || resources == null) return;
         DeliveryMission mission = missions[index];
         if (!mission.accepted || currentDay > mission.dueDay) return;
-        bool delivered = mission.item switch
-        {
-            DeliveryItem.Wood => resources.TryDeliverWood(mission.quantity),
-            DeliveryItem.Food => resources.TryDeliverFood(mission.quantity),
-            DeliveryItem.CornSeeds => resources.TryDeliverSeeds(CropType.Corn, mission.quantity),
-            DeliveryItem.PumpkinSeeds => resources.TryDeliverSeeds(CropType.Pumpkin, mission.quantity),
-            DeliveryItem.Fish => resources.TryDeliverFish(mission.quantity),
-            DeliveryItem.Corn => resources.TryDeliverCrop(CropType.Corn, mission.quantity),
-            DeliveryItem.Pumpkin => resources.TryDeliverCrop(CropType.Pumpkin, mission.quantity),
-            _ => false
-        };
-        if (!delivered)
+        if (!resources.TryDeliverMission(mission.requirements))
         {
             if (feedback != null) feedback.ShowMessage("Ainda faltam itens para a entrega.");
             return;
@@ -141,7 +143,7 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
         if (housesRewarded < houseRewardLimit)
         {
             communityDeliveries++;
-            if (communityDeliveries >= deliveriesPerHouse && hand != null &&
+            if (communityDeliveries >= DeliveriesForNextHouse() && hand != null &&
                 hand.AddCommunityHouseCard())
             {
                 communityDeliveries = 0;
@@ -159,7 +161,7 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
         if (housesRewarded >= houseRewardLimit)
             return "Comunidade: todas as casas foram liberadas.";
 
-        int remaining = deliveriesPerHouse - communityDeliveries;
+        int remaining = DeliveriesForNextHouse() - communityDeliveries;
         if (remaining <= 0)
             return "Comunidade: nova casa aguardando espaço para ser liberada.";
 
@@ -168,10 +170,27 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
             "faltam " + remaining + " entregas para uma nova casa.");
     }
 
+    private int DeliveriesForNextHouse() => housesRewarded switch
+    {
+        0 => deliveriesPerHouse,
+        1 => secondHouseDeliveries,
+        _ => thirdHouseDeliveries
+    };
+
     private void GenerateOffers()
     {
-        var pool = new List<DeliveryItem> { DeliveryItem.Wood, DeliveryItem.Food,
-            DeliveryItem.Fish, DeliveryItem.Corn, DeliveryItem.Pumpkin };
+        DeliveryMissionCatalog catalog = Resources.Load<DeliveryMissionCatalog>("DeliveryMissions");
+        if (catalog == null || catalog.entries == null)
+        {
+            Debug.LogError("Catálogo de encomendas não encontrado em Resources/DeliveryMissions.");
+            return;
+        }
+        var pool = new List<SaleItem>();
+        foreach (DeliveryMissionTemplate template in catalog.entries)
+            if (DeliveryMissionCatalog.IsUsable(template) &&
+                !pool.Contains(template.requirements[0].item))
+                pool.Add(template.requirements[0].item);
+        if (pool.Count == 0) return;
         int count = Mathf.Clamp(UnityEngine.Random.Range(minimumOffers, maximumOffers + 1), 1, pool.Count);
         int returning = Mathf.Min(returningOffersPerMarket, Mathf.Min(count, returningOffers.Count));
         for (int i = 0; i < returning; i++)
@@ -181,74 +200,33 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
             returningOffers.RemoveAt(pick);
             offer.dueDay = Mathf.Min(campaignDays, currentDay + 2);
             missions.Add(offer);
-            pool.Remove(offer.item);
+            if (offer.requirements.Count > 0) pool.Remove(offer.requirements[0].item);
         }
-        count -= returning;
+        count = Mathf.Min(count - returning, pool.Count);
         for (int i = 0; i < count; i++)
         {
             int pick = UnityEngine.Random.Range(0, pool.Count);
-            DeliveryItem item = pool[pick];
+            SaleItem item = pool[pick];
             pool.RemoveAt(pick);
-            int quantity = QuantityFor(item);
+            var options = new List<DeliveryMissionTemplate>();
+            foreach (DeliveryMissionTemplate template in catalog.entries)
+                if (DeliveryMissionCatalog.IsUsable(template) &&
+                    template.requirements[0].item == item) options.Add(template);
+            DeliveryMissionTemplate chosen = options[UnityEngine.Random.Range(0, options.Count)];
+            var requirements = new List<DeliveryRequirement>(chosen.requirements.Count);
+            foreach (DeliveryRequirement requirement in chosen.requirements)
+                requirements.Add(new DeliveryRequirement
+                    { item = requirement.item, quantity = requirement.quantity });
             missions.Add(new DeliveryMission
             {
-                title = RandomTitle(item),
-                item = item,
-                quantity = quantity,
+                title = chosen.title,
+                description = chosen.description,
+                requirements = requirements,
                 dueDay = Mathf.Min(campaignDays, currentDay + 2),
-                coinReward = 3 + quantity
+                coinReward = chosen.coinReward
             });
         }
     }
-
-    private static int QuantityFor(DeliveryItem item)
-    {
-        if (item == DeliveryItem.Wood) return UnityEngine.Random.Range(2, 4);
-        if (item == DeliveryItem.Food) return UnityEngine.Random.Range(3, 5);
-        if (item == DeliveryItem.CornSeeds) return UnityEngine.Random.Range(1, 3);
-        if (item == DeliveryItem.Fish) return UnityEngine.Random.Range(2, 4);
-        if (item == DeliveryItem.Corn || item == DeliveryItem.Pumpkin)
-            return UnityEngine.Random.Range(2, 4);
-        return 1;
-    }
-
-    private static string RandomTitle(DeliveryItem item)
-    {
-        string[] titles = item switch
-        {
-            DeliveryItem.Wood => new[] { "Reparos na comunidade", "Lenha para as famílias", "Madeira para o abrigo" },
-            DeliveryItem.Food => new[] { "Alimentos para a feira", "Provisões da comunidade", "Comida para os viajantes" },
-            DeliveryItem.CornSeeds => new[] { "Milho para o vizinho", "Sementes para o roçado" },
-            DeliveryItem.Fish => new[] { "Peixes para a comunidade", "Encomenda de peixe" },
-            DeliveryItem.Corn => new[] { "Milho para a feira", "Colheita encomendada" },
-            DeliveryItem.Pumpkin => new[] { "Macaxeira da comunidade", "Macaxeira para a feira" },
-            _ => new[] { "Plantio de macaxeira", "Sementes para a feira" }
-        };
-        return titles[UnityEngine.Random.Range(0, titles.Length)];
-    }
-
-    private int InStock(DeliveryItem item) => item switch
-    {
-        DeliveryItem.Wood => resources.Wood,
-        DeliveryItem.Food => resources.Food,
-        DeliveryItem.CornSeeds => resources.CornSeeds,
-        DeliveryItem.PumpkinSeeds => resources.PumpkinSeeds,
-        DeliveryItem.Fish => resources.Fish,
-        DeliveryItem.Corn => resources.Corn,
-        DeliveryItem.Pumpkin => resources.Pumpkin,
-        _ => 0
-    };
-
-    private static string ItemName(DeliveryItem item) => item switch
-    {
-        DeliveryItem.Wood => "madeira",
-        DeliveryItem.Food => "comida",
-        DeliveryItem.CornSeeds => "sementes de milho",
-        DeliveryItem.Fish => "peixe",
-        DeliveryItem.Corn => "milho",
-        DeliveryItem.Pumpkin => "macaxeira",
-        _ => "sementes de macaxeira"
-    };
 
     private void Refresh()
     {
@@ -263,15 +241,30 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
             return;
         }
         DeliveryMission selected = missions[selectedIndex];
-        int stock = InStock(selected.item);
         int daysLeft = selected.dueDay - currentDay + 1;
         if (orderText != null)
-            orderText.text = selected.title + "\nEntregar " + selected.quantity + " " + ItemName(selected.item) +
-                " (estoque: " + stock + ")\nPrazo: " + daysLeft + (daysLeft == 1 ? " dia" : " dias") +
-                "\nRecompensa: +" + selected.coinReward + " moedas" +
-                "\n\n" + CommunityReminder();
+        {
+            var text = new StringBuilder(selected.title);
+            if (!string.IsNullOrWhiteSpace(selected.description))
+                text.Append('\n').Append(selected.description);
+            text.Append("\nEntregar: ");
+            bool first = true;
+            foreach (DeliveryRequirement requirement in selected.requirements)
+            {
+                if (!first) text.Append("; ");
+                first = false;
+                text.Append(requirement.quantity).Append("x ")
+                    .Append(DeliveryMissionCatalog.ItemName(requirement.item))
+                    .Append(" (tem ").Append(resources.Stock(requirement.item)).Append(')');
+            }
+            text.Append("\nPrazo: ").Append(daysLeft).Append(daysLeft == 1 ? " dia" : " dias")
+                .Append("  ·  +").Append(selected.coinReward).Append(" moedas")
+                .Append("\n\n").Append(CommunityReminder());
+            orderText.text = text.ToString();
+        }
         if (acceptButton != null) acceptButton.interactable = marketOpen && !selected.accepted;
-        if (deliverButton != null) deliverButton.interactable = selected.accepted && stock >= selected.quantity;
+        if (deliverButton != null) deliverButton.interactable = selected.accepted &&
+            resources.CanDeliverMission(selected.requirements);
         if (nextButton != null) nextButton.interactable = missions.Count > 1;
     }
 }

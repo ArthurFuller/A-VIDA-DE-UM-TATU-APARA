@@ -31,7 +31,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
     private enum Page { Main, Options, Leaderboard }
     private Page current;
 
-    private sealed class PageItems
+    internal sealed class PageItems
     {
         public RectTransform[] rects;
         public Vector2[] positions;
@@ -118,7 +118,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
         motion = DOTween.Sequence().SetUpdate(true);
         motion.Join(from.DOAnchorPosX(-entryX, slideSeconds).SetEase(Ease.InOutCubic));
         if (wave)
-            AnimateWave(destination == Page.Main ? mainItems : optionsItems, entryX, motion);
+            AnimateWave(destination == Page.Main ? mainItems : optionsItems, entryX, motion, slideSeconds);
         else
         {
             motion.Join(to.DOAnchorPosX(0f, slideSeconds).SetEase(Ease.OutCubic));
@@ -160,7 +160,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
         return Mathf.Max(1100f, (viewportWidth + Mathf.Max(from.rect.width, to.rect.width)) * 0.5f + 32f);
     }
 
-    private PageItems CaptureItems(RectTransform page)
+    internal static PageItems CaptureItems(RectTransform page)
     {
         if (page == null) return null;
         var items = new PageItems
@@ -181,7 +181,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
         return items;
     }
 
-    private void AnimateWave(PageItems items, float entryX, Sequence sequence)
+    internal static void AnimateWave(PageItems items, float entryX, Sequence sequence, float duration)
     {
         if (items == null) return;
         for (int i = 0; i < items.rects.Length; i++)
@@ -190,7 +190,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
             item.anchoredPosition = items.positions[i] + Vector2.right * entryX;
             item.localScale = items.scales[i];
             float delay = i * 0.035f;
-            sequence.Insert(delay, item.DOAnchorPos(items.positions[i], slideSeconds)
+            sequence.Insert(delay, item.DOAnchorPos(items.positions[i], duration)
                 .SetEase(Ease.OutCubic));
         }
     }

@@ -9,6 +9,12 @@ public enum AnimalKind { None, Cow, Chicken }
 public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
     [SerializeField] private ActionResolver actionResolver;
+    [Tooltip("Pontos opcionais do trajeto, na ordem da ida. A volta usa a ordem inversa.")]
+    [SerializeField] private Transform[] workWaypoints;
+    [Tooltip("Opcional: posição do funcionário durante a atividade neste terreno.")]
+    [SerializeField] private Transform workPoint;
+    [SerializeField, Min(0f), Tooltip("Velocidade neste terreno. Zero usa a velocidade geral dos funcionários.")]
+    private float workTravelSpeed;
     [SerializeField] private Renderer surfaceRenderer;
     [SerializeField] private Material plowedMaterial;
     [SerializeField] private GameObject plowedVisual; // Visual opcional: mantém o solo lógico e collider.
@@ -56,7 +62,39 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     private static readonly Dictionary<string, JoinedVisual> joinedVisuals =
         new Dictionary<string, JoinedVisual>();
     public bool IsEmpty => !isWater && Crop == CropType.None;
-    public Vector3 WorkPosition => transform.position + Vector3.back * workClearance;
+    public Vector3 WorkPosition => workPoint != null ? workPoint.position :
+        transform.position + Vector3.back * (surfaceRenderer != null ?
+            surfaceRenderer.bounds.extents.z + 0.5f : workClearance);
+    public float WorkTravelSpeed => workTravelSpeed;
+    public Vector3[] WorkWaypoints
+    {
+        get
+        {
+            if (workWaypoints == null) return Array.Empty<Vector3>();
+            var points = new List<Vector3>(workWaypoints.Length);
+            foreach (Transform waypoint in workWaypoints)
+                if (waypoint != null) points.Add(waypoint.position);
+            return points.ToArray();
+        }
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        Vector3? from = null;
+        Gizmos.color = new Color(1f, 0.6f, 0.1f);
+        if (workWaypoints != null)
+            foreach (Transform waypoint in workWaypoints)
+            {
+                if (waypoint == null) continue;
+                if (from.HasValue) Gizmos.DrawLine(from.Value, waypoint.position);
+                Gizmos.DrawSphere(waypoint.position, 0.08f);
+                from = waypoint.position;
+            }
+        if (workPoint == null) return;
+        if (from.HasValue) Gizmos.DrawLine(from.Value, workPoint.position);
+        Gizmos.DrawSphere(workPoint.position, 0.12f);
+        Gizmos.DrawLine(workPoint.position, transform.position);
+    }
     // Mesma regra de vizinhança ortogonal usada pelos cercados.
     public bool IsAdjacentTo(Plot other)
     {

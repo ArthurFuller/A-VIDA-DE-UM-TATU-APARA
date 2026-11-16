@@ -26,10 +26,10 @@ public sealed class MandalaSynergy : MonoBehaviour
     [Tooltip("Slot do poço central.")]
     [SerializeField] private Transform centralWater;
     [Header("Bônus da mandala")]
-    [SerializeField, Min(0)] private int cropGrowthNearCorn = 1;
-    [SerializeField, Min(0)] private int cropYieldNearCorn = 2;
-    [SerializeField, Min(0)] private int animalProductionNearCorn = 1;
-    [SerializeField, Min(0)] private int cropSalePriceNearWaterCow = 2;
+    [SerializeField, HideInInspector, Min(0)] private int cropGrowthNearCorn = 1;
+    [SerializeField, HideInInspector, Min(0)] private int cropYieldNearCorn = 2;
+    [SerializeField, HideInInspector, Min(0)] private int animalProductionNearCorn = 1;
+    [SerializeField, HideInInspector, Min(0)] private int cropSalePriceNearWaterCow = 2;
     [Header("Uma única emissão por slot; efeitos são editáveis na Hierarchy")]
     [SerializeField] private SlotEffect[] slotEffects;
 
@@ -39,7 +39,16 @@ public sealed class MandalaSynergy : MonoBehaviour
     public static MandalaSynergy Instance { get; private set; }
     public event Action Changed;
 
-    private void Awake() => Instance = this;
+    private void Awake()
+    {
+        Instance = this;
+        GameBalance balance = GameBalance.Current;
+        if (balance == null) return;
+        cropGrowthNearCorn = balance.cropGrowthNearCorn;
+        cropYieldNearCorn = balance.cropYieldNearCorn;
+        animalProductionNearCorn = balance.animalProductionNearCorn;
+        cropSalePriceNearWaterCow = balance.cropSalePriceNearWaterCow;
+    }
     private void OnDestroy() { if (Instance == this) Instance = null; }
 
 

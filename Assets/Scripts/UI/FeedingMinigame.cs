@@ -103,8 +103,9 @@ public sealed class FeedingMinigame : MonoBehaviour
     public void Begin(WorkerAssignment[] dayWorkers, Action<SaleItem?[]> onCompleted,
         Action onCancelled = null)
     {
+        // Activate the parent first so Awake initializes the panel and its buttons.
+        if (!gameObject.activeSelf) gameObject.SetActive(true);
         transition?.Kill();
-        // The scene may keep this panel disabled for editor layout work.
         if (panel != null) panel.gameObject.SetActive(true);
         workers = dayWorkers;
         // Os dois cards atuais já têm tamanho e posição definidos na cena.

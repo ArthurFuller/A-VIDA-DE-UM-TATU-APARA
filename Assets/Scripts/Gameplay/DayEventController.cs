@@ -52,24 +52,24 @@ public sealed class DayEventController : MonoBehaviour
     [SerializeField] private Sprite pestsArt;
     [SerializeField] private Sprite reforestationArt;
     [Header("Parâmetros provisórios de eventos")]
-    [SerializeField, Range(0f, 1f)] private float generalEventChance = 0.35f;
-    [SerializeField, Min(1)] private int eventDurationDays = 2;
-    [SerializeField, Min(0)] private int droughtFishingReduction = 1;
-    [SerializeField, Min(0)] private int pestHarvestReduction = 1;
+    [SerializeField, HideInInspector, Range(0f, 1f)] private float generalEventChance = 0.35f;
+    [SerializeField, HideInInspector, Min(1)] private int eventDurationDays = 2;
+    [SerializeField, HideInInspector, Min(0)] private int droughtFishingReduction = 1;
+    [SerializeField, HideInInspector, Min(0)] private int pestHarvestReduction = 1;
     [Header("Pragas")]
     [FormerlySerializedAs("cassavaRegressionWithoutProtection")]
-    [SerializeField, Min(0)] private int pestGrowthRegression = 2;
-    [SerializeField, Min(0)] private int droughtGrowthDelay = 1;
-    [SerializeField, Min(0)] private int rainGrowthBonus = 1;
-    [SerializeField, Min(1)] private int forestExploitationThreshold = 6;
-    [SerializeField, Range(0f, 1f)] private float comadreChance = 0.5f;
-    [SerializeField, Min(1)] private int comadreAbsenceDays = 1;
-    [SerializeField, Min(0)] private int rainForestRecovery = 2;
-    [SerializeField, Min(1)] private int headOfCuiaFishTheft = 2;
+    [SerializeField, HideInInspector, Min(0)] private int pestGrowthRegression = 2;
+    [SerializeField, HideInInspector, Min(0)] private int droughtGrowthDelay = 1;
+    [SerializeField, HideInInspector, Min(0)] private int rainGrowthBonus = 1;
+    [SerializeField, HideInInspector, Min(1)] private int forestExploitationThreshold = 6;
+    [SerializeField, HideInInspector, Range(0f, 1f)] private float comadreChance = 0.5f;
+    [SerializeField, HideInInspector, Min(1)] private int comadreAbsenceDays = 1;
+    [SerializeField, HideInInspector, Min(0)] private int rainForestRecovery = 2;
+    [SerializeField, HideInInspector, Min(1)] private int headOfCuiaFishTheft = 2;
     [Header("Reflorestamento")]
-    [SerializeField, Min(1), InspectorName("Dias sem coletar madeira")]
+    [SerializeField, HideInInspector, Min(1)]
     private int daysWithoutWoodForReforestation = 3;
-    [SerializeField, Min(1), InspectorName("Madeiras recebidas")]
+    [SerializeField, HideInInspector, Min(1)]
     private int reforestationWood = 4;
 
     private readonly List<ActiveGeneral> activeGeneralEvents = new();
@@ -80,6 +80,33 @@ public sealed class DayEventController : MonoBehaviour
     private int lastWoodCollectionDay = 1;
     private int lastReforestationDay = -100;
     private int pendingWoodReward;
+
+    private void Awake()
+    {
+        GameBalance balance = GameBalance.Current;
+        if (balance == null) return;
+        generalEventChance = balance.generalEventChance;
+        droughtFishingReduction = balance.droughtFishingReduction;
+        pestHarvestReduction = balance.pestHarvestReduction;
+        pestGrowthRegression = balance.pestGrowthRegression;
+        droughtGrowthDelay = balance.droughtGrowthDelay;
+        rainGrowthBonus = balance.rainGrowthBonus;
+        forestExploitationThreshold = balance.forestExploitationThreshold;
+        comadreChance = balance.comadreChance;
+        comadreAbsenceDays = balance.comadreAbsenceDays;
+        rainForestRecovery = balance.rainForestRecovery;
+        headOfCuiaFishTheft = balance.headOfCuiaFishTheft;
+        daysWithoutWoodForReforestation = balance.daysWithoutWoodForReforestation;
+        reforestationWood = balance.reforestationWood;
+    }
+
+    private int DurationFor(SertaoEventKind kind)
+    {
+        GameBalance balance = GameBalance.Current;
+        if (balance == null) return eventDurationDays;
+        return kind == SertaoEventKind.Rain ? balance.rainDurationDays :
+            kind == SertaoEventKind.Pests ? balance.pestDurationDays : balance.droughtDurationDays;
+    }
     private bool pestRegressionPending;
     private CropType pestTarget = CropType.None;
     public bool IsRaining => IsActive(SertaoEventKind.Rain);
@@ -146,7 +173,7 @@ public sealed class DayEventController : MonoBehaviour
             resourceHud.FlyFromRect(ResourceKind.Wood, wood, card.CardRect);
     }
 
-    public void StartDay(int day)
+    public void StartDay(int day, Color? previousBackdrop = null)
     {
         currentDay = day;
         stolenFishToday = 0;
@@ -214,7 +241,7 @@ public sealed class DayEventController : MonoBehaviour
                 }
                 activeGeneralEvents.Add(new ActiveGeneral
                 {
-                    Kind = announced, StartedOn = day, DaysRemaining = eventDurationDays
+                    Kind = announced, StartedOn = day, DaysRemaining = DurationFor(announced)
                 });
             }
         }
@@ -253,7 +280,7 @@ public sealed class DayEventController : MonoBehaviour
         WeatherChanged?.Invoke();
         if (announced != SertaoEventKind.None && card != null)
         {
-            card.Show(Title(announced), Description(announced), Art(announced));
+            card.Show(Title(announced), Description(announced), Art(announced), previousBackdrop);
             switch (announced)
             {
                 case SertaoEventKind.Drought: AudioManager.Play(SoundCue.EventDrought); break;
@@ -326,13 +353,13 @@ public sealed class DayEventController : MonoBehaviour
 
     private string DefaultDescription(SertaoEventKind kind) => kind switch
     {
-        SertaoEventKind.Drought => "A seca reduz a pesca e atrasa o crescimento. Duração: " + eventDurationDays + " dia(s).",
+        SertaoEventKind.Drought => "A seca reduz a pesca e atrasa o crescimento. Duração: " + DurationFor(kind) + " dia(s).",
         SertaoEventKind.Pests => "As pragas afetam " +
             (pestTarget == CropType.Pumpkin ? "a macaxeira" :
              pestTarget == CropType.Corn ? "o milho" :
              pestTarget == CropType.Jerimum ? "o jerimum" : "as lavouras") +
-            ". Duração: " + eventDurationDays + " dia(s).",
-        SertaoEventKind.Rain => "A chuva acelera o crescimento e reduz o impacto da coleta de madeira. Duração: " + eventDurationDays + " dia(s).",
+            ". Duração: " + DurationFor(kind) + " dia(s).",
+        SertaoEventKind.Rain => "A chuva acelera o crescimento e reduz o impacto da coleta de madeira. Duração: " + DurationFor(kind) + " dia(s).",
         SertaoEventKind.Calm => "Nenhum novo evento especial começou hoje.",
         SertaoEventKind.HeadOfCuia => "O Cabeça de Cuia roubou " + stolenFishToday +
             (stolenFishToday == 1 ? " peixe." : " peixes."),

@@ -16,17 +16,17 @@ public sealed class CropSettings
 
 public sealed class SeedCatalog : MonoBehaviour
 {
-    [SerializeField] private CropSettings corn = new CropSettings
+    [SerializeField, HideInInspector] private CropSettings corn = new CropSettings
     {
         type = CropType.Corn, displayName = "Milho", coinCost = 2, seedsPerPurchase = 2,
         growthDays = 1, foodYield = 2
     };
-    [SerializeField] private CropSettings pumpkin = new CropSettings
+    [SerializeField, HideInInspector] private CropSettings pumpkin = new CropSettings
     {
         type = CropType.Pumpkin, displayName = "Macaxeira", coinCost = 2, seedsPerPurchase = 1,
         growthDays = 1, foodYield = 4
     };
-    [SerializeField] private CropSettings jerimum = new CropSettings
+    [SerializeField, HideInInspector] private CropSettings jerimum = new CropSettings
     {
         type = CropType.Jerimum, displayName = "Jerimum", coinCost = 4, seedsPerPurchase = 1,
         growthDays = 3, foodYield = 5
@@ -34,6 +34,10 @@ public sealed class SeedCatalog : MonoBehaviour
 
     public CropSettings Get(CropType type)
     {
+        GameBalance balance = GameBalance.Current;
+        if (balance != null)
+            return type == CropType.Corn ? balance.corn : type == CropType.Pumpkin ? balance.pumpkin :
+                type == CropType.Jerimum ? balance.jerimum : null;
         return type == CropType.Corn ? corn : type == CropType.Pumpkin ? pumpkin :
             type == CropType.Jerimum ? jerimum : null;
     }

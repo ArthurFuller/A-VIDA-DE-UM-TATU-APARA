@@ -160,10 +160,15 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
 
     private void ResizeScrollContent(int count)
     {
-        if (listContent == null) return;
         float needed = Mathf.Max(0f, firstCardTopPadding) + Mathf.Max(0, count) *
             Mathf.Max(1f, cardHeight) + Mathf.Max(0, count - 1) *
             Mathf.Max(0f, cardSpacing) + Mathf.Max(0f, listBottomPadding);
+        ResizeScrollContentHeight(needed);
+    }
+
+    private void ResizeScrollContentHeight(float needed)
+    {
+        if (listContent == null) return;
         RectTransform viewport = listContent.parent as RectTransform;
         float viewportHeight = viewport != null ? viewport.rect.height : 0f;
         listContent.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical,
@@ -296,30 +301,42 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
     {
         if (cards == null || missions == null || resources == null) return;
         int shown = 0;
+        float usedHeight = Mathf.Max(0f, firstCardTopPadding);
         for (int i = 0; i < missions.Count && shown < cards.Length; i++)
         {
             DeliveryMission mission = missions[i];
             if (!mission.accepted) continue;
-            ActiveMissionCard card = cards[shown++];
+            int cardIndex = shown++;
+            ActiveMissionCard card = cards[cardIndex];
             if (card == null) continue;
-            int stock = mission.item switch
-            {
-                DeliveryItem.Wood => resources.Wood,
-                DeliveryItem.Food => resources.Food,
-                DeliveryItem.CornSeeds => resources.CornSeeds,
-                DeliveryItem.PumpkinSeeds => resources.PumpkinSeeds,
-                DeliveryItem.Fish => resources.Fish,
-                DeliveryItem.Corn => resources.Corn,
-                _ => resources.Pumpkin
-            };
             card.gameObject.SetActive(true);
-            Sprite icon = itemIcons != null && (int)mission.item < itemIcons.Length
-                ? itemIcons[(int)mission.item] : null;
-            card.Bind(mission, day, stock, icon);
+            SaleItem firstItem = mission.requirements != null && mission.requirements.Count > 0 ?
+                mission.requirements[0].item : (SaleItem)(-1);
+            int iconIndex = IconIndex(firstItem);
+            Sprite icon = itemIcons != null && iconIndex >= 0 && iconIndex < itemIcons.Length
+                ? itemIcons[iconIndex] : null;
+            float height = Mathf.Max(cardHeight, card.Bind(mission, resources, icon));
+            RectTransform rect = card.transform as RectTransform;
+            if (rect == null) continue;
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
+            Vector2 position = rect.anchoredPosition;
+            position.y = -usedHeight;
+            rect.anchoredPosition = position;
+            if (cardIndex < cardPositions.Count) cardPositions[cardIndex] = position;
+            usedHeight += height + Mathf.Max(0f, cardSpacing);
         }
         for (int i = shown; i < cards.Length; i++)
             if (cards[i] != null) cards[i].gameObject.SetActive(false);
         // Ajusta a area rolavel a quantidade real de missoes, sem mudar as regras.
-        ResizeScrollContent(shown);
+        ResizeScrollContentHeight(usedHeight - (shown > 0 ? Mathf.Max(0f, cardSpacing) : 0f) +
+            Mathf.Max(0f, listBottomPadding));
     }
+
+    private static int IconIndex(SaleItem item) => item switch
+    {
+        SaleItem.Wood => 0, SaleItem.Food => 1, SaleItem.CornSeeds => 2,
+        SaleItem.PumpkinSeeds => 3, SaleItem.Fish => 4,
+        SaleItem.Corn => 5, SaleItem.Pumpkin => 6,
+        _ => -1
+    };
 }

@@ -1,21 +1,22 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public sealed class ResourceBank : MonoBehaviour
 {
     [Header("Recursos iniciais")]
-    [SerializeField, Min(0), InspectorName("Madeira")] private int startingWood;
-    [SerializeField, Min(0), InspectorName("Comida pronta")] private int startingFood = 2;
-    [SerializeField, InspectorName("Moedas")] private int startingCoins = 2;
-    [SerializeField, Min(0), InspectorName("Peixes")] private int startingFish;
-    [SerializeField, Min(0), InspectorName("Milho colhido")] private int startingCorn;
-    [SerializeField, Min(0), InspectorName("Macaxeira colhida")] private int startingPumpkin;
-    [SerializeField, Min(0), InspectorName("Jerimum colhido")] private int startingJerimum;
-    [SerializeField, Min(0), InspectorName("Leite")] private int startingMilk;
-    [SerializeField, Min(0), InspectorName("Ovos")] private int startingEggs;
-    [SerializeField, Min(0), InspectorName("Sementes de milho")] private int startingCornSeeds;
-    [SerializeField, Min(0), InspectorName("Sementes de macaxeira")] private int startingPumpkinSeeds;
-    [SerializeField, Min(0), InspectorName("Sementes de jerimum")] private int startingJerimumSeeds;
+    [SerializeField, HideInInspector, Min(0)] private int startingWood;
+    [SerializeField, HideInInspector, Min(0)] private int startingFood = 2;
+    [SerializeField, HideInInspector] private int startingCoins = 2;
+    [SerializeField, HideInInspector, Min(0)] private int startingFish;
+    [SerializeField, HideInInspector, Min(0)] private int startingCorn;
+    [SerializeField, HideInInspector, Min(0)] private int startingPumpkin;
+    [SerializeField, HideInInspector, Min(0)] private int startingJerimum;
+    [SerializeField, HideInInspector, Min(0)] private int startingMilk;
+    [SerializeField, HideInInspector, Min(0)] private int startingEggs;
+    [SerializeField, HideInInspector, Min(0)] private int startingCornSeeds;
+    [SerializeField, HideInInspector, Min(0)] private int startingPumpkinSeeds;
+    [SerializeField, HideInInspector, Min(0)] private int startingJerimumSeeds;
 
     public int Wood { get; private set; }
     public int Food { get; private set; }
@@ -33,6 +34,17 @@ public sealed class ResourceBank : MonoBehaviour
 
     private void Awake()
     {
+        GameBalance balance = GameBalance.Current;
+        if (balance != null)
+        {
+            startingWood = balance.startingWood; startingFood = balance.startingFood;
+            startingCoins = balance.startingCoins; startingFish = balance.startingFish;
+            startingCorn = balance.startingCorn; startingPumpkin = balance.startingPumpkin;
+            startingJerimum = balance.startingJerimum; startingMilk = balance.startingMilk;
+            startingEggs = balance.startingEggs; startingCornSeeds = balance.startingCornSeeds;
+            startingPumpkinSeeds = balance.startingPumpkinSeeds;
+            startingJerimumSeeds = balance.startingJerimumSeeds;
+        }
         Wood = startingWood;
         Food = startingFood;
         Coins = startingCoins;
@@ -105,6 +117,46 @@ public sealed class ResourceBank : MonoBehaviour
     }
 
     public bool TryDeliverFish(int amount) => TryRemove(SaleItem.Fish, amount);
+
+    public int Stock(SaleItem item) => StockForSale(item);
+
+    public bool CanDeliverMission(IReadOnlyList<DeliveryRequirement> requirements) =>
+        MissionAmounts(requirements, out _);
+
+    private bool MissionAmounts(IReadOnlyList<DeliveryRequirement> requirements, out int[] amounts)
+    {
+        amounts = new int[(int)SaleItem.Eggs + 1];
+        if (requirements == null || requirements.Count == 0) return false;
+        foreach (DeliveryRequirement requirement in requirements)
+        {
+            if (requirement == null || requirement.quantity <= 0 ||
+                (int)requirement.item < 0 || (int)requirement.item >= amounts.Length ||
+                requirement.quantity > int.MaxValue - amounts[(int)requirement.item]) return false;
+            amounts[(int)requirement.item] += requirement.quantity;
+        }
+        for (int i = 0; i < amounts.Length; i++)
+            if (amounts[i] > StockForSale((SaleItem)i)) return false;
+        return true;
+    }
+
+    public bool TryDeliverMission(IReadOnlyList<DeliveryRequirement> requirements)
+    {
+        if (!MissionAmounts(requirements, out int[] amounts)) return false;
+        Wood -= amounts[(int)SaleItem.Wood];
+        Fish -= amounts[(int)SaleItem.Fish];
+        Corn -= amounts[(int)SaleItem.Corn];
+        Pumpkin -= amounts[(int)SaleItem.Pumpkin];
+        RemoveFood(amounts[(int)SaleItem.Food]);
+        CornSeeds -= amounts[(int)SaleItem.CornSeeds];
+        PumpkinSeeds -= amounts[(int)SaleItem.PumpkinSeeds];
+        Jerimum -= amounts[(int)SaleItem.Jerimum];
+        JerimumSeeds -= amounts[(int)SaleItem.JerimumSeeds];
+        Milk -= amounts[(int)SaleItem.Milk];
+        Eggs -= amounts[(int)SaleItem.Eggs];
+        Changed?.Invoke();
+        return true;
+    }
+
     public bool TryDeliverCrop(CropType crop, int amount) => crop switch
     {
         CropType.Corn => TryRemove(SaleItem.Corn, amount),

@@ -26,11 +26,12 @@ public sealed class DayCycle : MonoBehaviour
     [SerializeField] private Button finishDayButton;
     [SerializeField] private Button continueButton;
     [SerializeField] private Text continueButtonText;
-    [SerializeField, Min(1)] private int totalDays = 12;
-    [SerializeField, Min(1)] private int milkPerCow = 1;
-    [SerializeField, Min(1)] private int eggsPerChicken = 1;
+    [SerializeField, HideInInspector, Min(1)] private int totalDays = 12;
+    [SerializeField, HideInInspector, Min(1)] private int milkPerCow = 1;
+    [SerializeField, HideInInspector, Min(1)] private int eggsPerChicken = 1;
 
     private int currentDay = 1;
+    private HoverPunchButton finishDayFeedback;
     private bool summaryOpen;
     private bool feedingOpen;
     private bool gameOver;
@@ -105,6 +106,20 @@ public sealed class DayCycle : MonoBehaviour
         workers = updated.ToArray();
     }
 
+    private void Awake()
+    {
+        GameBalance balance = GameBalance.Current;
+        if (balance != null)
+        {
+            totalDays = balance.totalDays;
+            milkPerCow = balance.milkPerCow;
+            eggsPerChicken = balance.eggsPerChicken;
+        }
+        if (finishDayButton != null &&
+            finishDayButton.TryGetComponent(out finishDayFeedback))
+            finishDayFeedback.AnimatePointerClick = false;
+    }
+
     private void Start()
     {
         UpdateDayLabel();
@@ -117,14 +132,12 @@ public sealed class DayCycle : MonoBehaviour
 
     public void FinishDay()
     {
-        if (finishDayButton != null &&
-            finishDayButton.GetComponent<HoverPunchButton>()?.BlocksNewClicks == true) return;
+        if (finishDayFeedback != null && finishDayFeedback.IsAnimating) return;
         if (!CanAcceptActions || resources == null || actions == null)
             return;
         if (actions.IsBusy)
         {
-            if (finishDayButton != null)
-                finishDayButton.GetComponent<HoverPunchButton>()?.ShakeRejected();
+            if (finishDayFeedback != null) finishDayFeedback.ShakeRejected();
             feedback.ShowMessage(actions.GatheringNeedsPlayer ?
                 "Inicie a coleta pendente pelo botão do trabalhador." :
                 actions.HasPendingSelection ? "Escolha um terreno ou cancele a carta ativa." :
@@ -140,6 +153,7 @@ public sealed class DayCycle : MonoBehaviour
             feedback.ShowMessage("Minigame de alimentação não configurado.");
             return;
         }
+        if (finishDayFeedback != null) finishDayFeedback.PlayAcceptedClick();
         AudioManager.Play(SoundCue.DayFinish);
         DayClosing?.Invoke();
         if (currentDay >= totalDays)
@@ -287,10 +301,16 @@ public sealed class DayCycle : MonoBehaviour
             (feedback != null && feedback.IsSummaryTransitioning))
             return;
 
+        if (feedback != null) feedback.HideSummary(BeginNextDay);
+        else BeginNextDay(null);
+    }
+
+    private bool BeginNextDay(Color? previousBackdrop)
+    {
         summaryOpen = false;
         currentDay++;
         ProduceAnimalResources();
-        if (dayEvents != null) dayEvents.StartDay(currentDay);
+        if (dayEvents != null) dayEvents.StartDay(currentDay, previousBackdrop);
         if (MandalaSynergy.Instance != null)
             MandalaSynergy.Instance.ApplyGrowthBonuses(currentDay, seedCatalog);
         if (dayEvents != null) dayEvents.ApplyPendingPestRegression(seedCatalog);
@@ -312,11 +332,11 @@ public sealed class DayCycle : MonoBehaviour
         foreach (Plot plot in plots)
             if (plot != null) plot.RefreshGrowth(currentDay, seedCatalog);
         UpdateMarket();
-        feedback.HideSummary();
-        feedback.ShowMessage("Dia " + currentDay + " de " + totalDays);
+        if (feedback != null) feedback.ShowMessage("Dia " + currentDay + " de " + totalDays);
         if (finishDayButton != null) finishDayButton.enabled = true;
         UpdateDayLabel();
         OpenDayAfterEvent(true);
+        return dayEvents != null && dayEvents.IsPanelOpen;
     }
 
     private void OpenDayAfterEvent(bool addAnimalResources)

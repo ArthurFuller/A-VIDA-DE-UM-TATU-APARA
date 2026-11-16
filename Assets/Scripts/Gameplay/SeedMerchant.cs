@@ -17,10 +17,10 @@ public sealed class SeedMerchant : MonoBehaviour
     [SerializeField] private DayTimeline timeline;
     [SerializeField] private ShopTabs shopTabs;
     [SerializeField] private ActivityCardAvailability hand;
-    [SerializeField, Min(0)] private int fenceWoodCost = 4;
-    [SerializeField, Min(0)] private int fenceCoinCost = 8;
-    [SerializeField] private int[] marketDays = { 1, 3, 5, 7, 9, 11 };
-    [SerializeField, Min(1)] private int foodCoinCost = 1;
+    [SerializeField, HideInInspector, Min(0)] private int fenceWoodCost = 4;
+    [SerializeField, HideInInspector, Min(0)] private int fenceCoinCost = 8;
+    [SerializeField, HideInInspector] private int[] marketDays = { 1, 3, 5, 7, 9, 11 };
+    [SerializeField, HideInInspector, Min(1)] private int foodCoinCost = 1;
     [SerializeField, Min(0)] private float panelFadeDuration = 0.25f;
     [Header("Apresentação da mercearia")]
     [SerializeField] private CanvasGroup backdropGroup;
@@ -46,6 +46,14 @@ public sealed class SeedMerchant : MonoBehaviour
 
     private void Awake()
     {
+        GameBalance balance = GameBalance.Current;
+        if (balance != null)
+        {
+            fenceWoodCost = balance.fenceWoodCost;
+            fenceCoinCost = balance.fenceCoinCost;
+            foodCoinCost = balance.foodCoinCost;
+            marketDays = balance.marketDays;
+        }
         if (shopGroup == null) return;
         panelRect = shopGroup.transform as RectTransform;
         if (panelRect != null) panelHome = panelRect.anchoredPosition;

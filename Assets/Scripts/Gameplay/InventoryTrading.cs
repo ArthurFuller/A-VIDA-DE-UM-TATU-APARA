@@ -6,17 +6,17 @@ public sealed class InventoryTrading : MonoBehaviour
     [SerializeField] private SeedMerchant merchant;
     [SerializeField] private GameFeedback feedback;
     [Header("Preços provisórios por unidade")]
-    [SerializeField, Min(0)] private int woodPrice = 1;
-    [SerializeField, Min(0)] private int fishPrice = 2;
-    [SerializeField, Min(0)] private int cornPrice = 4;
-    [SerializeField, Min(0)] private int pumpkinPrice = 1;
-    [SerializeField, Min(0)] private int foodPrice = 1;
-    [SerializeField, Min(0)] private int cornSeedPrice = 1;
-    [SerializeField, Min(0)] private int pumpkinSeedPrice = 2;
-    [SerializeField, Min(0)] private int jerimumPrice = 3;
-    [SerializeField, Min(0)] private int jerimumSeedPrice = 2;
-    [SerializeField, Min(0)] private int milkPrice = 2;
-    [SerializeField, Min(0)] private int eggPrice = 2;
+    [SerializeField, HideInInspector, Min(0)] private int woodPrice = 1;
+    [SerializeField, HideInInspector, Min(0)] private int fishPrice = 2;
+    [SerializeField, HideInInspector, Min(0)] private int cornPrice = 4;
+    [SerializeField, HideInInspector, Min(0)] private int pumpkinPrice = 1;
+    [SerializeField, HideInInspector, Min(0)] private int foodPrice = 1;
+    [SerializeField, HideInInspector, Min(0)] private int cornSeedPrice = 1;
+    [SerializeField, HideInInspector, Min(0)] private int pumpkinSeedPrice = 2;
+    [SerializeField, HideInInspector, Min(0)] private int jerimumPrice = 3;
+    [SerializeField, HideInInspector, Min(0)] private int jerimumSeedPrice = 2;
+    [SerializeField, HideInInspector, Min(0)] private int milkPrice = 2;
+    [SerializeField, HideInInspector, Min(0)] private int eggPrice = 2;
 
     public int GetStock(SaleItem item) => resources == null ? 0 : item switch
     {
@@ -36,19 +36,20 @@ public sealed class InventoryTrading : MonoBehaviour
 
     public int GetPrice(SaleItem item)
     {
+        GameBalance balance = GameBalance.Current;
         int price = item switch
         {
-            SaleItem.Wood => woodPrice,
-            SaleItem.Fish => fishPrice,
-            SaleItem.Corn => cornPrice,
-            SaleItem.Pumpkin => pumpkinPrice,
-            SaleItem.Jerimum => jerimumPrice,
-            SaleItem.Food => foodPrice,
-            SaleItem.CornSeeds => cornSeedPrice,
-            SaleItem.PumpkinSeeds => pumpkinSeedPrice,
-            SaleItem.JerimumSeeds => jerimumSeedPrice,
-            SaleItem.Milk => milkPrice,
-            SaleItem.Eggs => eggPrice,
+            SaleItem.Wood => balance != null ? balance.woodPrice : woodPrice,
+            SaleItem.Fish => balance != null ? balance.fishPrice : fishPrice,
+            SaleItem.Corn => balance != null ? balance.cornPrice : cornPrice,
+            SaleItem.Pumpkin => balance != null ? balance.pumpkinPrice : pumpkinPrice,
+            SaleItem.Jerimum => balance != null ? balance.jerimumPrice : jerimumPrice,
+            SaleItem.Food => balance != null ? balance.foodPrice : foodPrice,
+            SaleItem.CornSeeds => balance != null ? balance.cornSeedPrice : cornSeedPrice,
+            SaleItem.PumpkinSeeds => balance != null ? balance.pumpkinSeedPrice : pumpkinSeedPrice,
+            SaleItem.JerimumSeeds => balance != null ? balance.jerimumSeedPrice : jerimumSeedPrice,
+            SaleItem.Milk => balance != null ? balance.milkPrice : milkPrice,
+            SaleItem.Eggs => balance != null ? balance.eggPrice : eggPrice,
             _ => 0
         };
         if (item == SaleItem.Corn || item == SaleItem.Pumpkin || item == SaleItem.Jerimum)

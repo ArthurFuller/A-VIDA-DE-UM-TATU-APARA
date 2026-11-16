@@ -679,9 +679,39 @@ public sealed class DayTimeline : MonoBehaviour
         }
     }
 
+    private void OnRectTransformDimensionsChange()
+    {
+        if (Application.isPlaying && open && viewedDay > 0 &&
+            cardScroll != null && cardScroll.gameObject.activeInHierarchy)
+            FitCardViewport();
+    }
+
+    private void FitCardViewport()
+    {
+        RectTransform viewport = scroll.viewport;
+        RectTransform canvas = (RectTransform)GetComponent<Canvas>().rootCanvas.transform;
+        Rect track = cardScroll.rect;
+
+        Vector2 ToTrack(RectTransform mask, Vector2 point) =>
+            cardScroll.InverseTransformPoint(mask.TransformPoint(point));
+
+        float left = Mathf.Max(track.xMin,
+            ToTrack(canvas, canvas.rect.min).x, ToTrack(panelClip, panelClip.rect.min).x,
+            ToTrack(panel, panel.rect.min).x);
+        float right = Mathf.Min(track.xMax,
+            ToTrack(canvas, canvas.rect.max).x, ToTrack(panelClip, panelClip.rect.max).x,
+            ToTrack(panel, panel.rect.max).x);
+        right = Mathf.Max(left, right);
+
+        // ScrollRect must clamp at the same edges as the visible clip.
+        viewport.offsetMin = new Vector2(left - track.xMin, viewport.offsetMin.y);
+        viewport.offsetMax = new Vector2(right - track.xMax, viewport.offsetMax.y);
+    }
+
     private void RenderCards(int day, bool animate)
     {
         CloseInspection(true);
+        FitCardViewport();
         Clear(cardContent);
         cardNodes.Clear();
         cardLines.Clear();
@@ -695,11 +725,13 @@ public sealed class DayTimeline : MonoBehaviour
         int count = cards.Count;
         float stride = Mathf.Max(12f, cardWidth + cardGap - cardOverlap);
         float hoverOverflow = cardWidth * (Mathf.Max(1f, cardHoverScale) - 1f) * 0.5f;
+        float rotationOverflow = cardHeight * Mathf.Sin(hangingAngle * Mathf.Deg2Rad);
         float width = Mathf.Max(scroll.viewport.rect.width,
             (count - 1) * stride + cardWidth + cardStartX +
-            Mathf.Max(cardEndPadding, hoverOverflow + 8f));
+            Mathf.Max(cardEndPadding, Mathf.Max(hoverOverflow, rotationOverflow) + 8f));
         cardContent.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
-        scroll.horizontalNormalizedPosition = 0f;
+        scroll.StopMovement();
+        if (animate) scroll.horizontalNormalizedPosition = 0f;
         if (count == 0)
         {
             RectTransform empty = Label("Nenhuma carta usada neste dia", cardContent,

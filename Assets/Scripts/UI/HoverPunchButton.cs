@@ -22,10 +22,8 @@ public sealed class HoverPunchButton : MonoBehaviour, IPointerEnterHandler,
     private bool hovered;
     private bool pressedEligible;
     private bool animating;
-    private int animationStartedFrame = -1;
     public bool IsAnimating => animating;
-    public bool BlocksNewClicks => animating && animationStartedFrame != Time.frameCount;
-
+    public bool AnimatePointerClick { get; set; } = true;
 
     private void Awake()
     {
@@ -87,13 +85,18 @@ public sealed class HoverPunchButton : MonoBehaviour, IPointerEnterHandler,
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (!pressedEligible || animating || button == null || !button.isActiveAndEnabled ||
+        if (!AnimatePointerClick || !pressedEligible || animating || button == null || !button.isActiveAndEnabled ||
             !button.interactable) return;
+        PlayAcceptedClick();
+    }
+
+    public void PlayAcceptedClick()
+    {
+        if (rect == null || animating) return;
         pressedEligible = false;
         AudioManager.Play(SoundCue.UiClick);
-        animating = true;
-        animationStartedFrame = Time.frameCount;
         rect.DOKill();
+        animating = true;
         DOTween.Sequence().SetTarget(rect).SetUpdate(true)
             .Append(rect.DOScale(originalScale * pressedScale, 0.08f))
             .Append(rect.DOScale(originalScale * (hovered ? hoverScale : 1f), duration)
@@ -110,17 +113,17 @@ public sealed class HoverPunchButton : MonoBehaviour, IPointerEnterHandler,
 
     public void OnPointerDown(PointerEventData eventData)
     {
-        pressedEligible = !animating && button != null && button.isActiveAndEnabled && button.interactable;
+        pressedEligible = AnimatePointerClick && !animating && button != null &&
+            button.isActiveAndEnabled && button.interactable;
     }
 
     public void ShakeRejected()
     {
-        if (rect == null || BlocksNewClicks) return;
+        if (rect == null || animating) return;
         AudioManager.Play(SoundCue.UiRejected);
         pressedEligible = false;
         rect.DOKill();
         animating = true;
-        animationStartedFrame = Time.frameCount;
         rect.localScale = originalScale * (hovered ? hoverScale : 1f);
         rect.anchoredPosition = originalPosition;
         rect.localRotation = originalRotation;

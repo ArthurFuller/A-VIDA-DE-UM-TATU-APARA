@@ -31,10 +31,23 @@ public sealed class ActionResolver : MonoBehaviour
     [SerializeField, Min(0.1f)] private float fishingSpacing = 0.55f;
     [SerializeField] private Vector3 fishingShoreOffset = new Vector3(0.25f, 0f, 0f);
     [SerializeField] private Transform fencePassage;
-    [SerializeField, Min(0)] private int woodReward = 2;
-    [SerializeField, Min(1)] private int gambleStake = 10;
+    [SerializeField, Tooltip("Ponto A: passagem das casas 2, 3 e 5 antes do ponto B.")]
+    private Transform workerRoutePointA;
+    [SerializeField, Tooltip("Ponto B: passagem comum antes das atividades gerais.")]
+    private Transform workerRoutePointB;
+    [SerializeField, Tooltip("Pontos até a floresta, na ordem da ida. Vazio usa a passagem da cerca.")]
+    private Transform[] forestWaypoints;
+    [SerializeField, Tooltip("Pontos até a pesca, na ordem da ida. Vazio usa a passagem da cerca.")]
+    private Transform[] fishingWaypoints;
+    [SerializeField, Min(0f), Tooltip("Zero usa a velocidade geral.")]
+    private float forestTravelSpeed;
+    [SerializeField, Min(0f), Tooltip("Zero usa a velocidade geral.")]
+    private float fishingTravelSpeed;
+    [SerializeField, HideInInspector, Min(0)] private int woodReward = 2;
+    [SerializeField, HideInInspector, Min(1)] private int gambleStake = 10;
     [SerializeField, Min(0.1f)] private float coinTossDuration = 0.65f;
-    [SerializeField, Min(0.1f)] private float movementSpeed = 4.2f;
+    [SerializeField, Min(0.1f), Tooltip("Velocidade geral dos funcionários em unidades da cena por segundo.")]
+    private float movementSpeed = 2.4f;
     [SerializeField, Min(0.01f)] private float plowWorkDuration = 5f;
     [SerializeField, Min(0f)] private float arrivalStillTime = 0.2f;
 
@@ -82,6 +95,9 @@ public sealed class ActionResolver : MonoBehaviour
     private readonly System.Collections.Generic.HashSet<WorkerAssignment> busyMovements = new();
     private readonly System.Collections.Generic.HashSet<WorkerAssignment> returningHome = new();
     private readonly System.Collections.Generic.HashSet<WorkerAssignment> working = new();
+    private readonly System.Collections.Generic.Dictionary<WorkerAssignment, Vector3[]> workRoutes = new();
+    private readonly System.Collections.Generic.Dictionary<WorkerAssignment, Vector3[]> workOriginRoutes = new();
+    private readonly System.Collections.Generic.Dictionary<WorkerAssignment, float> workTravelSpeeds = new();
     [SerializeField] private Button cancelSelectionButton;
 
     public bool IsBusy => housePreviewBusy || busyWorkers > 0 || replayAnimations > 0 || pendingFoodWorker != null ||
@@ -105,6 +121,12 @@ public sealed class ActionResolver : MonoBehaviour
 
     private void Awake()
     {
+        GameBalance balance = GameBalance.Current;
+        if (balance != null)
+        {
+            woodReward = balance.woodReward;
+            gambleStake = balance.gambleStake;
+        }
         if (cancelSelectionButton == null)
             foreach (Button candidate in FindObjectsByType<Button>(FindObjectsInactive.Include,
                          FindObjectsSortMode.None))
@@ -574,7 +596,7 @@ public sealed class ActionResolver : MonoBehaviour
         ActivityCardDrag card = pendingPlotCard;
         WorkerAssignment worker = TakePendingWorker();
         CommitAction(worker, ActivityKind.FeedAnimals, "distribuindo ração", card);
-        MoveAndWork(worker, plot.WorkPosition, plowWorkDuration, () =>
+        MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
             if (dayCycle.TryRepeatAnimalProduction(out int milk, out int eggs))
                 feedback.ShowMessage("Ração: +" + milk + " leite e +" + eggs + " ovos.");
@@ -594,7 +616,7 @@ public sealed class ActionResolver : MonoBehaviour
         WorkerAssignment worker = TakePendingWorker();
         CommitAction(worker, animal == AnimalKind.Cow ? ActivityKind.PlaceCow :
             ActivityKind.PlaceChicken, "levando animal ao cercado", card);
-        MoveAndWork(worker, plot.WorkPosition, plowWorkDuration, () =>
+        MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
             plot.PlaceAnimal(animal);
             AudioManager.Play(animal == AnimalKind.Cow ? SoundCue.CowArrive : SoundCue.ChickenArrive);
@@ -613,7 +635,7 @@ public sealed class ActionResolver : MonoBehaviour
         ActivityCardDrag card = pendingPlotCard;
         WorkerAssignment worker = TakePendingWorker();
         CommitAction(worker, ActivityKind.BuildFence, "construindo cerca", card);
-        MoveAndWork(worker, plot.WorkPosition, plowWorkDuration, () =>
+        MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
             plot.BuildFence();
             AudioManager.Play(SoundCue.FenceBuilt);
@@ -631,7 +653,9 @@ public sealed class ActionResolver : MonoBehaviour
         ActivityCardDrag card = pendingPlotCard;
         WorkerAssignment builder = TakePendingWorker();
         CommitAction(builder, ActivityKind.BuildHouse, "construindo casa", card);
-        MoveAndWork(builder, site.ConstructionPosition, plowWorkDuration, () =>
+        MoveAndWork(builder, site.ConstructionPosition, site.ConstructionFacingPosition,
+            site.GetConstructionWaypoints(builder.OriginHouseNumber), site.ConstructionTravelSpeed,
+            plowWorkDuration, false, () =>
         {
             if (site.Build(dayCycle.CurrentDay))
             {
@@ -677,7 +701,7 @@ public sealed class ActionResolver : MonoBehaviour
                 return;
             }
             Plot target = targets[index];
-            MoveAndWork(worker, target.WorkPosition, plowWorkDuration, () =>
+            MoveAndWork(worker, target, plowWorkDuration, () =>
             {
                 if (activity == ActivityKind.Fertilizer)
                 {
@@ -707,7 +731,7 @@ public sealed class ActionResolver : MonoBehaviour
         ActivityCardDrag card = pendingPlotCard;
         WorkerAssignment worker = TakePendingWorker();
         CommitAction(worker, ActivityKind.Plow, "arando", card);
-        MoveAndWork(worker, plot.WorkPosition, plowWorkDuration, () =>
+        MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
             plot.Plow();
             AudioManager.Play(SoundCue.Plow);
@@ -733,7 +757,7 @@ public sealed class ActionResolver : MonoBehaviour
         ActivityCardDrag card = pendingPlotCard;
         WorkerAssignment worker = TakePendingWorker();
         CommitAction(worker, pendingPlotAction, "plantando", card);
-        MoveAndWork(worker, plot.WorkPosition, plowWorkDuration, () =>
+        MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
             plot.Plant(crop, dayCycle.CurrentDay, seedCatalog);
             AudioManager.Play(SoundCue.Plant);
@@ -770,7 +794,7 @@ public sealed class ActionResolver : MonoBehaviour
                 HarvestNext(index + 1);
                 return;
             }
-            MoveAndWork(worker, target.WorkPosition, plowWorkDuration, () =>
+            MoveAndWork(worker, target, plowWorkDuration, () =>
             {
                 int harvestYield = target.HarvestYield(dayCycle.CurrentDay, seedCatalog);
                 int pestLoss = dayEvents != null ? dayEvents.HarvestReductionFor(target) : 0;
@@ -890,7 +914,7 @@ public sealed class ActionResolver : MonoBehaviour
     }
 
     private void MoveWorker(WorkerAssignment worker, Vector3 destination, System.Action onArrived,
-        bool countAsBusy = true, bool isReturn = false)
+        bool countAsBusy = true, bool isReturn = false, float speedOverride = 0f)
     {
         bool braking = returningHome.Contains(worker) && !isReturn;
         StopMovement(worker);
@@ -900,9 +924,10 @@ public sealed class ActionResolver : MonoBehaviour
             busyMovements.Add(worker);
         }
         if (isReturn) returningHome.Add(worker);
-        float duration = Mathf.Max(0.01f, Vector3.Distance(worker.transform.position, destination) / movementSpeed);
+        float speed = speedOverride > 0f ? speedOverride : movementSpeed;
+        float duration = Mathf.Max(0.01f, Vector3.Distance(worker.transform.position, destination) / speed);
         worker.FaceTowards(destination);
-        Tween travel = worker.transform.DOMove(destination, duration).SetEase(Ease.Linear);
+        Tween travel = worker.transform.DOMove(destination, duration).SetEase(Ease.InOutSine);
         if (braking) travel = DOTween.Sequence().AppendInterval(0.1f).Append(travel);
         movements[worker] = travel;
         travel.OnComplete(() =>
@@ -941,6 +966,11 @@ public sealed class ActionResolver : MonoBehaviour
     private void SendWorkerHome(WorkerAssignment worker)
     {
         if (worker == null) return;
+        bool hasRoute = workRoutes.TryGetValue(worker, out Vector3[] returnRoute);
+        workRoutes.Remove(worker);
+        workOriginRoutes.Remove(worker);
+        workTravelSpeeds.TryGetValue(worker, out float travelSpeed);
+        workTravelSpeeds.Remove(worker);
         if (Vector3.Distance(worker.transform.position, worker.HomePosition) < 0.05f)
         {
             worker.RestoreHomeFacing();
@@ -948,29 +978,66 @@ public sealed class ActionResolver : MonoBehaviour
             return;
         }
         worker.SetStatus("voltando para casa");
-        MoveWorker(worker, worker.HomePosition, () =>
+        void Arrived()
         {
             worker.RestoreHomeFacing();
             worker.SetStatus("em casa");
-        }, false, true);
+        }
+        if (hasRoute)
+        {
+            var points = new Vector3[returnRoute.Length + 1];
+            System.Array.Copy(returnRoute, points, returnRoute.Length);
+            points[points.Length - 1] = worker.HomePosition;
+            MoveAlongRoute(worker, points, Arrived, false, travelSpeed);
+        }
+        else MoveWorker(worker, worker.HomePosition, Arrived, false, true, travelSpeed);
     }
 
-    private void MoveAndWork(WorkerAssignment worker, Vector3 destination, float workDuration, System.Action onFinished)
+    private void MoveAndWork(WorkerAssignment worker, Plot plot, float workDuration, System.Action onFinished) =>
+        MoveAndWork(worker, plot.WorkPosition, plot.transform.position,
+            plot.WorkWaypoints, plot.WorkTravelSpeed, workDuration, true, onFinished);
+
+    private void MoveAndWork(WorkerAssignment worker, Vector3 destination, Vector3 facingTarget,
+        Vector3[] waypoints, float travelSpeed, float workDuration, bool useGeneralAccess,
+        System.Action onFinished)
     {
+        bool continuing = workOriginRoutes.TryGetValue(worker, out Vector3[] originRoute);
+        if (!continuing)
+        {
+            originRoute = useGeneralAccess ? GeneralAccessRoute(worker) : System.Array.Empty<Vector3>();
+            workOriginRoutes[worker] = originRoute;
+        }
+        Vector3[] access = continuing ? System.Array.Empty<Vector3>() : originRoute;
+        var route = new Vector3[access.Length + waypoints.Length + 1];
+        System.Array.Copy(access, route, access.Length);
+        System.Array.Copy(waypoints, 0, route, access.Length, waypoints.Length);
+        route[route.Length - 1] = destination;
+        var reverse = new Vector3[waypoints.Length + originRoute.Length];
+        for (int i = 0; i < waypoints.Length; i++) reverse[i] = waypoints[waypoints.Length - 1 - i];
+        for (int i = 0; i < originRoute.Length; i++)
+            reverse[waypoints.Length + i] = originRoute[originRoute.Length - 1 - i];
+        workRoutes[worker] = reverse;
+        workTravelSpeeds[worker] = travelSpeed;
+        void BeginWork()
+        {
+            worker.FaceTowards(facingTarget);
+            WorkAtStation(worker, workDuration, onFinished);
+        }
         if (Vector3.Distance(worker.transform.position, destination) <= 0.15f)
         {
             StopMovement(worker);
-            WorkAtStation(worker, workDuration, onFinished);
+            BeginWork();
             return;
         }
         worker.SetStatus("caminhando");
-        MoveWorker(worker, destination, () => WorkAtStation(worker, workDuration, onFinished));
+        MoveAlongRoute(worker, route, BeginWork, true, travelSpeed);
     }
 
     private void WorkAtStation(WorkerAssignment worker, float workDuration, System.Action onFinished)
     {
         busyWorkers++;
         working.Add(worker);
+        worker.SetWorking(true);
         worker.SetStatus("trabalhando");
         bool soilWork = worker.LastActivity.HasValue &&
             (worker.LastActivity.Value == ActivityKind.Plow ||
@@ -992,6 +1059,7 @@ public sealed class ActionResolver : MonoBehaviour
             if (worker.Progress != null) worker.Progress.Hide();
             busyWorkers--;
             working.Remove(worker);
+            worker.SetWorking(false);
             onFinished?.Invoke();
         });
     }
@@ -1000,15 +1068,14 @@ public sealed class ActionResolver : MonoBehaviour
     {
         WorkerAssignment worker = task.Worker;
         worker.SetStatus("caminhando");
-        MoveAlongRoute(worker, new[] { fencePassage.position,
-            task.TargetPosition }, () =>
+        MoveAlongRoute(worker, GatheringRoute(worker, task.Activity, task.TargetPosition), () =>
         {
             task.Arrived = true;
             task.LastPosition = worker.transform.position;
             task.StillTime = 0f;
             worker.SetStatus("aguardando jogador");
             UpdateVisitButton(task);
-        });
+        }, speedOverride: GatheringTravelSpeed(task.Activity));
     }
 
     private void VisitForestWorker() => VisitGatheringWorker(WaitingTask(forestTasks), forestVisitButton);
@@ -1090,9 +1157,12 @@ public sealed class ActionResolver : MonoBehaviour
         if (forestVisitButton != null) forestVisitButton.gameObject.SetActive(false);
         if (fishingVisitButton != null) fishingVisitButton.gameObject.SetActive(false);
         busyWorkers++;
+        worker.FaceTowards(task.Destination.position);
+        worker.SetWorking(true);
         worker.SetStatus("atividade interativa");
         gatheringGame.Begin(task.SelectedActivity, rating =>
         {
+            worker.SetWorking(false);
             task.Worker = null;
             task.Arrived = false;
             task.Started = false;
@@ -1102,7 +1172,7 @@ public sealed class ActionResolver : MonoBehaviour
                 ResolveWoodGathering(task, worker, activity, rating);
                 return;
             }
-            SendGatheringWorkerHome(worker);
+            SendGatheringWorkerHome(worker, activity);
             CompleteGathering(worker, activity, rating, () =>
             {
                 FinishGatheringRound(task);
@@ -1147,7 +1217,7 @@ public sealed class ActionResolver : MonoBehaviour
             dropSequence.AppendInterval(0.28f);
             dropSequence.OnComplete(() =>
             {
-                SendGatheringWorkerHome(worker);
+                SendGatheringWorkerHome(worker, activity);
                 CompleteGathering(worker, activity, rating, () =>
                 {
                     FinishGatheringRound(task);
@@ -1181,26 +1251,69 @@ public sealed class ActionResolver : MonoBehaviour
                 next.StillTime = 0f;
                 worker.SetStatus("aguardando jogador");
             };
-            if (wasAtArea) MoveWorker(worker, next.TargetPosition, arrived);
-            else MoveAlongRoute(worker, new[] { fencePassage.position, next.TargetPosition }, arrived);
+            float speed = GatheringTravelSpeed(next.Activity);
+            if (wasAtArea) MoveWorker(worker, next.TargetPosition, arrived, speedOverride: speed);
+            else MoveAlongRoute(worker, GatheringRoute(worker, next.Activity, next.TargetPosition), arrived,
+                speedOverride: speed);
         }
         else communityCamera.ReturnToCommunity();
         UpdateVisitButton(forestTasks[0]);
         UpdateVisitButton(fishingTasks[0]);
     }
 
-    private void SendGatheringWorkerHome(WorkerAssignment worker)
+    private void SendGatheringWorkerHome(WorkerAssignment worker, ActivityKind activity)
     {
         int returnDay = dayCycle.CurrentDay;
         worker.SetStatus("voltando para casa");
-        MoveAlongRoute(worker, new[] { fencePassage.position, worker.HomePosition }, () =>
+        MoveAlongRoute(worker, GatheringRoute(worker, activity, worker.HomePosition, true), () =>
         {
             worker.RestoreHomeFacing();
             if (dayCycle.CurrentDay == returnDay) worker.SetStatus("em casa");
-        }, false);
+        }, false, GatheringTravelSpeed(activity));
     }
 
-    private void MoveAlongRoute(WorkerAssignment worker, Vector3[] points, System.Action onArrived, bool countAsBusy = true)
+    private float GatheringTravelSpeed(ActivityKind activity) =>
+        activity == ActivityKind.CollectWood || activity == ActivityKind.WoodPlus
+            ? forestTravelSpeed : fishingTravelSpeed;
+
+    private Vector3[] GeneralAccessRoute(WorkerAssignment worker)
+    {
+        var points = new System.Collections.Generic.List<Vector3>(2);
+        int house = worker.OriginHouseNumber;
+        if ((house == 2 || house == 3 || house == 5) && workerRoutePointA != null)
+            points.Add(workerRoutePointA.position);
+        if (workerRoutePointB != null) points.Add(workerRoutePointB.position);
+        return points.ToArray();
+    }
+
+    private Vector3[] GatheringRoute(WorkerAssignment worker, ActivityKind activity,
+        Vector3 destination, bool returning = false)
+    {
+        Transform[] markers = activity == ActivityKind.CollectWood || activity == ActivityKind.WoodPlus
+            ? forestWaypoints : fishingWaypoints;
+        var points = new System.Collections.Generic.List<Vector3>();
+        Vector3[] access = GeneralAccessRoute(worker);
+        if (!returning) points.AddRange(access);
+        int accessCount = points.Count;
+        if (markers != null && markers.Length > 0)
+        {
+            if (returning)
+            {
+                for (int i = markers.Length - 1; i >= 0; i--)
+                    if (markers[i] != null) points.Add(markers[i].position);
+            }
+            else foreach (Transform marker in markers)
+                if (marker != null) points.Add(marker.position);
+        }
+        if (points.Count == accessCount && fencePassage != null) points.Add(fencePassage.position);
+        if (returning)
+            for (int i = access.Length - 1; i >= 0; i--) points.Add(access[i]);
+        points.Add(destination);
+        return points.ToArray();
+    }
+
+    private void MoveAlongRoute(WorkerAssignment worker, Vector3[] points, System.Action onArrived,
+        bool countAsBusy = true, float speedOverride = 0f)
     {
         bool braking = returningHome.Contains(worker) && countAsBusy;
         StopMovement(worker);
@@ -1210,16 +1323,21 @@ public sealed class ActionResolver : MonoBehaviour
             busyMovements.Add(worker);
         }
         else returningHome.Add(worker);
-        Sequence route = DOTween.Sequence();
-        if (braking) route.AppendInterval(0.1f);
         Vector3 from = worker.transform.position;
+        float distance = 0f;
         foreach (Vector3 point in points)
         {
-            float duration = Mathf.Max(0.01f, Vector3.Distance(from, point) / movementSpeed);
-            route.AppendCallback(() => worker.FaceTowards(point));
-            route.Append(worker.transform.DOMove(point, duration).SetEase(Ease.Linear));
+            distance += Vector3.Distance(from, point);
             from = point;
         }
+        float speed = speedOverride > 0f ? speedOverride : movementSpeed;
+        float duration = Mathf.Max(0.01f, distance / speed);
+        worker.FaceTowards(points[0]);
+        Tween route = points.Length == 1
+            ? worker.transform.DOMove(points[0], duration)
+            : worker.transform.DOPath(points, duration, PathType.Linear, PathMode.Full3D);
+        route.SetEase(Ease.InOutSine);
+        if (braking) route = DOTween.Sequence().AppendInterval(0.1f).Append(route);
         movements[worker] = route;
         route.OnComplete(() =>
         {

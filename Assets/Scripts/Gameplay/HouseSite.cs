@@ -5,6 +5,13 @@ using UnityEngine.EventSystems;
 
 public sealed class HouseSite : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
+    [System.Serializable]
+    private sealed class WorkerConstructionRoute
+    {
+        public int houseNumber;
+        public Transform[] waypoints;
+    }
+
     [SerializeField] private ActionResolver actions;
     [Tooltip("Visual da Casa 2 deste lote. Fica visível no editor para ajustar o Transform e oculto até a construção durante o jogo.")]
     [SerializeField] private Transform houseVisualPreview;
@@ -14,6 +21,14 @@ public sealed class HouseSite : MonoBehaviour, IPointerClickHandler, IPointerEnt
     [SerializeField] private Transform outsideMarker;
     [Tooltip("Origem e destino habitual do morador desta casa.")]
     [SerializeField] private Transform homeMarker;
+    [Tooltip("Pontos do trajeto até a obra, na ordem da ida. A volta usa a ordem inversa.")]
+    [SerializeField] private Transform[] constructionWaypoints;
+    [Tooltip("Trecho exclusivo de cada casa de origem, antes dos pontos compartilhados da construção.")]
+    [SerializeField, HideInInspector] private WorkerConstructionRoute[] workerConstructionRoutes;
+    [Tooltip("Local onde o construtor para para trabalhar. Ajustável na cena.")]
+    [SerializeField] private Transform constructionWorkPoint;
+    [SerializeField, Min(0f), Tooltip("Velocidade do construtor neste trajeto. Zero usa a velocidade geral dos funcionários.")]
+    private float constructionTravelSpeed;
     [SerializeField] private WorkerAssignment workerTemplate;
     [SerializeField, Min(3)] private int houseNumber = 3;
     [SerializeField] private Vector3 workerOffset = new Vector3(0.9f, 0f, -0.95f);
@@ -29,11 +44,42 @@ public sealed class HouseSite : MonoBehaviour, IPointerClickHandler, IPointerEnt
     private static readonly List<HouseSite> allSites = new List<HouseSite>();
 
     public Vector3 DoorwayPosition => doorwayMarker != null ? doorwayMarker.position : transform.position;
+    public int HouseNumber => houseNumber;
+    public Transform HomeMarker => homeMarker;
+    public Vector3[] ConstructionWaypoints
+    {
+        get
+        {
+            if (constructionWaypoints == null) return System.Array.Empty<Vector3>();
+            var points = new List<Vector3>(constructionWaypoints.Length);
+            foreach (Transform waypoint in constructionWaypoints)
+                if (waypoint != null) points.Add(waypoint.position);
+            return points.ToArray();
+        }
+    }
+    public Vector3 ConstructionFacingPosition => houseVisualPreview != null ? houseVisualPreview.position : transform.position;
+    public float ConstructionTravelSpeed => constructionTravelSpeed;
+
+    public Vector3[] GetConstructionWaypoints(int originHouse)
+    {
+        var points = new List<Vector3>();
+        if (workerConstructionRoutes != null)
+            foreach (WorkerConstructionRoute route in workerConstructionRoutes)
+            {
+                if (route == null || route.houseNumber != originHouse || route.waypoints == null) continue;
+                foreach (Transform waypoint in route.waypoints)
+                    if (waypoint != null) points.Add(waypoint.position);
+                break;
+            }
+        points.AddRange(ConstructionWaypoints);
+        return points.ToArray();
+    }
 
     public Vector3 ConstructionPosition
     {
         get
         {
+            if (constructionWorkPoint != null) return constructionWorkPoint.position;
             Collider lot = GetComponent<Collider>();
             float distance = (lot != null ? lot.bounds.extents.x : 0.8f) + builderClearance;
             return transform.position + Vector3.right * distance;
@@ -183,6 +229,7 @@ public sealed class HouseSite : MonoBehaviour, IPointerClickHandler, IPointerEnt
         worker.transform.position = homeMarker != null ? homeMarker.position : transform.position + workerOffset;
         worker.ConfigureNewWorker("Trabalhador " + houseNumber);
         worker.SetHouseRoute(homeMarker, outsideMarker, doorwayMarker);
+        worker.SetOriginHouseNumber(houseNumber);
         return worker;
     }
 }
