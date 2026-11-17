@@ -10,8 +10,21 @@ public sealed class GS2SceneFade : MonoBehaviour
     [SerializeField] private CanvasGroup blackOverlay;
     [SerializeField, Min(0.1f)] private float fadeSeconds = 0.42f;
 
+    [Header("Transições")]
+    [SerializeField, Min(0.1f)] private float nicknameDarkenSeconds = 0.68f;
+    [SerializeField, Min(0.1f)] private float nicknameRevealSeconds = 0.85f;
+    [SerializeField, Min(0.1f)] private float loadingExitSeconds = 0.62f;
+    [SerializeField, Min(0.1f)] private float gameplayRevealSeconds = 0.95f;
+    [SerializeField, Range(0f, 1f)] private float firstEventAtRevealProgress = 0.60f;
+
     private Tween fade;
     private Tween musicFade;
+    private static GS2SceneFade gameplayTransition;
+    internal static bool IsEnteringGameplay => gameplayTransition != null;
+
+    private CanvasGroup loadingPresentation;
+    private ThreadPriority priorLoadingPriority;
+    private bool adjustedLoadingPriority;
     private const float MinimumLoadingSeconds = 3f;
     private Text loadingStatus;
     private AsyncOperation gameplayLoad;
@@ -37,10 +50,34 @@ public sealed class GS2SceneFade : MonoBehaviour
             .OnComplete(() => blackOverlay.blocksRaycasts = false);
     }
 
+    public void TransitionFromNickname(System.Action showMenu, System.Action finished = null)
+    {
+        if (blackOverlay == null || loading)
+        {
+            showMenu();
+            finished?.Invoke();
+            return;
+        }
+
+        fade?.Kill();
+        blackOverlay.blocksRaycasts = true;
+        fade = DOTween.Sequence().SetUpdate(true)
+            .Append(blackOverlay.DOFade(1f, nicknameDarkenSeconds).SetEase(Ease.InOutSine))
+            .AppendCallback(() => showMenu())
+            .AppendInterval(1f)
+            .Append(blackOverlay.DOFade(0f, nicknameRevealSeconds).SetEase(Ease.InOutSine))
+            .OnComplete(() =>
+            {
+                blackOverlay.blocksRaycasts = false;
+                finished?.Invoke();
+            });
+    }
+
     public void EnterGameplay(string sceneName)
     {
         if (loading || blackOverlay == null || string.IsNullOrEmpty(sceneName)) return;
         loading = true;
+        gameplayTransition = this;
         destination = sceneName;
         blackOverlay.blocksRaycasts = true;
         DontDestroyOnLoad(gameObject);
@@ -61,24 +98,34 @@ public sealed class GS2SceneFade : MonoBehaviour
         {
             GameObject screen = Instantiate(prefab, blackOverlay.transform, false);
             loadingStatus = screen.GetComponentInChildren<Text>();
-            Animator animator = screen.GetComponentInChildren<Animator>();
-            if (animator != null) animator.updateMode = AnimatorUpdateMode.UnscaledTime;
+            loadingPresentation = screen.AddComponent<CanvasGroup>();
+            loadingPresentation.interactable = loadingPresentation.blocksRaycasts = false;
         }
         StartCoroutine(LoadGameplay());
     }
 
     private IEnumerator LoadGameplay()
     {
-        // Deixa a primeira imagem da tela de carregamento aparecer antes de iniciar a troca.
+        // Renderiza o primeiro quadro antes de pedir a cena.
         yield return null;
-        float visibleSince = Time.realtimeSinceStartup;
+        priorLoadingPriority = Application.backgroundLoadingPriority;
+        Application.backgroundLoadingPriority = ThreadPriority.Low;
+        adjustedLoadingPriority = true;
         gameplayLoad = SceneManager.LoadSceneAsync(destination, LoadSceneMode.Single);
         gameplayLoad.allowSceneActivation = false;
+
+        float visibleSeconds = 0f;
+        float shownProgress = 0f;
         int lastPercent = -1;
         while (gameplayLoad.progress < 0.9f ||
-            Time.realtimeSinceStartup - visibleSince < MinimumLoadingSeconds)
+            visibleSeconds < MinimumLoadingSeconds || shownProgress < 99f)
         {
-            int percent = Mathf.FloorToInt(Mathf.Clamp01(gameplayLoad.progress / 0.9f) * 99f);
+            // Um quadro demorado durante a integração de ativos não pula a animação.
+            float seenFrame = Mathf.Min(Time.unscaledDeltaTime, 0.10f);
+            visibleSeconds += seenFrame;
+            float loadedPercent = Mathf.Clamp01(gameplayLoad.progress / 0.9f) * 99f;
+            shownProgress = Mathf.MoveTowards(shownProgress, loadedPercent, 58f * seenFrame);
+            int percent = Mathf.FloorToInt(shownProgress);
             if (loadingStatus != null && percent != lastPercent)
             {
                 loadingStatus.text = "Carregando... " + percent + "%";
@@ -95,14 +142,48 @@ public sealed class GS2SceneFade : MonoBehaviour
         SceneManager.sceneLoaded -= OnSceneLoaded;
         fade?.Kill();
         gameplayLoad = null;
+        RestoreLoadingPriority();
         if (loadingStatus != null) loadingStatus.text = "Carregando... 100%";
-        fade = blackOverlay.DOFade(0f, fadeSeconds).SetUpdate(true)
-            .SetEase(Ease.InOutSine).OnComplete(() =>
+        StartCoroutine(RevealGameplay(scene));
+    }
+
+    private IEnumerator RevealGameplay(Scene scene)
+    {
+        DayCycle dayCycle = FindFirstObjectByType<DayCycle>();
+        while (dayCycle != null && dayCycle.isActiveAndEnabled &&
+            dayCycle.gameObject.scene == scene && !dayCycle.FirstDayPreparationFinished)
+            yield return null;
+
+        var reveal = DOTween.Sequence().SetUpdate(true);
+        if (loadingPresentation != null)
+            reveal.Append(loadingPresentation.DOFade(0f, loadingExitSeconds).SetEase(Ease.InOutSine));
+        float revealStart = reveal.Duration();
+        bool hasDayCycle = dayCycle != null && dayCycle.isActiveAndEnabled && dayCycle.gameObject.scene == scene;
+        if (hasDayCycle)
+            reveal.AppendCallback(() =>
             {
-                AudioManager.RestartMusicAfterTransition();
-                loading = false;
-                Destroy(gameObject);
+                if (dayCycle != null) dayCycle.RevealFirstDayBackdrop();
             });
+        reveal.Append(blackOverlay.DOFade(0f, gameplayRevealSeconds).SetEase(Ease.InOutSine));
+        if (hasDayCycle)
+            reveal.InsertCallback(revealStart + gameplayRevealSeconds * firstEventAtRevealProgress, () =>
+            {
+                if (dayCycle != null) dayCycle.ShowFirstDayEvent();
+            });
+        fade = reveal.OnComplete(() =>
+        {
+            AudioManager.RestartMusicAfterTransition();
+            gameplayTransition = null;
+            loading = false;
+            Destroy(gameObject);
+        });
+    }
+
+    private void RestoreLoadingPriority()
+    {
+        if (!adjustedLoadingPriority) return;
+        Application.backgroundLoadingPriority = priorLoadingPriority;
+        adjustedLoadingPriority = false;
     }
 
     private void OnDestroy()
@@ -111,6 +192,8 @@ public sealed class GS2SceneFade : MonoBehaviour
         fade?.Kill();
         musicFade?.Kill();
         if (gameplayLoad != null) gameplayLoad.allowSceneActivation = true;
+        RestoreLoadingPriority();
+        if (gameplayTransition == this) gameplayTransition = null;
         if (loading) AudioManager.SetMusicTransitionGain(1f);
     }
 }

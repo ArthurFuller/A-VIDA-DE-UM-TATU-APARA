@@ -124,6 +124,8 @@ public static class DayTimelinePlaySave
     {
         RectTransform clip = timeline != null ? timeline.PanelClip : null;
         if (clip == null) return false;
+        TopBarAutoHide hud = timeline.GetComponentInChildren<TopBarAutoHide>(true);
+        if (hud != null && hud.IsMoving) return false;
         Vector2 delta = clip.anchoredPosition - timeline.PanelClipPosition;
         RectTransform panel = timeline.TimelinePanel;
         bool movedPanel = delta.sqrMagnitude <= 0.0001f && timeline.IsOpen &&

@@ -9,6 +9,17 @@ public sealed class GS2Profile : MonoBehaviour
     public static string Nickname => PlayerPrefs.GetString(NicknameKey, string.Empty);
     public static bool HasNickname => IsValidNickname(Nickname);
 
+    [Serializable]
+    internal sealed class NicknamePage
+    {
+        [SerializeField] internal GameObject Root;
+        [SerializeField] internal InputField Input;
+        [SerializeField] internal Button Proceed;
+        [SerializeField] internal Text Message;
+
+        internal bool IsReady => Root != null && Input != null && Proceed != null && Message != null;
+    }
+
     [SerializeField] private InputField nicknameInput;
     [SerializeField] private Button saveButton;
     [SerializeField] private Toggle skipTutorial;
@@ -45,9 +56,9 @@ public sealed class GS2Profile : MonoBehaviour
 
     private void SetSkipTutorial(bool value) => InitialTutorial.SkipRequested = value;
 
-    internal bool ShowFirstRun(Transform parent, Action done)
+    internal NicknamePage CreateFirstRunPage(Transform parent)
     {
-        if (nicknameInput == null || saveButton == null || notice == null) return false;
+        if (nicknameInput == null || saveButton == null || notice == null) return null;
         var screen = new GameObject("Primeiro acesso", typeof(RectTransform), typeof(Image));
         var rect = (RectTransform)screen.transform;
         rect.SetParent(parent, false);
@@ -57,6 +68,7 @@ public sealed class GS2Profile : MonoBehaviour
         screen.GetComponent<Image>().color = new Color32(35, 26, 20, 255);
 
         Text heading = Instantiate(notice, rect, false);
+        heading.name = "Título";
         Place(heading.rectTransform, 110f, 480f, 55f);
         heading.gameObject.SetActive(true);
         heading.text = "Qual é o seu nickname?";
@@ -65,6 +77,7 @@ public sealed class GS2Profile : MonoBehaviour
         heading.alignment = TextAnchor.MiddleCenter;
 
         Text message = Instantiate(notice, rect, false);
+        message.name = "Mensagem";
         Place(message.rectTransform, -91f, 540f, 46f);
         message.gameObject.SetActive(true);
         message.text = string.Empty;
@@ -72,6 +85,7 @@ public sealed class GS2Profile : MonoBehaviour
         message.alignment = TextAnchor.MiddleCenter;
 
         InputField input = Instantiate(nicknameInput, rect, false);
+        input.name = "Campo de nickname";
         Place((RectTransform)input.transform, 39f, 300f, 45f);
         input.characterLimit = 18;
         input.onValueChanged = new InputField.OnChangeEvent();
@@ -80,22 +94,57 @@ public sealed class GS2Profile : MonoBehaviour
         input.gameObject.SetActive(true);
 
         Button proceed = Instantiate(saveButton, rect, false);
+        proceed.name = "Botão Prosseguir";
         Place((RectTransform)proceed.transform, -34f, 176f, 72f);
         proceed.onClick = new Button.ButtonClickedEvent();
         Text buttonText = proceed.GetComponentInChildren<Text>(true);
         if (buttonText != null) buttonText.text = "Prosseguir";
+        proceed.gameObject.SetActive(true);
+        return new NicknamePage { Root = screen, Input = input, Proceed = proceed, Message = message };
+    }
+
+    internal bool ShowFirstRun(NicknamePage page, Transform parent, Action<Action> done, bool preview)
+    {
+        bool temporary = page == null || page.Root == null;
+        if (temporary) page = CreateFirstRunPage(parent);
+        if (page == null || !page.IsReady) return false;
+
+        InputField input = page.Input;
+        Button proceed = page.Proceed;
+        Text message = page.Message;
+        input.SetTextWithoutNotify(string.Empty);
+        message.text = string.Empty;
         proceed.gameObject.SetActive(false);
-        input.onValueChanged.AddListener(value =>
+        page.Root.SetActive(true);
+
+        void Refresh(string value)
         {
             proceed.gameObject.SetActive(IsValidNickname(value.Trim()));
             message.text = string.Empty;
-        });
-        proceed.onClick.AddListener(() => Save(input, proceed, message, () =>
+        }
+
+        void Complete()
         {
-            screen.SetActive(false);
-            Destroy(screen);
-            done();
-        }));
+            input.onValueChanged.RemoveListener(Refresh);
+            proceed.onClick.RemoveListener(Submit);
+            done(() =>
+            {
+                page.Root.SetActive(false);
+                if (temporary) Destroy(page.Root);
+            });
+        }
+
+        void Submit()
+        {
+            if (!IsValidNickname(input.text.Trim())) return;
+            if (preview)
+                Complete();
+            else
+                Save(input, proceed, message, Complete);
+        }
+
+        input.onValueChanged.AddListener(Refresh);
+        proceed.onClick.AddListener(Submit);
         SertaoButtonAudio.Bind(proceed);
         return true;
     }

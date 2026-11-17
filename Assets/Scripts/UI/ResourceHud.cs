@@ -182,12 +182,15 @@ public sealed class ResourceHud : MonoBehaviour
     }
 
     public void FlyFromWorld(ResourceKind kind, int amount, Vector3 origin,
-        float pauseSeconds = 0f, System.Action onAllArrived = null)
+        float pauseSeconds = 0f, System.Action onAllArrived = null,
+        float appearanceDelay = 0f, float appearanceInterval = 0f, System.Action onEachAppearance = null)
     {
         Camera worldCamera = Camera.main;
         Vector2 screen = worldCamera != null ? (Vector2)worldCamera.WorldToScreenPoint(origin) :
             new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-        FlyFromScreen(kind, amount, screen, pauseSeconds, onAllArrived);
+        FlyFromScreen(kind, amount, screen, pauseSeconds, onAllArrived,
+            appearanceDelay: appearanceDelay, appearanceInterval: appearanceInterval,
+            onEachAppearance: onEachAppearance);
     }
 
     public void FlyFromRect(ResourceKind kind, int amount, RectTransform origin,
@@ -287,11 +290,16 @@ public sealed class ResourceHud : MonoBehaviour
 
     public void FlyFromScreen(ResourceKind kind, int amount, Vector2 screenOrigin,
         float pauseSeconds = 0f, System.Action onAllArrived = null, System.Action onLastDeparture = null,
-        int maxIcons = int.MaxValue)
+        int maxIcons = int.MaxValue, float appearanceDelay = 0f,
+        float appearanceInterval = 0f, System.Action onEachAppearance = null)
     {
         Text target = TargetFor(kind);
         if (amount <= 0 || canvasRect == null || !isActiveAndEnabled || target == null)
         {
+            if (onEachAppearance != null)
+                for (int i = 0; i < amount; i++)
+                    DOVirtual.DelayedCall(appearanceDelay + i * appearanceInterval,
+                        () => onEachAppearance(), false).SetLink(gameObject);
             onLastDeparture?.Invoke();
             onAllArrived?.Invoke();
             return;
@@ -313,7 +321,8 @@ public sealed class ResourceHud : MonoBehaviour
             CreateIcon(kind, i, count, origin, target, pauseSeconds, credit, () =>
                 {
                     if (--pending == 0) onAllArrived?.Invoke();
-                }, i == count - 1 ? onLastDeparture : null);
+                }, i == count - 1 ? onLastDeparture : null,
+                appearanceDelay + i * appearanceInterval, onEachAppearance);
         }
     }
 
@@ -342,7 +351,8 @@ public sealed class ResourceHud : MonoBehaviour
     }
 
     private void CreateIcon(ResourceKind kind, int index, int count, Vector2 origin,
-        Text target, float pauseSeconds, int credit, System.Action onArrived, System.Action onDeparture)
+        Text target, float pauseSeconds, int credit, System.Action onArrived, System.Action onDeparture,
+        float appearanceDelay, System.Action onAppearance)
     {
         RectTransform rect = GetIcon(kind);
         rect.sizeDelta = Vector2.one * FlightIconSize(kind, 32f);
@@ -351,10 +361,13 @@ public sealed class ResourceHud : MonoBehaviour
         rect.anchoredPosition = origin + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
         rect.localScale = Vector3.zero;
         const float appearDuration = 0.12f;
-        float flightWait = FlightWait(kind, appearDuration + Mathf.Max(0f, pauseSeconds));
+        appearanceDelay = Mathf.Max(0f, appearanceDelay);
+        float flightWait = FlightWait(kind, appearanceDelay + appearDuration + Mathf.Max(0f, pauseSeconds));
         Sequence flight = DOTween.Sequence().SetId(this);
+        if (appearanceDelay > 0f) flight.AppendInterval(appearanceDelay);
+        if (onAppearance != null) flight.AppendCallback(() => onAppearance());
         flight.Append(rect.DOScale(1f, appearDuration).SetEase(Ease.OutBack));
-        flight.AppendInterval(Mathf.Max(0f, flightWait - appearDuration));
+        flight.AppendInterval(Mathf.Max(0f, flightWait - appearanceDelay - appearDuration));
         if (onDeparture != null) flight.AppendCallback(NotifyDeparture);
         flight.Append(FollowCounter(rect, target))
             .Join(rect.DOScale(0.4f, flightDuration).SetEase(Ease.InQuad))

@@ -5,82 +5,123 @@ using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-public sealed class SertaoCoinToss : MonoBehaviour
+public class SertaoCoinToss : MonoBehaviour
 {
-    private static readonly Rect FaceCrop = new Rect(629f / 2048f, 699f / 2048f, 932f / 2048f, 932f / 2048f);
-    private static readonly Color Paper = new Color(0.99f, 0.95f, 0.79f);
+    [SerializeField] private CanvasGroup screen;
+    [SerializeField] private CanvasGroup choices;
+    [SerializeField] private RectTransform stage, coin, turn;
+    [SerializeField] private RawImage face;
+    [SerializeField] private Button heads, tails;
+    [SerializeField] private Text stakeLabel, title;
+    [SerializeField] private Texture2D headsArt, tailsArt;
+    [SerializeField] private Color winColor = new Color(0.99f, 0.95f, 0.79f);
+    [SerializeField] private Color lossColor = new Color(1f, 0.82f, 0.67f);
+
     private static SertaoCoinToss active;
     public static bool IsOpen => active != null;
 
-    private SertaoPresentationAssets art;
-    private RectTransform stage, coin, turn;
-    private CanvasGroup screen, choices;
-    private RawImage face;
-    private Button heads, tails;
-    private Text title;
+    private Texture2D headsTexture, tailsTexture;
+    private TopBarAutoHide topBar;
+    private Tween intro;
     private Sequence idle, toss;
     private Action began;
     private Action<bool> completed;
-    private float angle, airtime;
-    private float verticalFlip;
+    private Vector2 stageHome, coinHome;
+    private Vector3 coinHomeScale, turnHomeScale;
+    private Quaternion turnHomeRotation;
+    private float angle, airtime, verticalFlip;
     private int stake;
-    private bool picked;
+    private bool picked, temporaryInstance;
     private GameObject previousSelection;
+
+    private bool IsConfigured => screen != null && choices != null && stage != null &&
+        coin != null && turn != null && face != null && heads != null && tails != null &&
+        stakeLabel != null && title != null;
+
+    protected void Awake()
+    {
+        if (!IsConfigured) return;
+        stageHome = stage.anchoredPosition;
+        coinHome = coin.anchoredPosition;
+        coinHomeScale = coin.localScale;
+        turnHomeScale = turn.localScale;
+        turnHomeRotation = turn.localRotation;
+        screen.alpha = 0f;
+        screen.interactable = screen.blocksRaycasts = false;
+        heads.onClick.AddListener(PickHeads);
+        tails.onClick.AddListener(PickTails);
+        SertaoButtonAudio.Bind(heads);
+        SertaoButtonAudio.Bind(tails);
+    }
 
     public static SertaoCoinToss Open(Scene scene, int stake, float airtime, Action began, Action<bool> completed)
     {
+        if (IsOpen || EventSystem.current == null) return null;
+
+        SertaoCoinToss view = null;
+        foreach (var candidate in FindObjectsByType<SertaoCoinToss>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (candidate.temporaryInstance || candidate.gameObject.scene != scene || !candidate.enabled ||
+                (candidate.transform.parent != null && !candidate.transform.parent.gameObject.activeInHierarchy) ||
+                !candidate.IsConfigured) continue;
+            view = candidate;
+            break;
+        }
+
+        if (view == null)
+        {
+            var prefab = Resources.Load<GameObject>("SertaoCaraOuCoroa");
+            if (prefab == null || !prefab.TryGetComponent(out SertaoCoinToss template) ||
+                !template.IsConfigured) return null;
+            view = Instantiate(template);
+            view.temporaryInstance = true;
+            if (scene.IsValid() && view.gameObject.scene != scene)
+                SceneManager.MoveGameObjectToScene(view.gameObject, scene);
+        }
+
         var assets = SertaoPresentationAssets.Current;
-        if (IsOpen || assets == null || assets.Heads == null || assets.Tails == null || EventSystem.current == null)
+        view.headsTexture = view.headsArt != null ? view.headsArt : assets != null ? assets.Heads : null;
+        view.tailsTexture = view.tailsArt != null ? view.tailsArt : assets != null ? assets.Tails : null;
+        if (view.headsTexture == null || view.tailsTexture == null)
+        {
+            if (view.temporaryInstance) Destroy(view.gameObject);
             return null;
-        var root = new GameObject("Cara ou coroa", typeof(Canvas), typeof(CanvasScaler),
-            typeof(GraphicRaycaster), typeof(CanvasGroup), typeof(SertaoCoinToss));
-        if (scene.IsValid() && root.scene != scene) SceneManager.MoveGameObjectToScene(root, scene);
-        var canvas = root.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 2000;
-        var scaler = root.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1280f, 720f);
-        scaler.matchWidthOrHeight = 1f;
-        active = root.GetComponent<SertaoCoinToss>();
-        active.Setup(assets, stake, airtime, began, completed);
-        return active;
+        }
+
+        active = view;
+        view.Setup(stake, airtime, began, completed);
+        return view;
     }
 
-    private void Setup(SertaoPresentationAssets assets, int value, float duration, Action start, Action<bool> finish)
+    private void Setup(int value, float duration, Action start, Action<bool> finish)
     {
-        art = assets;
+        if (!gameObject.activeSelf) gameObject.SetActive(true);
+        foreach (var candidate in FindObjectsByType<TopBarAutoHide>(FindObjectsSortMode.None))
+        {
+            if (candidate.gameObject.scene != gameObject.scene) continue;
+            topBar = candidate;
+            break;
+        }
+        topBar?.SetCoinTossOpen(true);
         stake = value;
         airtime = Mathf.Clamp(duration + 0.42f, 0.95f, 1.7f);
         began = start;
         completed = finish;
-        screen = GetComponent<CanvasGroup>();
+        picked = false;
+        verticalFlip = 0f;
+        stage.anchoredPosition = stageHome;
+        coin.anchoredPosition = coinHome;
+        coin.localScale = coinHomeScale;
+        choices.alpha = 1f;
+        choices.interactable = choices.blocksRaycasts = true;
         screen.alpha = 0f;
-        var scrim = MakeRect("Fundo", transform, Vector2.zero, Vector2.zero);
-        scrim.anchorMin = Vector2.zero;
-        scrim.anchorMax = Vector2.one;
-        scrim.sizeDelta = Vector2.zero;
-        scrim.gameObject.AddComponent<Image>().color = new Color(0.11f, 0.085f, 0.048f, 0.74f);
-
-        stage = MakeRect("Centro", transform, Vector2.zero, Vector2.zero);
-        var buttons = MakeRect("Escolha", stage, Vector2.zero, Vector2.zero);
-        choices = buttons.gameObject.AddComponent<CanvasGroup>();
-        Label(buttons, "Aposta de " + stake + " moedas", 197f, 23);
-        tails = Choice(buttons, "Coroa", 120f, false);
-        heads = Choice(buttons, "Cara", -120f, true);
-        tails.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnDown = heads };
-        heads.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = tails };
-
-        coin = MakeRect("Moeda", stage, Vector2.zero, Vector2.zero);
-        turn = MakeRect("Giro", coin, Vector2.zero, new Vector2(140f, 140f));
-        face = turn.gameObject.AddComponent<RawImage>();
-        face.uvRect = FaceCrop;
-        face.raycastTarget = false;
-        title = Label(stage, "", -120f, 27);
+        screen.interactable = screen.blocksRaycasts = true;
+        stakeLabel.text = "Aposta de " + stake + " moedas";
         title.enabled = false;
+        face.enabled = true;
 
         DrawFace(0f);
-        screen.DOFade(1f, 0.18f).SetLink(gameObject);
+        intro = screen.DOFade(1f, 0.18f).SetLink(gameObject);
         idle = DOTween.Sequence().SetLink(gameObject)
             .AppendInterval(0.28f)
             .Append(DOVirtual.Float(0f, 180f, 0.33f, DrawFace).SetEase(Ease.InOutCubic))
@@ -90,6 +131,9 @@ public sealed class SertaoCoinToss : MonoBehaviour
         previousSelection = EventSystem.current.currentSelectedGameObject;
         tails.Select();
     }
+
+    private void PickHeads() => Pick(true);
+    private void PickTails() => Pick(false);
 
     private void Pick(bool selectedHeads)
     {
@@ -104,19 +148,19 @@ public sealed class SertaoCoinToss : MonoBehaviour
         bool won = headsUp == selectedHeads;
         float target = (Mathf.Floor(angle / 360f) + 4f) * 360f + (headsUp ? 0f : 180f);
         var arc = DOTween.Sequence()
-            .Append(coin.DOAnchorPosY(157f, airtime * 0.44f).SetEase(Ease.OutQuad))
-            .Append(coin.DOAnchorPosY(0f, airtime * 0.56f).SetEase(Ease.InQuad));
+            .Append(coin.DOAnchorPosY(coinHome.y + 157f, airtime * 0.44f).SetEase(Ease.OutQuad))
+            .Append(coin.DOAnchorPosY(coinHome.y, airtime * 0.56f).SetEase(Ease.InQuad));
         toss = DOTween.Sequence().SetLink(gameObject)
             .Append(choices.DOFade(0f, 0.12f))
-            .Join(coin.DOAnchorPosY(-34f, 0.13f).SetEase(Ease.InQuad))
+            .Join(coin.DOAnchorPosY(coinHome.y - 34f, 0.13f).SetEase(Ease.InQuad))
             .Join(DOVirtual.Float(0f, 1f, 0.13f, FlipVertically).SetEase(Ease.InOutSine))
             .AppendCallback(() => AudioManager.Play(SoundCue.GambleSpin))
             .Append(arc)
             .Join(DOVirtual.Float(angle, target, airtime, DrawFace).SetEase(Ease.OutSine))
             .AppendCallback(() => Impact(headsUp, won, target))
-            .Append(coin.DOAnchorPosY(18f, 0.085f).SetEase(Ease.OutQuad))
+            .Append(coin.DOAnchorPosY(coinHome.y + 18f, 0.085f).SetEase(Ease.OutQuad))
             .AppendCallback(() => AudioManager.Play(won ? SoundCue.GambleWin : SoundCue.GambleLose))
-            .Append(coin.DOAnchorPosY(0f, 0.12f).SetEase(Ease.InQuad))
+            .Append(coin.DOAnchorPosY(coinHome.y, 0.12f).SetEase(Ease.InQuad))
             .AppendInterval(0.52f)
             .Append(screen.DOFade(0f, 0.17f))
             .OnComplete(() => Finish(won));
@@ -127,7 +171,7 @@ public sealed class SertaoCoinToss : MonoBehaviour
         DrawFace(settled);
         title.text = (headsUp ? "Deu cara" : "Deu coroa") + "\n" + (won ? "+" : "-") + stake + " moedas";
         title.enabled = true;
-        title.color = won ? Paper : new Color(1f, 0.82f, 0.67f);
+        title.color = won ? winColor : lossColor;
         coin.DOPunchScale(Vector3.one * 0.11f, 0.19f, 4, 0.45f).SetLink(gameObject);
         stage.DOShakeAnchorPos(0.17f, new Vector2(7f, 4f), 8, 55f).SetLink(gameObject);
         SertaoCoinImpact.Play();
@@ -145,75 +189,46 @@ public sealed class SertaoCoinToss : MonoBehaviour
         angle = degrees;
         float phase = angle * Mathf.Deg2Rad;
         float width = Mathf.Cos(phase);
-        Texture2D nextFace = width >= 0f ? art.Heads : art.Tails;
+        Texture2D nextFace = width >= 0f ? headsTexture : tailsTexture;
         if (face.texture != nextFace) face.texture = nextFace;
         float thickness = Mathf.Max(0.075f, Mathf.Abs(width));
-        turn.localScale = new Vector3(Mathf.Lerp(thickness, 1f, verticalFlip),
-            Mathf.Lerp(1f, thickness, verticalFlip), 1f);
-        turn.localRotation = Quaternion.Euler(0f, 0f, -4f * Mathf.Sin(phase));
+        turn.localScale = Vector3.Scale(turnHomeScale, new Vector3(Mathf.Lerp(thickness, 1f, verticalFlip),
+            Mathf.Lerp(1f, thickness, verticalFlip), 1f));
+        turn.localRotation = turnHomeRotation * Quaternion.Euler(0f, 0f, -4f * Mathf.Sin(phase));
     }
 
     private void Finish(bool won)
     {
         var callback = completed;
         completed = null;
-        if (active == this) active = null;
+        toss = null;
         gameObject.SetActive(false);
-        Destroy(gameObject);
-        if (previousSelection != null && previousSelection.activeInHierarchy && EventSystem.current != null)
-            EventSystem.current.SetSelectedGameObject(previousSelection);
+        if (temporaryInstance) Destroy(gameObject);
         callback?.Invoke(won);
     }
 
-    private void OnDestroy()
+    protected void OnDisable()
     {
+        intro?.Kill();
         idle?.Kill();
         toss?.Kill();
-        if (active == this) active = null;
+        if (active != this) return;
+
+        stage.DOKill();
+        coin.DOKill();
+        active = null;
+        topBar?.SetCoinTossOpen(false);
+        topBar = null;
+        if (previousSelection != null && previousSelection.activeInHierarchy && EventSystem.current != null)
+            EventSystem.current.SetSelectedGameObject(previousSelection);
+        previousSelection = null;
+        began = null;
+        completed = null;
     }
 
-    private Button Choice(RectTransform parent, string value, float y, bool isHeads)
+    protected void OnDestroy()
     {
-        var target = MakeRect(value, parent, Vector2.up * y, new Vector2(218f, 50f));
-        var background = target.gameObject.AddComponent<Image>();
-        background.color = new Color(0.29f, 0.24f, 0.13f);
-        var outline = target.gameObject.AddComponent<Outline>();
-        outline.effectColor = new Color(0.74f, 0.63f, 0.33f);
-        outline.effectDistance = new Vector2(1.5f, -1.5f);
-        var button = target.gameObject.AddComponent<Button>();
-        button.targetGraphic = background;
-        var states = button.colors;
-        states.colorMultiplier = 1.32f;
-        states.highlightedColor = states.selectedColor = Color.white;
-        states.normalColor = new Color(0.76f, 0.76f, 0.76f, 1f);
-        states.pressedColor = new Color(0.61f, 0.57f, 0.48f);
-        button.colors = states;
-        Label(target, value, 0f, 26);
-        button.onClick.AddListener(() => Pick(isHeads));
-        SertaoButtonAudio.Bind(button);
-        return button;
-    }
-
-    private Text Label(Transform parent, string value, float y, int size)
-    {
-        var label = MakeRect("Texto", parent, Vector2.up * y, new Vector2(330f, 72f))
-            .gameObject.AddComponent<Text>();
-        label.font = art.Font != null ? art.Font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        label.text = value;
-        label.fontSize = size;
-        label.alignment = TextAnchor.MiddleCenter;
-        label.color = Paper;
-        label.raycastTarget = false;
-        return label;
-    }
-
-    private static RectTransform MakeRect(string label, Transform parent, Vector2 position, Vector2 size)
-    {
-        var rect = (RectTransform)new GameObject(label, typeof(RectTransform)).transform;
-        rect.SetParent(parent, false);
-        rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.one * 0.5f;
-        rect.anchoredPosition = position;
-        rect.sizeDelta = size;
-        return rect;
+        if (heads != null) heads.onClick.RemoveListener(PickHeads);
+        if (tails != null) tails.onClick.RemoveListener(PickTails);
     }
 }

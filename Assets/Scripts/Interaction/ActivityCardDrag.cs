@@ -552,18 +552,16 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         if (eventData.button != PointerEventData.InputButton.Left) return;
         if (activity == ActivityKind.BuySeeds)
         {
-            if (shop == null || shopClicking) return;
+            if (shop == null) return;
+            shopClickTween?.Kill();
             shopClicking = true;
             shopHoverTween?.Kill();
             shopClickTween = DOTween.Sequence()
                 .Append(transform.DOScale(Vector3.one * 0.93f, 0.08f).SetEase(Ease.InSine))
                 .Append(transform.DOScale(Vector3.one * 1.12f, 0.12f).SetEase(Ease.OutBack))
                 .Append(transform.DOScale(Vector3.one, 0.12f).SetEase(Ease.OutSine))
-                .OnComplete(() =>
-                {
-                    shopClicking = false;
-                    shop.ToggleShop();
-                });
+                .OnComplete(() => shopClicking = false);
+            shop.ToggleShop();
             return;
         }
         if (!eventData.dragging && !dragging && !returning)

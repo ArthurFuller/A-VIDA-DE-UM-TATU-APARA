@@ -1,6 +1,8 @@
 using System;
-using System.Text;
+using System.Collections;
 using System.Collections.Generic;
+using DG.Tweening;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -24,30 +26,49 @@ public sealed class DayCycle : MonoBehaviour
     [SerializeField] private CardRewardChoice cardChoice;
     [SerializeField] private Text dayText;
     [SerializeField] private Button finishDayButton;
-    [SerializeField] private Button continueButton;
-    [SerializeField] private Text continueButtonText;
+    [SerializeField] private SertaoMatchResultsView resultsView;
     [SerializeField, HideInInspector, Min(1)] private int totalDays = 12;
     [SerializeField, HideInInspector, Min(1)] private int milkPerCow = 1;
     [SerializeField, HideInInspector, Min(1)] private int eggsPerChicken = 1;
 
+    private static readonly ProfilerMarker PrepareFirstDayMarker = new("Sertao.FirstDay.Prepare");
+    private static readonly ProfilerMarker ShowFirstEventMarker = new("Sertao.FirstDay.ShowEvent");
+
     private int currentDay = 1;
+    private bool firstDayOpening = true;
+    private bool firstDayEventPresented;
     private HoverPunchButton finishDayFeedback;
-    private bool summaryOpen;
     private bool feedingOpen;
     private bool gameOver;
     private int todayMilk;
     private int todayEggs;
-    private int lastSummarizedDay;
-    private int totalWoodGained;
-    private int totalFishGained;
-    private int totalFoodGained;
-    private int totalCropsStored;
-    private int totalPlotsPlowed;
-    private int totalCropsHarvested;
+    private readonly List<(Plot plot, ResourceKind kind, int amount)> animalGains = new();
+    private int lastClosedDay;
+    private int missedMeals;
+#if UNITY_EDITOR
+    private int? previewFinalBalance;
+    private int dayBeforePreview;
 
-    public bool CanAcceptActions => !summaryOpen && !feedingOpen && !gameOver &&
+    internal bool TryPreviewFinalDay(int finalBalance)
+    {
+        if (!CanAcceptActions || previewFinalBalance.HasValue || Time.timeScale <= 0f ||
+            SertaoCoinToss.IsOpen || actions == null || actions.IsBusy ||
+            (hand != null && hand.IsDraggingCard) || finishDayButton == null ||
+            !finishDayButton.isActiveAndEnabled || !finishDayButton.IsInteractable()) return false;
+
+        previewFinalBalance = finalBalance;
+        finishDayButton.onClick.Invoke();
+        if (feedingOpen) return true;
+        previewFinalBalance = null;
+        return false;
+    }
+#endif
+
+    public bool CanAcceptActions => !firstDayOpening && !GS2SceneFade.IsEnteringGameplay &&
+        !feedingOpen && !gameOver &&
         (dayEvents == null || !dayEvents.IsPanelOpen);
     public int CurrentDay => currentDay;
+    internal bool FirstDayPreparationFinished { get; private set; }
 
     public bool TryRepeatAnimalProduction(out int milk, out int eggs)
     {
@@ -55,6 +76,8 @@ public sealed class DayCycle : MonoBehaviour
         eggs = todayEggs;
         if (milk + eggs == 0 || resources == null) return false;
         resources.AddAnimalProducts(milk, eggs);
+        resources.RecordProduction(SaleItem.Milk, milk);
+        resources.RecordProduction(SaleItem.Eggs, eggs);
         AnimateAnimalGains();
         return true;
     }
@@ -63,13 +86,19 @@ public sealed class DayCycle : MonoBehaviour
     {
         todayMilk = 0;
         todayEggs = 0;
+        animalGains.Clear();
         foreach (Plot plot in plots)
         {
-            if (plot == null) continue;
-            if (plot.Animal == AnimalKind.Cow) todayMilk += milkPerCow +
-                (MandalaSynergy.Instance != null ? MandalaSynergy.Instance.ExtraAnimalProduction(plot) : 0);
-            if (plot.Animal == AnimalKind.Chicken) todayEggs += eggsPerChicken +
-                (MandalaSynergy.Instance != null ? MandalaSynergy.Instance.ExtraAnimalProduction(plot) : 0);
+            if (plot == null || plot.Animal == AnimalKind.None) continue;
+            bool isCow = plot.Animal == AnimalKind.Cow;
+            int bonus = MandalaSynergy.Instance != null ?
+                MandalaSynergy.Instance.ExtraAnimalProduction(plot) : 0;
+            int amount = (isCow ? milkPerCow : eggsPerChicken) + bonus;
+            if (amount <= 0) continue;
+
+            if (isCow) todayMilk += amount;
+            else todayEggs += amount;
+            animalGains.Add((plot, isCow ? ResourceKind.Milk : ResourceKind.Eggs, amount));
         }
     }
 
@@ -77,6 +106,8 @@ public sealed class DayCycle : MonoBehaviour
     {
         if (todayMilk + todayEggs == 0 || resources == null) return;
         resources.AddAnimalProducts(todayMilk, todayEggs);
+        resources.RecordProduction(SaleItem.Milk, todayMilk);
+        resources.RecordProduction(SaleItem.Eggs, todayEggs);
         AnimateAnimalGains();
         if (feedback != null)
             feedback.ShowMessage("Animais: +" + todayMilk + " leite e +" + todayEggs + " ovos.");
@@ -84,15 +115,26 @@ public sealed class DayCycle : MonoBehaviour
 
     private void AnimateAnimalGains()
     {
-        foreach (Plot plot in plots)
+        const float itemInterval = 0.20f;
+        float nextItem = 0f;
+        foreach (var gain in animalGains)
         {
-            if (plot == null || plot.Animal == AnimalKind.None) continue;
-            plot.PulseAnimal();
-            if (resourceHud == null) continue;
-            ResourceKind kind = plot.Animal == AnimalKind.Cow ? ResourceKind.Milk : ResourceKind.Eggs;
-            int amount = (plot.Animal == AnimalKind.Cow ? milkPerCow : eggsPerChicken) +
-                (MandalaSynergy.Instance != null ? MandalaSynergy.Instance.ExtraAnimalProduction(plot) : 0);
-            resourceHud.FlyFromWorld(kind, amount, plot.transform.position + Vector3.up, 0.8f);
+            Plot plot = gain.plot;
+            if (plot == null) continue;
+            void OnItem()
+            {
+                if (plot != null) plot.PulseAnimal();
+                AudioManager.Play(SoundCue.AnimalProductionPop);
+            }
+
+            if (resourceHud != null)
+                resourceHud.FlyFromWorld(gain.kind, gain.amount, plot.transform.position + Vector3.up,
+                    0.8f, appearanceDelay: nextItem, appearanceInterval: itemInterval,
+                    onEachAppearance: OnItem);
+            else
+                for (int i = 0; i < gain.amount; i++)
+                    DOVirtual.DelayedCall(nextItem + i * itemInterval, OnItem, false).SetLink(gameObject);
+            nextItem += gain.amount * itemInterval;
         }
     }
     public event Action DayChanged;
@@ -118,16 +160,47 @@ public sealed class DayCycle : MonoBehaviour
         if (finishDayButton != null &&
             finishDayButton.TryGetComponent(out finishDayFeedback))
             finishDayFeedback.AnimatePointerClick = false;
+        if (hand != null) hand.SuspendEntranceForEvent();
     }
 
-    private void Start()
+    private IEnumerator Start()
     {
         UpdateDayLabel();
-        if (dayEvents != null) dayEvents.StartDay(currentDay);
-        if (dayEvents != null) dayEvents.ApplyPendingPestRegression(seedCatalog);
-        if (actions != null) actions.BeginNextDay();
-        UpdateMarket();
-        OpenDayAfterEvent(false);
+        // Deixa os outros componentes da cena concluírem o Start ainda sob o loading.
+        yield return null;
+        try
+        {
+            using (PrepareFirstDayMarker.Auto())
+            {
+                if (dayEvents != null) dayEvents.PrepareFirstDay(currentDay);
+                if (dayEvents != null) dayEvents.ApplyPendingPestRegression(seedCatalog);
+                if (actions != null) actions.BeginNextDay();
+                UpdateMarket();
+            }
+        }
+        finally
+        {
+            FirstDayPreparationFinished = true;
+        }
+        while (GS2SceneFade.IsEnteringGameplay && !firstDayEventPresented) yield return null;
+        ShowFirstDayEvent();
+    }
+
+    internal void RevealFirstDayBackdrop()
+    {
+        if (!firstDayEventPresented && dayEvents != null) dayEvents.RevealPreparedBackdrop();
+    }
+
+    internal void ShowFirstDayEvent()
+    {
+        if (firstDayEventPresented || GS2SceneFade.IsEnteringGameplay &&
+            (dayEvents == null || !dayEvents.HasPreparedEvent)) return;
+        firstDayEventPresented = true;
+        using (ShowFirstEventMarker.Auto())
+        {
+            if (dayEvents != null) dayEvents.ShowPreparedEvent();
+            OpenDayAfterEvent(false);
+        }
     }
 
     public void FinishDay()
@@ -145,33 +218,51 @@ public sealed class DayCycle : MonoBehaviour
             return;
         }
 
+        bool finalDay = currentDay >= totalDays;
+#if UNITY_EDITOR
+        finalDay |= previewFinalBalance.HasValue;
+#endif
+        if (feedingGame == null)
+        {
+            feedback?.ShowMessage("Minigame de alimentação não configurado.");
+            return;
+        }
+        if (finalDay && !FindResultsView())
+        {
+            feedback?.ShowMessage("Tela de resultado não configurada.");
+            return;
+        }
+
+#if UNITY_EDITOR
+        if (previewFinalBalance.HasValue)
+        {
+            dayBeforePreview = currentDay;
+            currentDay = totalDays;
+            UpdateDayLabel();
+        }
+#endif
+        feedingOpen = true;
         if (timeline != null) timeline.ClosePanel();
         if (activeMissionsPanel != null) activeMissionsPanel.Close();
         if (merchant != null && merchant.IsOpen) merchant.HideShop();
-        if (currentDay < totalDays && feedingGame == null)
-        {
-            feedback.ShowMessage("Minigame de alimentação não configurado.");
-            return;
-        }
         if (finishDayFeedback != null) finishDayFeedback.PlayAcceptedClick();
-        DayClosing?.Invoke();
-        if (currentDay >= totalDays)
-        {
-            feedingOpen = true;
-            if (finishDayButton != null) finishDayButton.enabled = false;
-            if (hand != null) hand.ExitForDay(() => ShowDaySummary(0, 0, 0, 0));
-            else ShowDaySummary(0, 0, 0, 0);
-            return;
-        }
-        feedingOpen = true;
         if (finishDayButton != null) finishDayButton.enabled = false;
-        if (hand != null) hand.ExitForDay(() => feedingGame.Begin(workers, FinishFeeding,
-            CancelFeeding));
-        else feedingGame.Begin(workers, FinishFeeding, CancelFeeding);
+        DayClosing?.Invoke();
+        void OpenFeeding() => feedingGame.Begin(workers, FinishFeeding, CancelFeeding, finalDay);
+        if (hand != null) hand.ExitForDay(OpenFeeding);
+        else OpenFeeding();
     }
 
     private void CancelFeeding()
     {
+#if UNITY_EDITOR
+        if (previewFinalBalance.HasValue)
+        {
+            previewFinalBalance = null;
+            currentDay = dayBeforePreview;
+            UpdateDayLabel();
+        }
+#endif
         feedingOpen = false;
         if (finishDayButton != null) finishDayButton.enabled = true;
         if (hand != null) hand.ReturnAfterCancelledDay();
@@ -180,136 +271,97 @@ public sealed class DayCycle : MonoBehaviour
 
     private void FinishFeeding(SaleItem?[] chosenFood)
     {
-        int prepared = 0;
-        int raw = 0;
-        int unfed = 0;
-        int absent = 0;
+        if (!feedingOpen || gameOver || lastClosedDay == currentDay) return;
+        lastClosedDay = currentDay;
+        bool finalDay = currentDay >= totalDays;
 
+        int missedMealsToday = 0;
         for (int i = 0; i < workers.Length; i++)
         {
             WorkerAssignment worker = workers[i];
-            if (worker == null) continue;
-            if (worker.IsUnavailableToday)
-            {
-                absent++;
-                continue;
-            }
-
-            SaleItem? received = chosenFood[i];
-            if (received == SaleItem.Food)
-            {
-                prepared++;
-                worker.ScheduleExtraAction();
-            }
-            else if (received.HasValue)
-            {
-                raw++;
-            }
-            else
-            {
-                unfed++;
-            }
+            if (worker == null || worker.IsUnavailableToday) continue;
+            SaleItem? received = i < chosenFood.Length ? chosenFood[i] : null;
+            if (!received.HasValue) missedMealsToday++;
+            else if (!finalDay && received == SaleItem.Food) worker.ScheduleExtraAction();
         }
 
-        if (cardChoice != null && currentDay < totalDays)
+        if (finalDay)
         {
-            cardChoice.Begin(currentDay, () => ShowDaySummary(prepared, raw, unfed, absent));
+            FinishMatch(missedMealsToday);
             return;
         }
-        ShowDaySummary(prepared, raw, unfed, absent);
+        missedMeals += missedMealsToday;
+        if (cardChoice != null) cardChoice.Begin(currentDay, ContinueToNextDay);
+        else ContinueToNextDay();
     }
 
-    private void ShowDaySummary(int prepared, int raw, int unfed, int absent)
+    private bool FindResultsView()
     {
-        if (lastSummarizedDay != currentDay)
-        {
-            totalWoodGained += actions.WoodGainedToday;
-            totalFishGained += actions.FishGainedToday;
-            totalFoodGained += actions.FoodGainedToday;
-            totalCropsStored += actions.CropsStoredToday;
-            totalPlotsPlowed += actions.PlotsPlowedToday;
-            totalCropsHarvested += actions.CropsHarvestedToday;
-            lastSummarizedDay = currentDay;
-        }
+        if (resultsView == null)
+            resultsView = FindFirstObjectByType<SertaoMatchResultsView>(FindObjectsInactive.Include);
+        if (resultsView != null) return resultsView.IsConfigured;
+        var prefab = Resources.Load<GameObject>("SertaoFimDePartida");
+        if (prefab == null || !prefab.TryGetComponent(out SertaoMatchResultsView template) ||
+            !template.IsConfigured) return false;
+        resultsView = Instantiate(template);
+        return true;
+    }
+
+    private void FinishMatch(int missedMealsToday)
+    {
+        gameOver = true;
         feedingOpen = false;
-        summaryOpen = true;
-        gameOver = currentDay >= totalDays;
-        if (finishDayButton != null) finishDayButton.enabled = false;
-        if (continueButton != null) continueButton.interactable = !gameOver;
-        if (gameOver && continueButtonText != null) continueButtonText.text = "PARTIDA ENCERRADA";
-
-        if (gameOver)
+#if UNITY_EDITOR
+        if (previewFinalBalance is int finalBalance)
         {
-            GS2LeaderboardScore.RecordFinishedGame(resources.Coins);
-            feedback.ShowSummary(BuildFinalSummary());
-            if (merchant != null) merchant.HideShop();
-            actions.ReturnWorkersHome();
+            resultsView.Show(SertaoMatchResult.CreatePreview(finalBalance, missedMealsToday,
+                GameBalance.Current), null);
             return;
         }
-
-        var summary = new StringBuilder();
-        summary.AppendLine(gameOver ? "FIM DA PARTIDA" : "RESUMO DO DIA " + currentDay);
-        summary.AppendLine("Madeira obtida: +" + actions.WoodGainedToday);
-        summary.AppendLine("Comida obtida: +" + actions.FoodGainedToday);
-        summary.AppendLine("Peixes guardados: +" + actions.FishGainedToday);
-        summary.AppendLine("Colheita guardada: +" + actions.CropsStoredToday);
-        summary.AppendLine("Terrenos arados: " + actions.PlotsPlowedToday);
-        summary.AppendLine("Culturas colhidas: " + actions.CropsHarvestedToday);
-        summary.AppendLine("Alimentos distribuídos: " + (prepared + raw));
-        summary.AppendLine("Comida pronta: " + prepared + "  |  Outros: " + raw +
-            "  |  Sem comida: " + unfed + "  |  Ausentes: " + absent);
-        summary.Append("Dinheiro: " + resources.Coins);
-        feedback.ShowSummary(summary.ToString());
-        if (merchant != null) merchant.HideShop();
-        actions.ReturnWorkersHome();
-    }
-
-    private string BuildFinalSummary()
-    {
-        int houses = 0, cows = 0, chickens = 0;
-        if (houseSites != null)
-            foreach (HouseSite site in houseSites)
-                if (site != null && site.IsBuilt) houses++;
+#endif
+        int totalPlots = 0, developedPlots = 0;
+        var seenPlots = new HashSet<Plot>();
         if (plots != null)
             foreach (Plot plot in plots)
             {
-                if (plot == null) continue;
-                if (plot.Animal == AnimalKind.Cow) cows++;
-                else if (plot.Animal == AnimalKind.Chicken) chickens++;
+                if (plot == null || plot.IsWater || !seenPlots.Add(plot)) continue;
+                totalPlots++;
+                if (plot.IsPlowed || plot.IsFenced) developedPlots++;
             }
 
-        var summary = new StringBuilder();
-        summary.AppendLine("FIM DA PARTIDA — " + currentDay + " DIAS");
-        summary.AppendLine("Moedas finais: " + resources.Coins);
-        summary.AppendLine("Coleta: " + totalWoodGained + " madeira | " + totalFishGained + " peixes");
-        summary.AppendLine("Comida preparada: " + totalFoodGained);
-        summary.AppendLine("Terrenos arados: " + totalPlotsPlowed + " | Colheitas: " + totalCropsHarvested);
-        summary.AppendLine("Culturas colhidas: " + totalCropsStored);
-        summary.AppendLine("Casas: " + houses + " | Vacas: " + cows + " | Galinhas: " + chickens);
-        summary.AppendLine("Estoque: " + resources.Wood + " madeira | " + resources.Fish +
-            " peixe | " + resources.Food + " comida");
-        summary.AppendLine("Lavoura: " + resources.Corn + " milho | " + resources.Pumpkin +
-            " macaxeira | " + resources.Jerimum + " jerimum");
-        summary.Append("Animais: " + resources.Milk + " leite | " + resources.Eggs + " ovos");
-        return summary.ToString();
+        int totalHouses = 0, builtHouses = 0;
+        var seenHouses = new HashSet<HouseSite>();
+        if (houseSites != null)
+            foreach (HouseSite site in houseSites)
+            {
+                if (site == null || !seenHouses.Add(site)) continue;
+                totalHouses++;
+                if (site.IsBuilt) builtHouses++;
+            }
+
+        var result = new SertaoMatchResult(resources, missedMeals + missedMealsToday,
+            missionBoard != null ? missionBoard.DeliveredCount : 0,
+            missionBoard != null ? missionBoard.UndeliveredCount : 0,
+            developedPlots, totalPlots, builtHouses, totalHouses, GameBalance.Current);
+        resultsView.Show(result, () =>
+        {
+            resources.ApplyFinalBalance(result.FinalCoins);
+            if (result.Won) GS2LeaderboardScore.RecordFinishedGame((int)result.FinalCoins);
+        });
     }
 
     public void ContinueToNextDay()
     {
-        if (!summaryOpen || gameOver || actions.IsBusy ||
-            (feedback != null && feedback.IsSummaryTransitioning))
-            return;
-
-        if (feedback != null) feedback.HideSummary(BeginNextDay);
-        else BeginNextDay(null);
+        if (!feedingOpen || gameOver || lastClosedDay != currentDay || currentDay >= totalDays) return;
+        actions.ReturnWorkersHome();
+        BeginNextDay();
     }
 
-    private bool BeginNextDay(Color? previousBackdrop)
+    private void BeginNextDay()
     {
-        summaryOpen = false;
         currentDay++;
         ProduceAnimalResources();
-        if (dayEvents != null) dayEvents.StartDay(currentDay, previousBackdrop);
+        if (dayEvents != null) dayEvents.StartDay(currentDay);
         if (MandalaSynergy.Instance != null)
             MandalaSynergy.Instance.ApplyGrowthBonuses(currentDay, seedCatalog);
         if (dayEvents != null) dayEvents.ApplyPendingPestRegression(seedCatalog);
@@ -335,23 +387,23 @@ public sealed class DayCycle : MonoBehaviour
         if (finishDayButton != null) finishDayButton.enabled = true;
         UpdateDayLabel();
         OpenDayAfterEvent(true);
-        return dayEvents != null && dayEvents.IsPanelOpen;
     }
 
     private void OpenDayAfterEvent(bool addAnimalResources)
     {
         if (dayEvents != null && dayEvents.IsPanelOpen)
         {
-            if (hand != null) hand.SuspendEntranceForEvent();
-            dayEvents.AfterEventCardClosed(() =>
-            {
-                AudioManager.Play(SoundCue.DayStart);
-                DayChanged?.Invoke();
-                dayEvents.ReleasePendingReward();
-                if (addAnimalResources) AddDailyAnimalResources();
-            });
+            if (hand != null && !firstDayOpening) hand.SuspendEntranceForEvent();
+            dayEvents.AfterEventCardClosed(() => ActivateDay(addAnimalResources));
             return;
         }
+        ActivateDay(addAnimalResources);
+    }
+
+    private void ActivateDay(bool addAnimalResources)
+    {
+        firstDayOpening = false;
+        feedingOpen = false;
         AudioManager.Play(SoundCue.DayStart);
         DayChanged?.Invoke();
         dayEvents?.ReleasePendingReward();

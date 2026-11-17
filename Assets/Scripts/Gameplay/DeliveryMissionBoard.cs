@@ -47,6 +47,19 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
     private bool delivering;
     private int communityDeliveries;
     private int housesRewarded;
+    private int expiredAcceptedCount;
+    internal int DeliveredCount { get; private set; }
+
+    internal int UndeliveredCount
+    {
+        get
+        {
+            int undelivered = expiredAcceptedCount;
+            foreach (DeliveryMission mission in missions)
+                if (mission.accepted) undelivered++;
+            return undelivered;
+        }
+    }
 
     public bool HasDeliveryDueOn(int day)
     {
@@ -87,6 +100,7 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
                 if (!mission.accepted) refusedTemplates.Add(mission.template);
             missions.RemoveAll(m => !m.accepted);
             int expired = missions.RemoveAll(m => day > m.dueDay);
+            expiredAcceptedCount += expired;
             if (expired > 0 && feedback != null)
                 feedback.ShowMessage("Pedidos com prazo encerrado foram removidos.");
         }
@@ -170,6 +184,7 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
             }
 
             missions.RemoveAt(index);
+            DeliveredCount++;
             if (index < selectedIndex) selectedIndex--;
             selectedIndex = Mathf.Clamp(selectedIndex, 0, Mathf.Max(0, missions.Count - 1));
             resources.AddCoins(mission.coinReward);

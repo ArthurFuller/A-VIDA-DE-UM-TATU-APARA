@@ -74,6 +74,7 @@ public sealed class DayEventController : MonoBehaviour
 
     private readonly List<ActiveGeneral> activeGeneralEvents = new();
     private SertaoEventKind lastAnnounced;
+    private SertaoEventKind preparedEvent;
     private int forestExploitation;
     private int stolenFishToday;
     private int currentDay = 1;
@@ -173,8 +174,16 @@ public sealed class DayEventController : MonoBehaviour
             resourceHud.FlyFromRect(ResourceKind.Wood, wood, card.CardRect);
     }
 
-    public void StartDay(int day, Color? previousBackdrop = null)
+    public void StartDay(int day, Color? previousBackdrop = null) =>
+        StartDay(day, previousBackdrop, false);
+
+    internal void PrepareFirstDay(int day) => StartDay(day, null, true);
+
+    internal bool HasPreparedEvent => preparedEvent != SertaoEventKind.None && card != null;
+
+    private void StartDay(int day, Color? previousBackdrop, bool deferPresentation)
     {
+        preparedEvent = SertaoEventKind.None;
         currentDay = day;
         stolenFishToday = 0;
         pestRegressionPending = false;
@@ -278,17 +287,40 @@ public sealed class DayEventController : MonoBehaviour
         eventsByDay[day] = activeToday;
         lastAnnounced = announced;
         WeatherChanged?.Invoke();
-        if (announced != SertaoEventKind.None && card != null)
+        if (announced == SertaoEventKind.None || card == null) return;
+        if (deferPresentation)
         {
-            card.Show(Title(announced), Description(announced), Art(announced), previousBackdrop);
-            switch (announced)
-            {
-                case SertaoEventKind.Drought: AudioManager.Play(SoundCue.EventDrought); break;
-                case SertaoEventKind.Rain: AudioManager.Play(SoundCue.EventRain); break;
-                case SertaoEventKind.Pests: AudioManager.Play(SoundCue.EventPests); break;
-                case SertaoEventKind.Comadre: AudioManager.Play(SoundCue.EventComadre); break;
-                case SertaoEventKind.HeadOfCuia: AudioManager.Play(SoundCue.EventHeadOfCuia); break;
-            }
+            card.Prepare(Title(announced), Description(announced), Art(announced), previousBackdrop);
+            preparedEvent = announced;
+            return;
+        }
+        card.Show(Title(announced), Description(announced), Art(announced), previousBackdrop);
+        PlayEventSound(announced);
+    }
+
+    internal void RevealPreparedBackdrop()
+    {
+        if (HasPreparedEvent) card.RevealPreparedBackdrop();
+    }
+
+    internal void ShowPreparedEvent()
+    {
+        if (!HasPreparedEvent) return;
+        SertaoEventKind announced = preparedEvent;
+        preparedEvent = SertaoEventKind.None;
+        card.PlayPreparedEntrance(firstDay: true);
+        PlayEventSound(announced);
+    }
+
+    private static void PlayEventSound(SertaoEventKind announced)
+    {
+        switch (announced)
+        {
+            case SertaoEventKind.Drought: AudioManager.Play(SoundCue.EventDrought); break;
+            case SertaoEventKind.Rain: AudioManager.Play(SoundCue.EventRain); break;
+            case SertaoEventKind.Pests: AudioManager.Play(SoundCue.EventPests); break;
+            case SertaoEventKind.Comadre: AudioManager.Play(SoundCue.EventComadre); break;
+            case SertaoEventKind.HeadOfCuia: AudioManager.Play(SoundCue.EventHeadOfCuia); break;
         }
     }
 

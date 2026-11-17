@@ -73,3 +73,7 @@ Os sons abaixo foram recortados ou mixados a partir das gravações e dos arquiv
 | [rustling paper.wav — keweldog](https://freesound.org/people/keweldog/sounds/181774/) | Painel_papel.wav | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Recorte curto de uma folha sendo manuseada, filtro, fades e ajuste de nível |
 | [digging sand with hands.WAV — schneidi67](https://freesound.org/people/schneidi67/sounds/662864/) | Terra_cavar_1.wav, Terra_cavar_2.wav | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Dois movimentos de areia sendo cavada à mão. Recorte, filtro, fades e nível. |
 | [Flowing Sand — SteveMeli](https://freesound.org/people/SteveMeli/sounds/215006/) | Terra_graos.wav | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | Areia sendo despejada. Recorte, filtro, fades e nível. |
+
+## Produção animal
+
+- **Animal_producao_pop.wav** — [Mouth Pop Short](https://freesound.org/people/qubodup/sounds/792928/), por qubodup ([CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)). Ajuste de nível e fades curtos.

@@ -45,7 +45,7 @@ public sealed class DayCounterMotion : MonoBehaviour
         if (Time.timeScale == 0f) return;
         // The parent RectTransform includes large empty areas. Only the visible
         // artwork should activate the hover, not the entire HUD container.
-        bool over = hitArea != null && Mouse.current != null &&
+        bool over = !SertaoCoinToss.IsOpen && hitArea != null && Mouse.current != null &&
             RectTransformUtility.RectangleContainsScreenPoint(
                 hitArea, Mouse.current.position.ReadValue(), uiCamera);
         if (over && Mouse.current.leftButton.wasPressedThisFrame)

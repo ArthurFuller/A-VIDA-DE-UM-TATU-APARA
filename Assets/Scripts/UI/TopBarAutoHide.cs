@@ -32,8 +32,13 @@ public sealed class TopBarAutoHide : MonoBehaviour
     private bool timelineDayOpen;
     private bool closingAfterTimeline;
     private bool paused;
+    private bool coinTossOpen;
+    private bool MotionLocked => paused || coinTossOpen;
     private bool followingWorker;
     private float lastHoverTime;
+
+    // Paused transitions still have a temporary layout and should not be captured by the editor.
+    public bool IsMoving => motion != null && motion.IsActive() && !motion.IsComplete();
 
     private void Awake()
     {
@@ -81,7 +86,7 @@ public sealed class TopBarAutoHide : MonoBehaviour
 
     private void Update()
     {
-        if (paused || !dayActive) return;
+        if (MotionLocked || !dayActive) return;
         if (followingWorker && (resourceHud == null || !resourceHud.HasFlyingResources))
         {
             if (open) SetOpen(false, false);
@@ -155,7 +160,7 @@ public sealed class TopBarAutoHide : MonoBehaviour
     // The day counter is the only manual close target for the top bar.
     public void CloseFromDayCounter()
     {
-        if (paused || !dayActive || !open || closingAfterTimeline ||
+        if (MotionLocked || !dayActive || !open || closingAfterTimeline ||
             (resourceHud != null && resourceHud.HasFlyingResources) ||
             (hand != null && (hand.IsDraggingCard || hand.IsSelectionLocked))) return;
 
@@ -168,7 +173,7 @@ public sealed class TopBarAutoHide : MonoBehaviour
     // Returns the time remaining before the counter area is fully visible.
     public float PrepareResourceFeedback()
     {
-        if (paused || !dayActive || closingAfterTimeline || timelineDayOpen ||
+        if (MotionLocked || !dayActive || closingAfterTimeline || timelineDayOpen ||
             (timeline != null && timeline.IsOpen) ||
             (hand != null && (hand.IsSelectionLocked || hand.IsDraggingCard))) return 0f;
 
@@ -183,7 +188,19 @@ public sealed class TopBarAutoHide : MonoBehaviour
     {
         if (paused == value) return;
         paused = value;
-        if (paused) motion?.Pause();
+        UpdateMotionLock();
+    }
+
+    internal void SetCoinTossOpen(bool value)
+    {
+        if (coinTossOpen == value) return;
+        coinTossOpen = value;
+        UpdateMotionLock();
+    }
+
+    private void UpdateMotionLock()
+    {
+        if (MotionLocked) motion?.Pause();
         else
         {
             motion?.Play();
@@ -208,7 +225,7 @@ public sealed class TopBarAutoHide : MonoBehaviour
 
     public void PreviewCurrentPosition()
     {
-        if (!Application.isPlaying) return;
+        if (!Application.isPlaying || coinTossOpen) return;
         motion?.Complete();
         MoveBar(timelineDayOpen ? timelineDayPosition :
             open ? openPosition : closedPosition, true, null);
@@ -216,6 +233,11 @@ public sealed class TopBarAutoHide : MonoBehaviour
 
     public void MoveToTimelineDay(System.Action onComplete)
     {
+        if (coinTossOpen)
+        {
+            onComplete?.Invoke();
+            return;
+        }
         timelineDayOpen = true;
         open = true;
         lastHoverTime = Time.unscaledTime;
@@ -224,6 +246,11 @@ public sealed class TopBarAutoHide : MonoBehaviour
 
     public void ReturnFromTimelineDay(System.Action onComplete)
     {
+        if (coinTossOpen)
+        {
+            onComplete?.Invoke();
+            return;
+        }
         timelineDayOpen = false;
         lastHoverTime = Time.unscaledTime;
         MoveBar(openPosition, false, onComplete);
@@ -246,7 +273,7 @@ public sealed class TopBarAutoHide : MonoBehaviour
 
     private void SetOpen(bool show, bool immediate)
     {
-        if (paused) return;
+        if (MotionLocked) return;
         bool playWave = show && wavePendingForDay && !immediate;
         if (open == show && !immediate && !playWave) return;
         open = show;

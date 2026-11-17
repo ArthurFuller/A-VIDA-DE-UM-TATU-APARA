@@ -6,12 +6,15 @@ public static class GS2LeaderboardScore
     private const string HasScoreKey = "GS2.Leaderboard.HasLocalScore";
     private const string ScoreKey = "GS2.Leaderboard.LocalBestCoins";
 
-    public static bool HasLocalScore => PlayerPrefs.GetInt(HasScoreKey, 0) != 0;
+    public static bool HasLocalScore => PlayerPrefs.GetInt(HasScoreKey, 0) != 0 && LocalBestCoins > 0;
     public static int LocalBestCoins => PlayerPrefs.GetInt(ScoreKey);
 
     public static void RecordFinishedGame(int coins)
     {
-        if (HasLocalScore && coins <= LocalBestCoins) return;
+#if UNITY_EDITOR
+        if (SertaoPlayModeTests.UseTestResources) return;
+#endif
+        if (coins <= 0 || (HasLocalScore && coins <= LocalBestCoins)) return;
         PlayerPrefs.SetInt(ScoreKey, coins);
         PlayerPrefs.SetInt(HasScoreKey, 1);
         PlayerPrefs.Save();

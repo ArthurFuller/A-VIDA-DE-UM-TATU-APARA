@@ -1,5 +1,6 @@
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 // Navegação da cena de entrada; a transição preta permanece até a cena do jogo abrir.
@@ -10,6 +11,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
     [SerializeField] private GS2SceneFade sceneFade;
     [SerializeField] private RectTransform mainPage;
     [SerializeField] private RectTransform optionsPage;
+    [SerializeField] private GS2Profile.NicknamePage nicknamePage;
     [SerializeField] private RectTransform leaderboardPage;
     [SerializeField] private CanvasGroup mainGroup;
     [SerializeField] private CanvasGroup optionsGroup;
@@ -28,8 +30,13 @@ public sealed class GS2FrontEnd : MonoBehaviour
     private PageItems mainItems;
     private PageItems optionsItems;
     private bool locked;
+    private Image inputShield;
+    private EventSystem blockedEventSystem;
+    private bool previousNavigation;
     private enum Page { Main, Options, Leaderboard }
     private Page current;
+    private Page leaderboardBackPage = Page.Options;
+    private bool returnToRanking;
 
     internal sealed class PageItems
     {
@@ -41,7 +48,9 @@ public sealed class GS2FrontEnd : MonoBehaviour
     private void Awake()
     {
         Time.timeScale = 0f;
-        if (root != null) { root.alpha = 0f; root.interactable = false; root.blocksRaycasts = true; }
+        bool returningFromMatch = SertaoMatchResultsView.BindReturningMenu(this, out returnToRanking);
+        if (nicknamePage?.Root != null) nicknamePage.Root.SetActive(false);
+        if (root != null) { root.alpha = 0f; root.interactable = true; root.blocksRaycasts = true; }
         SetInitialPage(mainPage, mainGroup, true);
         SetInitialPage(optionsPage, optionsGroup, false);
         SetInitialPage(leaderboardPage, leaderboardGroup, false);
@@ -57,44 +66,149 @@ public sealed class GS2FrontEnd : MonoBehaviour
         if (leaderboardButton != null) leaderboardButton.onClick.AddListener(OpenLeaderboard);
         if (leaderboardBackButton != null) leaderboardBackButton.onClick.AddListener(Back);
         current = Page.Main;
-        locked = true;
-        if (!GS2Profile.HasNickname && root != null && optionsPage != null &&
+        SetLocked(true);
+        bool previewNickname = false;
+#if UNITY_EDITOR
+        previewNickname = SertaoPlayModeTests.TakeNicknamePreview();
+#endif
+        if ((previewNickname || !GS2Profile.HasNickname) && root != null && optionsPage != null &&
             optionsPage.TryGetComponent(out GS2Profile profile) &&
-            profile.ShowFirstRun(root.transform, CompleteFirstRun))
+            profile.ShowFirstRun(nicknamePage, root.transform, CompleteFirstRun, previewNickname))
         {
             SetInitialPage(mainPage, mainGroup, false);
-            motion = DOTween.Sequence().SetUpdate(true)
-                .Append(root.DOFade(1f, fadeSeconds))
-                .OnComplete(() => root.interactable = true);
+            SetLocked(true);
+            if (!returningFromMatch)
+                motion = DOTween.Sequence().SetUpdate(true)
+                    .Append(root.DOFade(1f, fadeSeconds))
+                    .OnComplete(() => SetLocked(false));
             return;
         }
-        AnimateMainEntrance();
+        SetInitialDestination();
+        if (!returningFromMatch) AnimateMainEntrance();
     }
 
-    private void CompleteFirstRun()
+    private void Start()
     {
-        SetInitialPage(mainPage, mainGroup, true);
-        AnimateMainEntrance();
+        if (locked) BlockNavigation();
+    }
+
+    private void SetLocked(bool value)
+    {
+        locked = value;
+        if (value)
+        {
+            if (inputShield == null && root != null)
+            {
+                var shield = new GameObject("Bloqueio de entrada", typeof(RectTransform), typeof(Image));
+                inputShield = shield.GetComponent<Image>();
+                RectTransform rect = inputShield.rectTransform;
+                rect.SetParent(root.transform, false);
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = rect.offsetMax = Vector2.zero;
+                inputShield.color = Color.clear;
+                inputShield.canvasRenderer.cullTransparentMesh = false;
+                inputShield.raycastTarget = true;
+            }
+
+            if (inputShield != null)
+            {
+                inputShield.transform.SetAsLastSibling();
+                inputShield.gameObject.SetActive(true);
+            }
+            BlockNavigation();
+        }
+        else
+        {
+            if (inputShield != null) inputShield.gameObject.SetActive(false);
+            RestoreNavigation();
+        }
+    }
+
+    private void BlockNavigation()
+    {
+        EventSystem system = EventSystem.current;
+        if (system == null || system == blockedEventSystem) return;
+        RestoreNavigation();
+        blockedEventSystem = system;
+        previousNavigation = system.sendNavigationEvents;
+        system.sendNavigationEvents = false;
+        system.SetSelectedGameObject(null);
+    }
+
+    private void RestoreNavigation()
+    {
+        if (blockedEventSystem != null)
+            blockedEventSystem.sendNavigationEvents = previousNavigation;
+        blockedEventSystem = null;
+    }
+
+#if UNITY_EDITOR
+    internal GameObject EditableNicknamePage()
+    {
+        if (nicknamePage?.Root != null) return nicknamePage.Root;
+        if (root == null || optionsPage == null ||
+            !optionsPage.TryGetComponent(out GS2Profile profile))
+            return null;
+        UnityEditor.Undo.RecordObject(this, "Criar tela de nickname");
+        nicknamePage = profile.CreateFirstRunPage(root.transform);
+        if (nicknamePage != null)
+            UnityEditor.Undo.RegisterCreatedObjectUndo(nicknamePage.Root, "Criar tela de nickname");
+        return nicknamePage?.Root;
+    }
+#endif
+
+    private void CompleteFirstRun(System.Action hideNickname)
+    {
+        SetLocked(true);
+        void ShowMenu()
+        {
+            hideNickname();
+            SetInitialDestination();
+        }
+
+        if (sceneFade != null)
+            sceneFade.TransitionFromNickname(ShowMenu, () => SetLocked(false));
+        else
+        {
+            ShowMenu();
+            AnimateMainEntrance();
+        }
+    }
+
+    private void SetInitialDestination()
+    {
+        bool showRanking = returnToRanking && leaderboardPage != null && leaderboardGroup != null;
+        returnToRanking = false;
+        current = showRanking ? Page.Leaderboard : Page.Main;
+        if (showRanking) leaderboardBackPage = Page.Main;
+        SetInitialPage(mainPage, mainGroup, !showRanking);
+        SetInitialPage(leaderboardPage, leaderboardGroup, showRanking);
     }
 
     private void AnimateMainEntrance()
     {
-        locked = true;
-        if (mainPage != null) mainPage.localScale = Vector3.one * enteringScale;
+        SetLocked(true);
         motion = DOTween.Sequence().SetUpdate(true);
-        if (root != null) motion.Join(root.DOFade(1f, fadeSeconds));
-        if (mainPage != null)
-            motion.Join(mainPage.DOScale(1f, fadeSeconds).SetEase(Ease.OutCubic));
-        motion.OnComplete(() =>
-        {
-            if (root != null) root.interactable = true;
-            locked = false;
-        });
+        AddEntranceTweens(motion);
+        motion.OnComplete(() => SetLocked(false));
     }
+
+    internal void AddEntranceTweens(Sequence sequence)
+    {
+        RectTransform page = PageRect(current);
+        if (page != null) page.localScale = Vector3.one * enteringScale;
+        if (root != null) sequence.Insert(0f, root.DOFade(1f, fadeSeconds));
+        if (page != null)
+            sequence.Insert(0f, page.DOScale(1f, fadeSeconds).SetEase(Ease.OutCubic));
+    }
+
+    internal void CompleteMatchReturn() => SetLocked(false);
 
     private void OnDestroy()
     {
         motion?.Kill();
+        RestoreNavigation();
         if (playButton != null) playButton.onClick.RemoveListener(Play);
         if (optionsButton != null) optionsButton.onClick.RemoveListener(OpenOptions);
         if (exitButton != null) exitButton.onClick.RemoveListener(Exit);
@@ -108,16 +222,20 @@ public sealed class GS2FrontEnd : MonoBehaviour
     {
         if (locked || root == null || sceneFade == null ||
             !Application.CanStreamedLevelBeLoaded("PrototypeLayout")) return;
-        locked = true;
-        root.interactable = false;
-        root.blocksRaycasts = false;
+        SetLocked(true);
         motion?.Kill();
         sceneFade.EnterGameplay("PrototypeLayout");
     }
 
     public void OpenOptions() => SwitchTo(Page.Options);
-    public void OpenLeaderboard() => SwitchTo(Page.Leaderboard);
-    public void Back() => SwitchTo(current == Page.Leaderboard ? Page.Options : Page.Main);
+    public void OpenLeaderboard()
+    {
+        if (locked || current == Page.Leaderboard) return;
+        leaderboardBackPage = current;
+        SwitchTo(Page.Leaderboard);
+    }
+
+    public void Back() => SwitchTo(current == Page.Leaderboard ? leaderboardBackPage : Page.Main);
 
     private void SwitchTo(Page destination)
     {
@@ -128,7 +246,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
         CanvasGroup toGroup = PageGroup(destination);
         if (from == null || to == null || fromGroup == null || toGroup == null) return;
         AudioManager.Play(SoundCue.UiPaper);
-        locked = true;
+        SetLocked(true);
         Canvas.ForceUpdateCanvases();
         float distance = SlideDistance(from, to);
         bool back = destination == Page.Main ||
@@ -139,8 +257,9 @@ public sealed class GS2FrontEnd : MonoBehaviour
         to.anchoredPosition = wave ? Vector2.zero : new Vector2(entryX, 0f);
         to.localScale = wave ? Vector3.one : Vector3.one * enteringScale;
         toGroup.alpha = wave ? 1f : 0f;
-        toGroup.interactable = toGroup.blocksRaycasts = false;
-        fromGroup.interactable = fromGroup.blocksRaycasts = false;
+        toGroup.interactable = true;
+        toGroup.blocksRaycasts = false;
+        fromGroup.blocksRaycasts = false;
         motion?.Kill();
         motion = DOTween.Sequence().SetUpdate(true);
         motion.Join(from.DOAnchorPosX(-entryX, slideSeconds).SetEase(Ease.InOutCubic));
@@ -155,9 +274,9 @@ public sealed class GS2FrontEnd : MonoBehaviour
         motion.OnComplete(() =>
             {
                 from.gameObject.SetActive(false);
-                toGroup.interactable = toGroup.blocksRaycasts = true;
+                toGroup.blocksRaycasts = true;
                 current = destination;
-                locked = false;
+                SetLocked(false);
             });
     }
 
@@ -175,7 +294,8 @@ public sealed class GS2FrontEnd : MonoBehaviour
         if (group != null)
         {
             group.alpha = 1f;
-            group.interactable = group.blocksRaycasts = active;
+            group.interactable = true;
+            group.blocksRaycasts = active;
         }
         page.gameObject.SetActive(active);
     }
@@ -225,9 +345,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
     public void Exit()
     {
         if (locked || root == null || blackFade == null) return;
-        locked = true;
-        root.interactable = false;
-        root.blocksRaycasts = false;
+        SetLocked(true);
         motion?.Kill();
         blackFade.blocksRaycasts = true;
         blackFade.DOKill();
@@ -244,8 +362,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
                 blackFade.DOFade(0f, fadeSeconds).SetUpdate(true).OnComplete(() =>
                 {
                     blackFade.blocksRaycasts = false;
-                    root.interactable = root.blocksRaycasts = true;
-                    locked = false;
+                    SetLocked(false);
                 });
 #else
                 Application.Quit();

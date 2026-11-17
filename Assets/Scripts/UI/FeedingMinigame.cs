@@ -34,6 +34,9 @@ public sealed class FeedingMinigame : MonoBehaviour
     [SerializeField] private Sprite milkSprite;
     [SerializeField] private Sprite eggSprite;
     [SerializeField] private Button finishButton;
+    private bool lastDay;
+    private string normalFinishText;
+    private int normalFinishFontSize;
     [SerializeField] private Button backButton;
     [SerializeField, Min(0f)] private float entranceDuration = 0.45f;
     [SerializeField, Min(0f)] private float foodWaveDelay = 0.07f;
@@ -101,7 +104,7 @@ public sealed class FeedingMinigame : MonoBehaviour
     }
 
     public void Begin(WorkerAssignment[] dayWorkers, Action<SaleItem?[]> onCompleted,
-        Action onCancelled = null)
+        Action onCancelled = null, bool finalDay = false)
     {
         AudioManager.Play(SoundCue.UiPaper);
         // Activate the parent first so Awake initializes the panel and its buttons.
@@ -109,6 +112,17 @@ public sealed class FeedingMinigame : MonoBehaviour
         transition?.Kill();
         if (panel != null) panel.gameObject.SetActive(true);
         workers = dayWorkers;
+        lastDay = finalDay;
+        if (finishButton != null && finishButton.GetComponentInChildren<Text>(true) is Text finishLabel)
+        {
+            if (normalFinishText == null)
+            {
+                normalFinishText = finishLabel.text;
+                normalFinishFontSize = finishLabel.fontSize;
+            }
+            finishLabel.text = lastDay ? "Finalizar partida" : normalFinishText;
+            finishLabel.fontSize = lastDay ? Mathf.Min(24, normalFinishFontSize) : normalFinishFontSize;
+        }
         // Os dois cards atuais já têm tamanho e posição definidos na cena.
         // O arranjo automático só é necessário para slots adicionais.
         if (workers.Length > workerTargets.Length)
@@ -160,9 +174,7 @@ public sealed class FeedingMinigame : MonoBehaviour
             .Append(panel.DOAnchorPos(panelHome, transitionDuration).SetEase(Ease.InOutSine));
         AnimateWorkers();
         Refresh(true, transitionDuration);
-        int visibleFoods = 0;
-        foreach (SaleItem kind in FoodKinds)
-            if (Stock(kind) > 0) visibleFoods++;
+        int visibleFoods = Mathf.Min(FoodKinds.Length, foodIcons.Length);
         float waveEnd = transitionDuration + Mathf.Max(
             entranceDuration + Mathf.Max(0, visibleFoods - 1) * foodWaveDelay,
             workerEntranceDuration + Mathf.Max(0, workers.Length - 1) * workerWaveDelay);
@@ -345,6 +357,9 @@ public sealed class FeedingMinigame : MonoBehaviour
     }
 #endif
 
+    internal bool IsEmptyFood(FeedingFoodIcon icon) =>
+        open && !transitioning && Stock(icon.Kind) <= 0;
+
     public bool Reserve(FeedingFoodIcon icon)
     {
         if (!open || transitioning || reservedIcon != null || Stock(icon.Kind) == 0) return false;
@@ -424,15 +439,13 @@ public sealed class FeedingMinigame : MonoBehaviour
     {
         if (foodCount != null) foodCount.text = "Escolha um alimento para cada trabalhador";
         RefreshLabels();
-        int visibleCount = 0;
-        for (int i = 0; i < FoodKinds.Length; i++)
-            if (Stock(FoodKinds[i]) > 0) visibleCount++;
+        int visibleCount = Mathf.Min(FoodKinds.Length, foodIcons.Length);
         int visibleIndex = 0;
         for (int i = 0; i < foodIcons.Length; i++)
         {
             FeedingFoodIcon icon = foodIcons[i];
             if (icon == null) continue;
-            bool visible = i < FoodKinds.Length && Stock(FoodKinds[i]) > 0;
+            bool visible = i < FoodKinds.Length;
             icon.gameObject.SetActive(visible);
             if (!visible) continue;
             SaleItem kind = FoodKinds[i];
@@ -466,6 +479,7 @@ public sealed class FeedingMinigame : MonoBehaviour
             WorkerAssignment worker = workers[i];
             workerLabels[i].text = worker == null ? "" : worker.DisplayName + "\n" +
                 (worker.IsUnavailableToday ? "ausente" : !chosenFood[i].HasValue ? "sem alimento" :
+                 lastDay ? "alimentado" :
                  chosenFood[i].Value == SaleItem.Food ? "Pronta: 2 ações amanhã" :
                  chosenFood[i].Value == SaleItem.Fish ? "Peixe: 1 ação amanhã" :
                  chosenFood[i].Value == SaleItem.Corn ? "Milho: 1 ação amanhã" :

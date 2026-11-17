@@ -386,3 +386,8 @@ MonoBehaviour:
     - {fileID: 8300000, guid: 8b2b769369aa59759c6ebc575318e5c3, type: 3}
     volume: 0.56
     minInterval: 0.28
+  - cue: 72
+    clips:
+    - {fileID: 8300000, guid: a46c808abbcf57d09ae63b13502b8a5b, type: 3}
+    volume: 0.43
+    minInterval: 0

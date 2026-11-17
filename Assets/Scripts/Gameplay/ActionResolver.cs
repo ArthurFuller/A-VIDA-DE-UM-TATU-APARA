@@ -549,6 +549,7 @@ public sealed class ActionResolver : MonoBehaviour
             int gained = woodReward + rating + (activity == ActivityKind.WoodPlus ? 1 : 0);
             gained = Mathf.Max(0, gained - worker.ProductionReduction);
             resources.AddWood(gained);
+            resources.RecordProduction(SaleItem.Wood, gained);
             if (resourceHud != null && drops != null && drops.Icons.Count > 0)
                 resourceHud.FlyDrops(drops, onResourcesCollected);
             else if (resourceHud != null) resourceHud.FlyFromWorld(ResourceKind.Wood,
@@ -563,6 +564,7 @@ public sealed class ActionResolver : MonoBehaviour
             int gained = activity == ActivityKind.FishPlus ?
                 2 + (rating > 0 ? 2 : 0) : 1 + (rating > 0 ? 1 : 0);
             resources.AddFish(gained);
+            resources.RecordProduction(SaleItem.Fish, gained);
             if (resourceHud != null && drops != null && drops.Icons.Count > 0)
                 resourceHud.FlyDrops(drops, onResourcesCollected);
             else if (resourceHud != null) resourceHud.FlyFromWorld(ResourceKind.Fish,
@@ -838,6 +840,9 @@ public sealed class ActionResolver : MonoBehaviour
                 CropSettings settings = seedCatalog.Get(crop);
                 int gained = Mathf.Max(0, harvestYield - worker.ProductionReduction - pestLoss);
                 resources.AddCrop(crop, gained);
+                SaleItem harvestedCrop = crop == CropType.Corn ? SaleItem.Corn :
+                    crop == CropType.Pumpkin ? SaleItem.Pumpkin : SaleItem.Jerimum;
+                resources.RecordProduction(harvestedCrop, gained);
                 if (resourceHud != null)
                 {
                     ResourceKind kind = crop == CropType.Corn ? ResourceKind.Corn :
@@ -876,6 +881,7 @@ public sealed class ActionResolver : MonoBehaviour
         WorkAtStation(worker, foodPreparationDuration, () =>
         {
             resources.AddFood(preparedFood);
+            resources.RecordProduction(SaleItem.Food, preparedFood);
             AudioManager.Play(SoundCue.FoodPrepared);
             if (resourceHud != null) resourceHud.FlyFromWorld(ResourceKind.Food,
                 preparedFood, worker.transform.position + Vector3.up);
@@ -1091,7 +1097,8 @@ public sealed class ActionResolver : MonoBehaviour
         {
             ActivityKind.BuildFence or ActivityKind.BuildHouse => SoundCue.HammerWork,
             ActivityKind.Plow => SoundCue.PlowWork,
-            ActivityKind.PlantCorn or ActivityKind.PlantPumpkin or ActivityKind.PlantJerimum => SoundCue.SoilWork,
+            ActivityKind.PlantCorn or ActivityKind.PlantPumpkin or ActivityKind.PlantJerimum or
+            ActivityKind.PlaceCow or ActivityKind.PlaceChicken => SoundCue.SoilWork,
             _ => null
         };
         float nextStrike = 0.16f;

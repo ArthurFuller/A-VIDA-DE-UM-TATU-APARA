@@ -267,7 +267,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
                 if (card == null || IsSeed(card.Kind) || card.Kind == ActivityKind.PrepareFood ||
                     card.Kind == ActivityKind.BuySeeds ||
                     card.Kind == ActivityKind.BuildHouse || card.Kind == ActivityKind.BuildFence) continue;
-                SetVisible(card, true);
+                SetVisible(card, !entranceSuspended);
                 shown.Add(card);
                 deckOrder.Add(card);
             }
@@ -397,8 +397,8 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
 
     public void SuspendEntranceForEvent()
     {
-        if (!initialized) Refresh();
         entranceSuspended = true;
+        if (!initialized) Refresh();
         ClearHover(true);
         foreach (ActivityCardDrag card in shown)
             if (card != null) SetVisible(card, false);

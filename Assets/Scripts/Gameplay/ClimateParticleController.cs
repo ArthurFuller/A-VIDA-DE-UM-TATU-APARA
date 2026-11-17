@@ -22,7 +22,7 @@ public sealed class ClimateParticleController : MonoBehaviour
     [SerializeField] private GameObject tumbleweedPrefab;
     [SerializeField, Min(0.1f), Tooltip("Diâmetro da bola em unidades da cena.")] private float tumbleweedDiameter = 0.85f;
     [SerializeField, Min(0.1f), Tooltip("Unidades da cena percorridas por segundo.")] private float tumbleweedMoveSpeed = 3.5f;
-    [SerializeField, Min(0f), Tooltip("Graus de rotação por segundo.")] private float tumbleweedRotationSpeed = 360f;
+    [SerializeField, Range(0.1f, 1f)] private float tumbleweedSpeedMultiplier = 0.58f;
     [SerializeField, Min(1f)] private float tumbleweedIntervalMin = 18f;
     [SerializeField, Min(1f)] private float tumbleweedIntervalMax = 32f;
     [SerializeField, Tooltip("Cada caminho tem um ponto inicial e um final em coordenadas da cena.")] private TumbleweedRoute[] tumbleweedRoutes;
@@ -33,7 +33,9 @@ public sealed class ClimateParticleController : MonoBehaviour
     private UniversalAdditionalCameraData cameraData;
     private CameraOverrideOption previousColorOption;
     private GameObject tumbleweed;
-    private Tween tumbleweedTravel;
+    private Transform tumbleweedShadow;
+    private Sprite tumbleweedShadowSprite;
+    private Sequence tumbleweedTravel;
     private float nextTumbleweedTime;
 
     private void Awake()
@@ -88,6 +90,11 @@ public sealed class ClimateParticleController : MonoBehaviour
         if (cameraData != null) cameraData.requiresColorOption = previousColorOption;
     }
 
+    private void OnDestroy()
+    {
+        if (tumbleweedShadowSprite != null) Destroy(tumbleweedShadowSprite);
+    }
+
     private void Refresh()
     {
         bool nextRain = events != null && events.IsRaining;
@@ -140,7 +147,9 @@ public sealed class ClimateParticleController : MonoBehaviour
         if (route == null) return;
         Vector3 start = route.start;
         Vector3 end = route.end;
-        if ((end - start).sqrMagnitude < 0.01f) return;
+        Vector3 travel = end - start;
+        Vector3 horizontalTravel = Vector3.ProjectOnPlane(travel, Vector3.up);
+        if (horizontalTravel.sqrMagnitude < 0.01f) return;
 
         tumbleweed = Instantiate(tumbleweedPrefab, start, Quaternion.identity);
         tumbleweed.name = "Bola do deserto - seca";
@@ -153,22 +162,53 @@ public sealed class ClimateParticleController : MonoBehaviour
             Mathf.Max(0.01f, bounds.size.x, bounds.size.y, bounds.size.z);
         bounds = renderers[0].bounds;
         for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
-        float groundOffset = start.y - bounds.min.y;
-        tumbleweed.transform.position += Vector3.up * groundOffset;
-        end.y += groundOffset;
         foreach (Collider collider in tumbleweed.GetComponentsInChildren<Collider>())
             collider.enabled = false;
 
-        Vector3 rollAxis = Vector3.Cross(Vector3.up, end - tumbleweed.transform.position).normalized;
-        float travelSeconds = Vector3.Distance(tumbleweed.transform.position, end) /
-            Mathf.Max(0.1f, tumbleweedMoveSpeed);
-        Quaternion initialRotation = tumbleweed.transform.rotation;
+        Transform ball = tumbleweed.transform;
+        Vector3 pivotToCenter = bounds.center - ball.position;
+        Vector3 centerStart = bounds.center + Vector3.up * (start.y - bounds.min.y);
+        Quaternion initialRotation = ball.rotation;
+        ball.position = centerStart - pivotToCenter;
+        Vector3 rollAxis = Vector3.Cross(Vector3.up, horizontalTravel).normalized;
+        float radius = Mathf.Max(0.05f, bounds.extents.y);
+        float totalRoll = horizontalTravel.magnitude / radius * Mathf.Rad2Deg;
+        float travelSeconds = travel.magnitude / Mathf.Max(0.1f, tumbleweedMoveSpeed * tumbleweedSpeedMultiplier);
+        Vector3 shadowOffset = Vector3.ProjectOnPlane(bounds.center - start, Vector3.up) + Vector3.up * 0.035f;
+        tumbleweedShadow = CreateTumbleweedShadow(route.start + shadowOffset);
         tumbleweedTravel = DOTween.Sequence().SetTarget(this)
-            .Join(tumbleweed.transform.DOMove(end, travelSeconds).SetEase(Ease.Linear))
-            .Join(DOTween.To(() => 0f,
-                angle => tumbleweed.transform.rotation = Quaternion.AngleAxis(angle, rollAxis) * initialRotation,
-                tumbleweedRotationSpeed * travelSeconds, travelSeconds).SetEase(Ease.Linear))
-            .OnComplete(RemoveTumbleweed);
+            .Append(DOVirtual.Float(0f, 1f, travelSeconds, progress =>
+            {
+                Quaternion roll = Quaternion.AngleAxis(totalRoll * progress, rollAxis);
+                Vector3 center = centerStart + travel * progress;
+                ball.SetPositionAndRotation(center - roll * pivotToCenter, roll * initialRotation);
+            }).SetEase(Ease.Linear));
+        if (tumbleweedShadow != null)
+            tumbleweedTravel.Join(tumbleweedShadow.DOMove(route.end + shadowOffset, travelSeconds)
+                .SetEase(Ease.Linear));
+        tumbleweedTravel.OnComplete(RemoveTumbleweed);
+    }
+
+    private Transform CreateTumbleweedShadow(Vector3 position)
+    {
+        Material material = Resources.Load<Material>("GS2_SombraBolaDeserto");
+        if (material == null) return null;
+        if (tumbleweedShadowSprite == null)
+        {
+            Texture2D white = Texture2D.whiteTexture;
+            tumbleweedShadowSprite = Sprite.Create(white, new Rect(0, 0, white.width, white.height),
+                new Vector2(0.5f, 0.5f), white.width, 0, SpriteMeshType.FullRect);
+        }
+        var shadow = new GameObject("Sombra da bola do deserto", typeof(SpriteRenderer));
+        shadow.layer = tumbleweed.layer;
+        Transform shadowTransform = shadow.transform;
+        shadowTransform.SetParent(transform, false);
+        shadowTransform.SetPositionAndRotation(position, Quaternion.Euler(90f, 0f, 0f));
+        shadowTransform.localScale = new Vector3(1.22f, 0.88f, 1f) * tumbleweedDiameter;
+        SpriteRenderer renderer = shadow.GetComponent<SpriteRenderer>();
+        renderer.sharedMaterial = material;
+        renderer.sprite = tumbleweedShadowSprite;
+        return shadowTransform;
     }
 
     private void RemoveTumbleweed()
@@ -177,5 +217,7 @@ public sealed class ClimateParticleController : MonoBehaviour
         tumbleweedTravel = null;
         if (tumbleweed != null) Destroy(tumbleweed);
         tumbleweed = null;
+        if (tumbleweedShadow != null) Destroy(tumbleweedShadow.gameObject);
+        tumbleweedShadow = null;
     }
 }

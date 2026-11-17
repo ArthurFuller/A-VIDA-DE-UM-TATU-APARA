@@ -14,6 +14,7 @@ public sealed class EventCardView : MonoBehaviour
     [SerializeField] private Button skipButton;
     [Header("Animação configurável")]
     [SerializeField, Min(0)] private float entranceDuration = 0.6f;
+    [SerializeField, Min(1f)] private float firstDayEntranceMultiplier = 1.30f;
     [SerializeField, Min(0)] private float flipDuration = 0.35f;
     [SerializeField, Min(0)] private float textDuration = 1.2f;
     [SerializeField] private float entranceOffset = -650f;
@@ -35,6 +36,8 @@ public sealed class EventCardView : MonoBehaviour
     private bool originalPreserveAspect;
     private string pendingDescription;
     private bool flipped;
+    private bool prepared;
+    private bool animateBackdropColor;
     private Sequence revealMotion;
     public bool IsOpen { get; private set; }
     public RectTransform CardRect => card;
@@ -95,10 +98,18 @@ public sealed class EventCardView : MonoBehaviour
     public void Show(string title, string description, Sprite art = null,
         Color? previousBackdrop = null)
     {
+        Prepare(title, description, art, previousBackdrop);
+        PlayPreparedEntrance();
+    }
+
+    internal void Prepare(string title, string description, Sprite art, Color? previousBackdrop)
+    {
         if (card == null || backdrop == null) return;
         // The overlay can start inactive in the scene. Run Awake before setting up the card.
         if (!backdrop.gameObject.activeSelf) backdrop.gameObject.SetActive(true);
-        IsOpen = true;
+        IsOpen = false;
+        backdrop.alpha = 0f;
+        backdrop.blocksRaycasts = false;
         pendingDescription = description;
         flipped = false;
         revealMotion?.Kill();
@@ -137,22 +148,45 @@ public sealed class EventCardView : MonoBehaviour
         }
         if (descriptionRect != null)
             descriptionRect.anchoredPosition = descriptionHomePosition + Vector2.left * descriptionSlideOffset;
-        backdrop.gameObject.SetActive(true);
-        AudioManager.Play(SoundCue.UiPaper);
-        backdrop.transform.SetAsLastSibling();
-        backdrop.alpha = 1f;
-        backdrop.blocksRaycasts = true;
-        card.anchoredPosition = homePosition + Vector2.up * entranceOffset;
+        card.anchoredPosition = homePosition + Vector2.down * Mathf.Abs(entranceOffset);
         card.localScale = Vector3.one;
         card.localRotation = Quaternion.identity;
+        animateBackdropColor = previousBackdrop.HasValue;
         if (backdropImage != null)
         {
             backdropImage.DOKill();
             backdropImage.color = previousBackdrop ?? backdropColor;
-            if (previousBackdrop.HasValue)
-                backdropImage.DOColor(backdropColor, entranceDuration).SetEase(Ease.OutCubic);
         }
-        card.DOAnchorPos(homePosition, entranceDuration).SetEase(Ease.OutCubic)
+        backdrop.gameObject.SetActive(true);
+        backdrop.transform.SetAsLastSibling();
+        prepared = true;
+    }
+
+    internal void RevealPreparedBackdrop()
+    {
+        if (!prepared) return;
+        if (card.parent is RectTransform cardArea)
+        {
+            float belowScreen = (cardArea.rect.height + card.rect.height) * 0.5f + 12f;
+            card.anchoredPosition = homePosition + Vector2.down *
+                Mathf.Max(Mathf.Abs(entranceOffset), belowScreen);
+        }
+        backdrop.alpha = 1f;
+    }
+
+    internal void PlayPreparedEntrance(bool firstDay = false)
+    {
+        if (!prepared) return;
+        if (firstDay) RevealPreparedBackdrop();
+        prepared = false;
+        IsOpen = true;
+        AudioManager.Play(SoundCue.UiPaper);
+        backdrop.alpha = 1f;
+        backdrop.blocksRaycasts = true;
+        float duration = firstDay ? entranceDuration * firstDayEntranceMultiplier : entranceDuration;
+        if (backdropImage != null && animateBackdropColor)
+            backdropImage.DOColor(backdropColor, duration).SetEase(Ease.OutCubic);
+        card.DOAnchorPos(homePosition, duration).SetEase(Ease.OutCubic)
             .OnComplete(() => card.DORotate(new Vector3(0, 0, swingDegrees), 0.12f)
                 .SetLoops(2, LoopType.Yoyo).OnComplete(() => card.localRotation = Quaternion.identity));
     }
@@ -207,6 +241,7 @@ public sealed class EventCardView : MonoBehaviour
 
     private void HideImmediate()
     {
+        prepared = false;
         if (descriptionGroup != null)
         {
             descriptionGroup.alpha = 0;

@@ -52,6 +52,12 @@ public sealed class GameBalance : ScriptableObject
     [Range(0, 3)] public int returningOffersPerMarket = 1;
     public bool dailyMissionOffers = true;
 
+    [Header("Resultado da partida")]
+    [Min(0)] public int missedMealPenalty = 2;
+    [Min(0)] public int undeliveredOrderPenalty = 3;
+    [Min(0)] public int undevelopedPlotPenalty = 5;
+    [Min(0)] public int unbuiltHousePenalty = 7;
+
     [Header("Eventos")]
     [Range(0f, 1f)] public float generalEventChance = 0.35f, comadreChance = 0.5f;
     [Min(1)] public int droughtDurationDays = 2, pestDurationDays = 2, rainDurationDays = 1;

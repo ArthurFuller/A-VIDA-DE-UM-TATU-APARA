@@ -31,9 +31,33 @@ public sealed class ResourceBank : MonoBehaviour
     public int Milk { get; private set; }
     public int Eggs { get; private set; }
     public event Action Changed;
+    private readonly long[] production = new long[(int)SaleItem.Eggs + 1];
+    internal long CoinsEarned { get; private set; }
+
+    internal void RecordProduction(SaleItem item, int amount)
+    {
+        production[(int)item] += Math.Max(0, amount);
+    }
+
+    internal long[] CopyProduction() => (long[])production.Clone();
+
+    internal void ApplyFinalBalance(long balance)
+    {
+        Coins = (int)Math.Max(int.MinValue, Math.Min(int.MaxValue, balance));
+        Changed?.Invoke();
+    }
 
     private void Awake()
     {
+#if UNITY_EDITOR
+        if (SertaoPlayModeTests.UseTestResources)
+        {
+            const int testStock = 99;
+            Wood = Food = Coins = Fish = Corn = Pumpkin = Jerimum = testStock;
+            Milk = Eggs = CornSeeds = PumpkinSeeds = JerimumSeeds = testStock;
+            return;
+        }
+#endif
         GameBalance balance = GameBalance.Current;
         if (balance != null)
         {
@@ -196,6 +220,7 @@ public sealed class ResourceBank : MonoBehaviour
         Milk -= quantities[(int)SaleItem.Milk];
         Eggs -= quantities[(int)SaleItem.Eggs];
         Coins = (int)((long)Coins + total);
+        CoinsEarned += total;
         Changed?.Invoke();
         return true;
     }
@@ -232,7 +257,9 @@ public sealed class ResourceBank : MonoBehaviour
     public void AddCoins(int amount)
     {
         int gain = Mathf.Max(0, amount);
+        int before = Coins;
         Coins = (int)System.Math.Min(int.MaxValue, (long)Coins + gain);
+        CoinsEarned += (long)Coins - before;
         Changed?.Invoke();
     }
 

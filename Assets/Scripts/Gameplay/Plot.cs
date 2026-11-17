@@ -8,6 +8,9 @@ public enum AnimalKind { None, Cow, Chicken }
 
 public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
+    // Na grade de PrototypeLayout, a areia desce até cerca de 0,084 m abaixo da origem dos slots.
+    private const float FenceFootOffset = -0.09f;
+
     [SerializeField] private ActionResolver actionResolver;
     [Tooltip("Pontos opcionais do trajeto, na ordem da ida. A volta usa a ordem inversa.")]
     [SerializeField] private Transform[] workWaypoints;
@@ -141,11 +144,17 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         {
             fenceBasePositions = new Vector3[fenceParts.Length];
             fenceBaseScales = new Vector3[fenceParts.Length];
+            Vector3 fenceGround = transform.position + Vector3.up * FenceFootOffset;
             for (int i = 0; i < fenceParts.Length; i++)
             {
                 if (fenceParts[i] == null) continue;
-                fenceBasePositions[i] = fenceParts[i].transform.localPosition;
-                fenceBaseScales[i] = fenceParts[i].transform.localScale;
+                Transform piece = fenceParts[i].transform;
+                Vector3 position = piece.localPosition;
+                // As peças têm pivô central; o pé fica ligeiramente dentro da areia.
+                position.y = piece.parent.InverseTransformPoint(fenceGround).y +
+                    Mathf.Abs(piece.localScale.y) * 0.5f;
+                fenceBasePositions[i] = position;
+                fenceBaseScales[i] = piece.localScale;
             }
         }
         if (plowedVisual != null)
@@ -727,7 +736,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         if (animalVisual == null) return;
         animalVisual.DOKill();
         animalVisual.localScale = Vector3.one;
-        animalVisual.DOPunchScale(Vector3.one * 0.12f, 0.3f);
+        animalVisual.DOPunchScale(Vector3.one * 0.09f, 0.19f, 2, 0.45f)
+            .SetLink(animalVisual.gameObject);
     }
 
     private static void AddAnimalPart(Transform parent, string name, Vector3 position,
@@ -769,8 +779,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         if (plowedVisual != null && plowedVisual.activeSelf != showPlowed)
             plowedVisual.SetActive(showPlowed);
         if (surfaceRenderer != null)
-            surfaceRenderer.enabled = joinedVisual == null && !showPlowed && !UsesPlowedGround &&
-                (idleOutline == null || IsPlowed || IsFenced);
+            surfaceRenderer.enabled = !IsFenced && joinedVisual == null && !showPlowed &&
+                !UsesPlowedGround && (idleOutline == null || IsPlowed);
         RefreshIdleOutline();
     }
 
@@ -921,7 +931,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             surface.sharedMaterial = connected[0].surfaceRenderer.sharedMaterial;
             root.GetComponent<MeshCollider>().sharedMesh = surfaceMesh;
             bool usesMandalaGround = !IsAnimalGroup && connected.TrueForAll(plot => plot.UsesPlowedGround);
-            if (usesMandalaGround) surface.enabled = false;
+            // O cercado unificado usa a mesma malha para seleção, com o visual do chão do mapa.
+            if (usesMandalaGround || IsAnimalGroup) surface.enabled = false;
             else if (UsesDetailedPlowed)
             {
                 // Os modelos individuais mantêm o relevo. Só as faixas entre slots
@@ -1005,7 +1016,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
                 if (plot != null)
                 {
                     plot.joinedVisual = null;
-                    if (plot.surfaceRenderer != null) plot.surfaceRenderer.enabled = true;
+                    if (!plot.IsFenced && plot.surfaceRenderer != null) plot.surfaceRenderer.enabled = true;
                 }
             if (outline != null) outline.DOKill();
             if (root != null)

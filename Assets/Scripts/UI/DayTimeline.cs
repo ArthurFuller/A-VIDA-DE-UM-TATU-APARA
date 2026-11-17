@@ -23,7 +23,7 @@ public sealed class DayTimeline : MonoBehaviour
     [SerializeField, Min(44f)] private float daysHeight = 96f;
     [SerializeField, Min(120f)] private float cardsHeight = 160f;
     [SerializeField, Min(30f)] private float topBarHeight = 78f;
-    [SerializeField, InspectorName("Deslocamento do painel")]
+    [SerializeField, InspectorName("Posição sob o HUD")]
     private Vector2 panelOffset;
     [SerializeField, Min(24f)] private float dayButtonWidth = 34f;
     [SerializeField, Min(20f)] private float dayButtonHeight = 22f;
@@ -103,14 +103,13 @@ public sealed class DayTimeline : MonoBehaviour
     {
         get
         {
-            if (panelClip == null || panelClip.parent is not RectTransform parent || missionsButton == null)
+            if (panelClip == null || panelClip.parent is not RectTransform parent || topBar == null)
                 return new Vector2(-2f, -topBarHeight) + panelOffset;
 
-            Vector3 corner = missionsButton.TransformPoint(missionsButton.rect.xMax,
-                missionsButton.rect.yMin, 0f);
+            Vector3 corner = topBar.TransformPoint(topBar.rect.xMax,
+                topBar.rect.yMin, 0f);
             Vector2 position = parent.InverseTransformPoint(corner);
-            return new Vector2(Mathf.Min(position.x + panelOffset.x, parent.rect.xMax - 4f),
-                position.y + panelOffset.y) - parent.rect.max;
+            return position + panelOffset - parent.rect.max;
         }
     }
 
@@ -189,7 +188,6 @@ public sealed class DayTimeline : MonoBehaviour
     {
         if (this == null || Application.isPlaying) return;
         EnsureUI();
-        if (panelClip != null) panelClip.anchoredPosition = PanelClipPosition;
         RefreshDays();
         if (panelGroup != null)
         {
@@ -361,7 +359,7 @@ public sealed class DayTimeline : MonoBehaviour
         backButton.onClick.AddListener(BackToDays);
         SertaoButtonAudio.Bind(backButton);
         if (created) Layout();
-        FollowHud();
+        if (Application.isPlaying) FollowHud();
         if (!Application.isPlaying || daysPanelSize == Vector2.zero)
         {
             daysPanelSize = panel.sizeDelta;

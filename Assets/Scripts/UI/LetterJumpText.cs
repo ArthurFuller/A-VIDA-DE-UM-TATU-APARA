@@ -6,27 +6,35 @@ public sealed class LetterJumpText : Text
 {
     [SerializeField, Min(0)] private float jumpHeight = 14f;
     private float revealProgress;
+    private bool normalizeToMesh;
 
-    public void Reveal(string message, float duration)
+    public void Reveal(string message, float duration) => CreateReveal(message, duration, false);
+
+    internal Tween PrepareTimedReveal(string message, float duration) =>
+        CreateReveal(message, duration, true);
+
+    private Tween CreateReveal(string message, float duration, bool useMeshCount)
     {
         DOTween.Kill(this);
         text = message;
+        normalizeToMesh = useMeshCount;
         revealProgress = 0;
         SetVerticesDirty();
-        int glyphCount = Mathf.Max(1, message.Length);
-        DOTween.To(() => revealProgress, value =>
+        float end = normalizeToMesh ? 1f : Mathf.Max(1, message.Length);
+        return DOTween.To(() => revealProgress, value =>
         {
             revealProgress = value;
             SetVerticesDirty();
-        }, glyphCount, duration).SetEase(Ease.Linear).SetTarget(this);
+        }, end, duration).SetEase(Ease.Linear).SetTarget(this);
     }
 
     protected override void OnPopulateMesh(VertexHelper vertexHelper)
     {
         base.OnPopulateMesh(vertexHelper);
         int count = vertexHelper.currentVertCount / 4;
-        int shown = Mathf.CeilToInt(revealProgress);
-        float fraction = revealProgress - Mathf.Floor(revealProgress);
+        float progress = normalizeToMesh ? revealProgress * count : revealProgress;
+        int shown = Mathf.CeilToInt(progress);
+        float fraction = progress - Mathf.Floor(progress);
         for (int i = 0; i < count; i++)
         {
             bool hidden = i >= shown;

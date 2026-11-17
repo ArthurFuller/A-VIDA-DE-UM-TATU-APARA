@@ -72,5 +72,6 @@ public enum SoundCue
     CardInspectClose,
     UiPaper,
     UiHover,
-    PlowWork
+    PlowWork,
+    AnimalProductionPop
 }

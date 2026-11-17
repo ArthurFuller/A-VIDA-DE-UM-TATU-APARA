@@ -129,24 +129,22 @@ public sealed class ShopTabs : MonoBehaviour
     {
         shopOpen = true;
         AnimateHeader();
-        // Respeita a ordem visual: primeiro a janela, depois as abas e entao o conteudo.
-        // O tempo extra e reduzido pelo ritmo geral, sem alterar as configuracoes salvas.
-        float delay = Mathf.Max(0f, pageDelay) + Fast(contentStartDelay);
-        if (headerSequence != null && headerSequence.IsActive())
+        bool openingBuyPage = buyPage != null && selectedPage == buyPage;
+        float headerEnd = headerSequence.Duration();
+        float contentDelay = Fast(contentStartDelay);
+        if (openingBuyPage)
         {
-            headerSequence.OnComplete(() =>
-            {
-                headerSequence = null;
-                if (shopOpen) AnimatePage(selectedPage, delay);
-            });
+            // A compra começa quando a última aba já completou a maior parte do movimento.
+            headerEnd = Mathf.Max(0f, headerEnd - Fast(headerDuration) * 0.25f);
+            contentDelay = Mathf.Min(contentDelay, 0.02f);
         }
-        else AnimatePage(selectedPage, delay);
+        AnimatePage(selectedPage, headerEnd + contentDelay + Mathf.Max(0f, pageDelay), openingBuyPage);
     }
 
     public void OnShopClosed()
     {
         shopOpen = false;
-        StopAnimations();
+        StopAnimations(false);
     }
 
     public bool AnimateOrderChange(Action advance)
@@ -185,8 +183,9 @@ public sealed class ShopTabs : MonoBehaviour
 
     private void Select(CanvasGroup page, bool playSound = true)
     {
+        if (shopOpen && page == selectedPage) return;
         if (playSound && page != selectedPage) AudioManager.Play(SoundCue.UiPaper);
-        StopAnimations();
+        StopContentAnimations();
         selectedPage = page;
         SetPage(buyPage, page == buyPage);
         SetPage(sellPage, page == sellPage);
@@ -239,7 +238,7 @@ public sealed class ShopTabs : MonoBehaviour
                 i * Fast(headerWaveInterval), headerSequence);
     }
 
-    private void AnimatePage(CanvasGroup page, float delay)
+    private void AnimatePage(CanvasGroup page, float delay, bool openingBuyPage = false)
     {
         if (page == null) return;
         pageSequence?.Kill();
@@ -247,31 +246,32 @@ public sealed class ShopTabs : MonoBehaviour
         float footerStart;
         if (page == buyPage)
         {
-            footerStart = AnimateRows(buyRows, delay);
-            AnimateFooter(buyFooter, footerStart + Fast(footerStartDelay));
+            footerStart = AnimateRows(buyRows, delay, openingBuyPage);
+            AnimateFooter(buyFooter, footerStart);
         }
         else if (page == sellPage)
         {
             // Cada linha inteira (imagem, quantidade, preco e botoes) usa UM tween.
             footerStart = AnimateRows(sellRows, delay);
-            AnimateFooter(sellFooter, footerStart + Fast(footerStartDelay));
+            AnimateFooter(sellFooter, footerStart);
         }
         else if (page == ordersPage)
         {
             footerStart = AnimateRows(orderTextBlocks, delay);
-            AnimateFooter(ordersFooter, footerStart + Fast(footerStartDelay));
+            AnimateFooter(ordersFooter, footerStart);
         }
     }
 
     // Retorna quando o footer pode COMEÇAR (nao quando a ultima linha termina).
     // A ultima linha ja deve estar entrando, mas nao precisa terminar por inteiro.
-    private float AnimateRows(RectTransform[] rows, float start)
+    private float AnimateRows(RectTransform[] rows, float start, bool openingBuyPage = false)
     {
-        if (rows == null) return start;
+        float footerDelay = Fast(footerStartDelay);
+        if (rows == null) return start + footerDelay;
         int count = 0;
         foreach (RectTransform row in rows)
             if (row != null) count++;
-        if (count == 0) return start;
+        if (count == 0) return start + footerDelay;
 
         float duration = Fast(rowDuration);
         float interval = count > 1
@@ -287,7 +287,9 @@ public sealed class ShopTabs : MonoBehaviour
             index++;
         }
         float lastRowStart = start + (count - 1) * interval;
-        return lastRowStart + duration * Mathf.Clamp01(footerAfterLastRow);
+        footerDelay += duration * Mathf.Clamp01(footerAfterLastRow);
+        if (openingBuyPage) footerDelay = Mathf.Min(footerDelay, 0.075f);
+        return lastRowStart + footerDelay;
     }
 
     private void AnimateFooter(RectTransform[] items, float start)
@@ -410,16 +412,21 @@ public sealed class ShopTabs : MonoBehaviour
         element.anchoredPosition = Home(element);
     }
 
-    private void StopAnimations()
+    private void StopAnimations(bool restorePositions = true)
     {
         headerSequence?.Kill();
         headerSequence = null;
+        if (restorePositions) Restore(TabTransforms());
+        StopContentAnimations(restorePositions);
+    }
+
+    private void StopContentAnimations(bool restorePositions = true)
+    {
         pageSequence?.Kill();
         pageSequence = null;
         orderSequence?.Kill();
         orderSequence = null;
-        Restore(TabTransforms());
-        RestorePagePositions();
+        if (restorePositions) RestorePagePositions();
     }
 
     private void OnDisable()
