@@ -172,6 +172,8 @@ Shader "Sertao/XiloCartoon Completo"
             Name "LineArt"
             Tags { "LightMode" = "SRPDefaultUnlit" }
             Cull Front
+            ZWrite Off
+            ZTest LEqual
 
             HLSLPROGRAM
             #pragma vertex vert
@@ -187,25 +189,21 @@ Shader "Sertao/XiloCartoon Completo"
                 Varyings o;
                 UNITY_SETUP_INSTANCE_ID(v);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
-                // direção: normal da face, ou "para fora do centro" para fechar as quinas de modelos low poly
-                float3 centro = v.positionOS.xyz;
-                float3 dirOS = normalize(lerp(v.normalOS, normalize(centro + 1e-5), _FecharQuinas));
                 float3 posWS = TransformObjectToWorld(v.positionOS.xyz);
-                // empurra o contorno para longe da câmera: o piso vizinho cobre a linha da emenda,
-                // mas a borda de fora (sem vizinho) continua com contorno
-                posWS -= GetWorldSpaceNormalizeViewDir(posWS) * _EmpurrarLineArt;
-                float3 dirWS = TransformObjectToWorldNormal(dirOS);
                 float4 cs = TransformWorldToHClip(posWS);
-                float3 dirCS = mul((float3x3)GetWorldToHClipMatrix(), dirWS);
+                float3 normalWS = TransformObjectToWorldNormal(v.normalOS);
+                float4 normalCS = mul(GetWorldToHClipMatrix(), float4(normalWS, 0.0));
 
-                float var = sin(dot(posWS, float3(3.1, 5.3, 4.2)) * _EscalaVariacao) * 0.5
-                          + sin(dot(posWS, float3(-7.7, 2.9, 6.1)) * _EscalaVariacao) * 0.5;
-                float px = _EspessuraLineArt * max(1.0 + _VariacaoLineArt * var, 0.0);
-
-                float2 d = dirCS.xy;
-                float len = length(d);
-                d = len > 1e-5 ? d / len : float2(0, 0);
-                cs.xy += d * px * 2.0 / _ScreenParams.xy * cs.w;
+                // Derivada da projeção em pixels. O pivô não participa do contorno.
+                float2 pixels = (normalCS.xy - cs.xy * (normalCS.w / max(cs.w, 0.0001)))
+                    * _ScaledScreenParams.xy;
+                float projectedLength = length(pixels);
+                float variation = sin(dot(v.positionOS.xyz, float3(3.1, 5.3, 4.2))
+                    * _EscalaVariacao);
+                float width = clamp(_EspessuraLineArt * (1.0 + variation * _VariacaoLineArt * 0.12),
+                    0.0, 1.75);
+                if (cs.w > 0.0001 && projectedLength > 0.0001)
+                    cs.xy += pixels * (width / projectedLength) * 2.0 / _ScaledScreenParams.xy * cs.w;
                 o.positionCS = cs;
                 o.fog = ComputeFogFactor(cs.z);
                 return o;

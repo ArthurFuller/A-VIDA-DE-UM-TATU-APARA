@@ -22,6 +22,7 @@ public sealed class SertaoCoinToss : MonoBehaviour
     private Action began;
     private Action<bool> completed;
     private float angle, airtime;
+    private float verticalFlip;
     private int stake;
     private bool picked;
     private GameObject previousSelection;
@@ -109,6 +110,7 @@ public sealed class SertaoCoinToss : MonoBehaviour
         toss = DOTween.Sequence().SetLink(gameObject)
             .Append(choices.DOFade(0f, 0.12f))
             .Join(coin.DOAnchorPosY(-34f, 0.13f).SetEase(Ease.InQuad))
+            .Join(DOVirtual.Float(0f, 1f, 0.13f, FlipVertically).SetEase(Ease.InOutSine))
             .Append(arc)
             .Join(DOVirtual.Float(angle, target, airtime, DrawFace).SetEase(Ease.OutSine))
             .AppendCallback(() => Impact(headsUp, won, target))
@@ -131,6 +133,12 @@ public sealed class SertaoCoinToss : MonoBehaviour
         AudioManager.Play(won ? SoundCue.GambleWin : SoundCue.GambleLose);
     }
 
+    private void FlipVertically(float amount)
+    {
+        verticalFlip = amount;
+        DrawFace(angle);
+    }
+
     private void DrawFace(float degrees)
     {
         angle = degrees;
@@ -138,7 +146,9 @@ public sealed class SertaoCoinToss : MonoBehaviour
         float width = Mathf.Cos(phase);
         Texture2D nextFace = width >= 0f ? art.Heads : art.Tails;
         if (face.texture != nextFace) face.texture = nextFace;
-        turn.localScale = new Vector3(Mathf.Max(0.075f, Mathf.Abs(width)), 1f, 1f);
+        float thickness = Mathf.Max(0.075f, Mathf.Abs(width));
+        turn.localScale = new Vector3(Mathf.Lerp(thickness, 1f, verticalFlip),
+            Mathf.Lerp(1f, thickness, verticalFlip), 1f);
         turn.localRotation = Quaternion.Euler(0f, 0f, -4f * Mathf.Sin(phase));
     }
 

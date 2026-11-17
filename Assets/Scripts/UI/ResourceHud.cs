@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -221,7 +221,7 @@ public sealed class ResourceHud : MonoBehaviour
         Vector2 origin = CanvasPoint(screenOrigin);
         int index = batch.Icons.Count;
         RectTransform rect = GetIcon(batch.Kind);
-        rect.sizeDelta = new Vector2(34f, 34f);
+        rect.sizeDelta = Vector2.one * FlightIconSize(batch.Kind, 34f);
         rect.anchoredPosition = origin;
         rect.localScale = Vector3.zero;
         batch.Icons.Add(rect);
@@ -317,6 +317,9 @@ public sealed class ResourceHud : MonoBehaviour
         }
     }
 
+    private static float FlightIconSize(ResourceKind kind, float size) =>
+        kind is ResourceKind.Coins or ResourceKind.Eggs ? size * 1.18f : size;
+
     private Vector2 CanvasPoint(Vector2 screen)
     {
         RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screen, UiCamera,
@@ -342,7 +345,7 @@ public sealed class ResourceHud : MonoBehaviour
         Text target, float pauseSeconds, int credit, System.Action onArrived, System.Action onDeparture)
     {
         RectTransform rect = GetIcon(kind);
-        rect.sizeDelta = new Vector2(32f, 32f);
+        rect.sizeDelta = Vector2.one * FlightIconSize(kind, 32f);
         float angle = index * 2.39996f;
         float radius = 4f + 11f * Mathf.Sqrt((index + 0.5f) / count);
         rect.anchoredPosition = origin + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;

@@ -672,7 +672,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         var art = SertaoPresentationAssets.Current;
         Sprite[] frames = art != null ? art.AnimalFrames(kind) : null;
         if (frames != null && frames.Length > 0 && frames[0] != null)
-            root.AddComponent<SertaoAnimalIdle>().Setup(kind, frames);
+            SertaoAnimalIdle.CreateGroup(root.transform, kind, frames);
         else if (kind == AnimalKind.Cow)
         {
             AddAnimalPart(root.transform, "Corpo", new Vector3(0f, 0.43f, 0f),
