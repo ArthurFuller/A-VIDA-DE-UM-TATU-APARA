@@ -4,8 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-// Apenas controla a pausa e anima objetos de UI JA EXISTENTES na cena.
-// Nada e criado, reparentado ou recebe sprite/texto por codigo.
+// Controla a pausa e anima os elementos montados na cena, mantendo sua hierarquia.
 public sealed class PauseToggle : MonoBehaviour
 {
     [Header("Botao original da HUD")]
@@ -40,9 +39,7 @@ public sealed class PauseToggle : MonoBehaviour
     private Button[] menuActions;
     private Vector2[] buttonHomes;
     private Vector2 panelHome;
-    private Vector2 optionsHome;
     private RectMask2D buttonMask;
-    private GS2FrontEnd.PageItems optionsItems;
     private bool paused;
     private bool busy;
     private Image backdrop;
@@ -87,11 +84,7 @@ public sealed class PauseToggle : MonoBehaviour
         backdrop = pauseOverlay.GetComponent<Image>();
         if (backdrop != null) backdropColor = backdrop.color;
         panelHome = panel.anchoredPosition;
-        optionsHome = optionsPage.anchoredPosition;
         buttonMask = buttonViewport.GetComponent<RectMask2D>();
-        if (optionsPage != null && optionsPage.TryGetComponent(out AudioSettingsUI audioSettings))
-            audioSettings.PrepareWeatherControls();
-        optionsItems = GS2FrontEnd.CaptureItems(optionsPage);
         menuActions = new[] { resumeButton, settingsButton, exitButton };
         menuButtons = new RectTransform[menuActions.Length];
         buttonHomes = new Vector2[menuActions.Length];
@@ -143,6 +136,11 @@ public sealed class PauseToggle : MonoBehaviour
         pauseOverlay.gameObject.SetActive(true);
         panel.gameObject.SetActive(true);
         Canvas.ForceUpdateCanvases();
+        Image frame = panel.GetComponent<Image>();
+        bool hasFrameMask = buttonMask != null && frame != null && frame.canvas != null &&
+            frame.overrideSprite != null;
+        Rect inner = hasFrameMask ? GS2FrontEnd.FitMaskToFrame(buttonMask, frame) : buttonViewport.rect;
+        if (!hasFrameMask && buttonMask != null) inner.yMin += buttonMask.padding.y;
         pauseOverlay.alpha = 1f;
         pauseOverlay.interactable = pauseOverlay.blocksRaycasts = true;
         if (backdrop != null) backdrop.color = backdropColor;
@@ -153,13 +151,12 @@ public sealed class PauseToggle : MonoBehaviour
         motion?.Kill();
         motion = DOTween.Sequence().SetUpdate(true);
         motion.Append(panel.DOAnchorPos(panelHome, panelEnterDuration).SetEase(Ease.OutBack, 1.12f));
-        float innerBottom = buttonViewport.rect.yMin + (buttonMask != null ? buttonMask.padding.y : 0f);
         for (int i = 0; i < menuButtons.Length; i++)
         {
             RectTransform item = menuButtons[i];
             item.anchoredPosition = buttonHomes[i];
-            Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(buttonViewport, item);
-            item.anchoredPosition += Vector2.down * (bounds.max.y - innerBottom + 12f);
+            item.anchoredPosition += GS2FrontEnd.OffsetOutsideFrame(item,
+                hasFrameMask ? panel : buttonViewport, inner, Vector2.down);
             motion.Insert(panelEnterDuration + i * buttonWaveInterval,
                 item.DOAnchorPos(buttonHomes[i], buttonEnterDuration).SetEase(Ease.OutBack));
         }
@@ -226,27 +223,31 @@ public sealed class PauseToggle : MonoBehaviour
         float width = overlayRect != null ? overlayRect.rect.width : 900f;
         float distance = Mathf.Max(width + 8f,
             (panel.rect.width + optionsPage.rect.width) * 0.5f + 20f);
-        Vector2 travel = Vector2.right * (back ? distance : -distance);
-        Vector2 fromHome = from == panel ? panelHome : optionsHome;
-        Vector2 toHome = to == panel ? panelHome : optionsHome;
-        from.anchoredPosition = fromHome;
-        to.anchoredPosition = toHome - travel;
+        float travel = back ? distance : -distance;
+        float fromX = from.anchoredPosition.x;
+        float toX = to.anchoredPosition.x;
+        GS2FrontEnd.SetHorizontalPosition(to, toX - travel);
         if (toGroup != null) toGroup.alpha = 1f;
 
         motion = DOTween.Sequence().SetUpdate(UpdateType.Normal, true)
-            .Append(from.DOAnchorPos(fromHome + travel, optionsSlideDuration)
+            .Append(from.DOAnchorPosX(fromX + travel, optionsSlideDuration)
                 .SetEase(Ease.InOutCubic))
-            .Join(to.DOAnchorPos(toHome, optionsSlideDuration)
+            .Join(to.DOAnchorPosX(toX, optionsSlideDuration)
                 .SetEase(Ease.InOutCubic));
         if (next == Page.Options)
-            GS2FrontEnd.AnimateWave(optionsItems, distance, motion, optionsSlideDuration);
-        to.gameObject.SetActive(true);
+        {
+            to.gameObject.SetActive(true);
+            Canvas.ForceUpdateCanvases();
+            GS2FrontEnd.AnimateOptionsWave(to, to.GetComponent<Image>(),
+                distance, motion, optionsSlideDuration);
+        }
+        else to.gameObject.SetActive(true);
 
         motion.InsertCallback(optionsSlideDuration, () =>
         {
-            to.anchoredPosition = toHome;
+            GS2FrontEnd.SetHorizontalPosition(to, toX);
             from.gameObject.SetActive(false);
-            from.anchoredPosition = fromHome;
+            GS2FrontEnd.SetHorizontalPosition(from, fromX);
         });
         motion.OnComplete(() =>
         {

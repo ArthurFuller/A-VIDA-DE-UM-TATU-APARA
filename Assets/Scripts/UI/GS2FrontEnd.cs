@@ -28,7 +28,6 @@ public sealed class GS2FrontEnd : MonoBehaviour
     [SerializeField, Range(0.8f, 1f)] private float enteringScale = 0.975f;
     private Sequence motion;
     private PageItems mainItems;
-    private PageItems optionsItems;
     private bool locked;
     private Image inputShield;
     private EventSystem blockedEventSystem;
@@ -55,9 +54,6 @@ public sealed class GS2FrontEnd : MonoBehaviour
         SetInitialPage(optionsPage, optionsGroup, false);
         SetInitialPage(leaderboardPage, leaderboardGroup, false);
         mainItems = CaptureItems(mainPage);
-        if (optionsPage != null && optionsPage.TryGetComponent(out AudioSettingsUI audioSettings))
-            audioSettings.PrepareWeatherControls();
-        optionsItems = CaptureItems(optionsPage);
         if (mainPage != null) mainPage.localScale = Vector3.one * enteringScale;
         if (playButton != null) playButton.onClick.AddListener(Play);
         if (optionsButton != null) optionsButton.onClick.AddListener(OpenOptions);
@@ -254,17 +250,27 @@ public sealed class GS2FrontEnd : MonoBehaviour
         float entryX = back ? -distance : distance;
         to.gameObject.SetActive(true);
         bool wave = destination == Page.Main || destination == Page.Options;
-        to.anchoredPosition = wave ? Vector2.zero : new Vector2(entryX, 0f);
-        to.localScale = wave ? Vector3.one : Vector3.one * enteringScale;
+        if (destination != Page.Options)
+        {
+            to.anchoredPosition = wave ? Vector2.zero : new Vector2(entryX, 0f);
+            to.localScale = wave ? Vector3.one : Vector3.one * enteringScale;
+        }
         toGroup.alpha = wave ? 1f : 0f;
         toGroup.interactable = true;
         toGroup.blocksRaycasts = false;
         fromGroup.blocksRaycasts = false;
         motion?.Kill();
         motion = DOTween.Sequence().SetUpdate(true);
-        motion.Join(from.DOAnchorPosX(-entryX, slideSeconds).SetEase(Ease.InOutCubic));
-        if (wave)
-            AnimateWave(destination == Page.Main ? mainItems : optionsItems, entryX, motion, slideSeconds);
+        bool leavingOptions = current == Page.Options;
+        float fromX = leavingOptions ? from.anchoredPosition.x : 0f;
+        motion.Join(from.DOAnchorPosX(fromX - entryX, slideSeconds).SetEase(Ease.InOutCubic));
+        if (destination == Page.Main)
+            AnimateWave(mainItems, entryX, motion, slideSeconds);
+        else if (destination == Page.Options)
+        {
+            Canvas.ForceUpdateCanvases();
+            AnimateOptionsWave(to, root.GetComponent<Image>(), distance, motion, slideSeconds);
+        }
         else
         {
             motion.Join(to.DOAnchorPosX(0f, slideSeconds).SetEase(Ease.OutCubic));
@@ -274,6 +280,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
         motion.OnComplete(() =>
             {
                 from.gameObject.SetActive(false);
+                if (leavingOptions) SetHorizontalPosition(from, fromX);
                 toGroup.blocksRaycasts = true;
                 current = destination;
                 SetLocked(false);
@@ -289,8 +296,11 @@ public sealed class GS2FrontEnd : MonoBehaviour
     private void SetInitialPage(RectTransform page, CanvasGroup group, bool active)
     {
         if (page == null) return;
-        page.anchoredPosition = Vector2.zero;
-        page.localScale = Vector3.one;
+        if (page != optionsPage)
+        {
+            page.anchoredPosition = Vector2.zero;
+            page.localScale = Vector3.one;
+        }
         if (group != null)
         {
             group.alpha = 1f;
@@ -340,6 +350,89 @@ public sealed class GS2FrontEnd : MonoBehaviour
             sequence.Insert(delay, item.DOAnchorPos(items.positions[i], duration)
                 .SetEase(Ease.OutCubic));
         }
+    }
+
+    internal static void AnimateOptionsWave(RectTransform page, Image frame,
+        float distance, Sequence sequence, float duration)
+    {
+        PageItems items = CaptureItems(page);
+        if (items == null || items.rects.Length == 0) return;
+        RectMask2D mask = null;
+        bool maskWasEnabled = false;
+        Vector4 previousPadding = Vector4.zero;
+        Rect inner = default;
+        if (frame != null && frame.canvas != null && frame.overrideSprite != null)
+        {
+            if (page.TryGetComponent(out mask))
+            {
+                maskWasEnabled = mask.enabled;
+                previousPadding = mask.padding;
+            }
+            else mask = page.gameObject.AddComponent<RectMask2D>();
+            mask.enabled = true;
+            inner = FitMaskToFrame(mask, frame);
+        }
+
+        // A página já começou a deslizar quando os primeiros controles aparecem.
+        float waveStart = duration * 0.5f;
+        for (int i = 0; i < items.rects.Length; i++)
+        {
+            RectTransform item = items.rects[i];
+            float homeX = items.positions[i].x;
+            float offset = mask != null ? OffsetOutsideFrame(item, frame.rectTransform, inner, Vector2.right).x :
+                distance;
+            SetHorizontalPosition(item, homeX + offset);
+            sequence.Insert(waveStart + i * 0.035f,
+                item.DOAnchorPosX(homeX, duration).SetEase(Ease.OutCubic));
+        }
+
+        // O recorte é temporário nas Opções para preservar a interface editada em repouso.
+        sequence.SetAutoKill(true).OnKill(() =>
+        {
+            if (mask == null) return;
+            mask.enabled = maskWasEnabled;
+            mask.padding = previousPadding;
+        });
+    }
+
+    internal static void SetHorizontalPosition(RectTransform rect, float x)
+    {
+        Vector2 position = rect.anchoredPosition;
+        position.x = x;
+        rect.anchoredPosition = position;
+    }
+
+    internal static Rect FitMaskToFrame(RectMask2D mask, Image frame)
+    {
+        RectTransform frameRect = frame.rectTransform;
+        Rect inner = frame.GetPixelAdjustedRect();
+        // Distâncias até o papel no sprite 9SlicedBox: esquerda, baixo, direita e cima.
+        Vector4 paperInset = new Vector4(112f, 116f, 99f, 97f);
+        float unitsPerPixel = 1f / (frame.pixelsPerUnit * frame.pixelsPerUnitMultiplier);
+        Vector4 slice = frame.overrideSprite.border;
+        float xUnits = Mathf.Min(unitsPerPixel, inner.width / Mathf.Max(1f, slice.x + slice.z));
+        float yUnits = Mathf.Min(unitsPerPixel, inner.height / Mathf.Max(1f, slice.y + slice.w));
+        inner.xMin += paperInset.x * xUnits;
+        inner.yMin += paperInset.y * yUnits;
+        inner.xMax -= paperInset.z * xUnits;
+        inner.yMax -= paperInset.w * yUnits;
+
+        Transform canvas = frame.canvas.rootCanvas.transform;
+        Vector3 min = canvas.InverseTransformPoint(frameRect.TransformPoint(inner.min));
+        Vector3 max = canvas.InverseTransformPoint(frameRect.TransformPoint(inner.max));
+        Rect outer = mask.canvasRect;
+        mask.padding = new Vector4(min.x - outer.xMin, min.y - outer.yMin,
+            outer.xMax - max.x, outer.yMax - max.y);
+        return inner;
+    }
+
+    internal static Vector2 OffsetOutsideFrame(RectTransform item, RectTransform frame,
+        Rect inner, Vector2 direction)
+    {
+        Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(frame, item);
+        float distance = direction.y < 0f ? bounds.max.y - inner.yMin :
+            direction.x < 0f ? bounds.max.x - inner.xMin : inner.xMax - bounds.min.x;
+        return item.parent.InverseTransformVector(frame.TransformVector(direction * Mathf.Max(0f, distance + 2f)));
     }
 
     public void Exit()
