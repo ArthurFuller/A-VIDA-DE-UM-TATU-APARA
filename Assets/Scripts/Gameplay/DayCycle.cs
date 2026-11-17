@@ -154,7 +154,6 @@ public sealed class DayCycle : MonoBehaviour
             return;
         }
         if (finishDayFeedback != null) finishDayFeedback.PlayAcceptedClick();
-        AudioManager.Play(SoundCue.DayFinish);
         DayClosing?.Invoke();
         if (currentDay >= totalDays)
         {

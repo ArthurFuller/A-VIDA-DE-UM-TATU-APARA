@@ -267,7 +267,7 @@ public sealed class ResourceHud : MonoBehaviour
             RectTransform rect = batch.Icons[i];
             if (rect == null)
             {
-                CreditArrival(batch.Kind, 1);
+                CreditArrival(batch.Kind, 1, false);
                 if (--pending == 0) onAllArrived?.Invoke();
                 continue;
             }
@@ -465,7 +465,7 @@ public sealed class ResourceHud : MonoBehaviour
     }
 
     // The bank already owns the resource. Reveal each portion exactly when its icon lands.
-    private void CreditArrival(ResourceKind kind, int amount)
+    private void CreditArrival(ResourceKind kind, int amount, bool visibleFlight = true)
     {
         int index = (int)kind;
         inFlight[index] = Mathf.Max(0, inFlight[index] - amount);
@@ -475,6 +475,18 @@ public sealed class ResourceHud : MonoBehaviour
             displayed[index] = next;
             DrawCounter(kind);
             FlashCounter(kind, 1);
+            if (visibleFlight) AudioManager.Play(kind switch
+            {
+                ResourceKind.Coins => SoundCue.CounterCoins,
+                ResourceKind.Wood => SoundCue.CounterWood,
+                ResourceKind.Fish => SoundCue.CounterFish,
+                ResourceKind.Corn => SoundCue.CounterGrain,
+                ResourceKind.Pumpkin or ResourceKind.Jerimum => SoundCue.CounterCrop,
+                ResourceKind.Food => SoundCue.CounterFood,
+                ResourceKind.Milk => SoundCue.CounterMilk,
+                ResourceKind.Eggs => SoundCue.CounterEgg,
+                _ => SoundCue.ResourceGained
+            });
         }
         Refresh();
     }

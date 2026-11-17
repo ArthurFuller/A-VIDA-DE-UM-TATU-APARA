@@ -89,6 +89,8 @@ public sealed class PauseToggle : MonoBehaviour
         panelHome = panel.anchoredPosition;
         optionsHome = optionsPage.anchoredPosition;
         buttonMask = buttonViewport.GetComponent<RectMask2D>();
+        if (optionsPage != null && optionsPage.TryGetComponent(out AudioSettingsUI audioSettings))
+            audioSettings.PrepareWeatherControls();
         optionsItems = GS2FrontEnd.CaptureItems(optionsPage);
         menuActions = new[] { resumeButton, settingsButton, exitButton };
         menuButtons = new RectTransform[menuActions.Length];
@@ -133,7 +135,7 @@ public sealed class PauseToggle : MonoBehaviour
         if (paused) return;
         paused = busy = true;
         current = Page.Pause;
-        AudioManager.Play(SoundCue.PanelOpen);
+        AudioManager.Play(SoundCue.UiPaper);
         FreezeGameplayAnimations();
         Time.timeScale = 0f;
         topBar?.SetPaused(true);
@@ -178,7 +180,7 @@ public sealed class PauseToggle : MonoBehaviour
     {
         if (!paused || busy || current != Page.Pause) return;
         busy = true;
-        AudioManager.Play(SoundCue.PanelClose);
+        AudioManager.Play(SoundCue.UiPaper);
         pauseGroup.blocksRaycasts = false;
         motion?.Kill();
         motion = DOTween.Sequence().SetUpdate(true)
@@ -200,12 +202,14 @@ public sealed class PauseToggle : MonoBehaviour
     public void OpenOptions()
     {
         if (!paused || busy || current != Page.Pause) return;
+        AudioManager.Play(SoundCue.UiPaper);
         SlidePages(panel, optionsPage, optionsGroup, Page.Options, false);
     }
 
     private void BackFromOptions()
     {
         if (busy || current != Page.Options) return;
+        AudioManager.Play(SoundCue.UiPaper);
         SlidePages(optionsPage, panel, pauseGroup, Page.Pause, true);
     }
 
@@ -262,6 +266,7 @@ public sealed class PauseToggle : MonoBehaviour
         }
         busy = true;
         pauseGroup.blocksRaycasts = false;
+        AudioManager.Play(SoundCue.UiPaper);
         PauseIrisTransition.ToMenu(irisShader);
     }
 

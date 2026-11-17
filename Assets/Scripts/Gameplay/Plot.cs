@@ -16,6 +16,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     [SerializeField, Min(0f), Tooltip("Velocidade neste terreno. Zero usa a velocidade geral dos funcionários.")]
     private float workTravelSpeed;
     [SerializeField] private Renderer surfaceRenderer;
+    [SerializeField, Tooltip("Contorno discreto do terreno enquanto ele está livre.")]
+    private GameObject idleOutline;
     [SerializeField] private Material plowedMaterial;
     [SerializeField] private GameObject plowedVisual; // Visual opcional: mantém o solo lógico e collider.
     [SerializeField, Tooltip("Slot de água: bloqueia ações de cultivo, cercas e animais.")]
@@ -151,6 +153,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             plowedVisualHome = plowedVisual.transform.localPosition;
             plowedVisual.SetActive(false);
         }
+        if (idleOutline != null) RefreshSurfaceVisual();
     }
 
     private void OnEnable()
@@ -179,6 +182,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     public void OnPointerEnter(PointerEventData eventData)
     {
         if (isWater) return;
+        if (!pointerOver && Time.timeScale > 0f && selectionOutline != null && selectionOutline.gameObject.activeSelf)
+            AudioManager.Play(SoundCue.PlotHover);
         pointerOver = true;
         PulseOutline();
         joinedVisual?.SetHovered(true);
@@ -241,11 +246,21 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
 
     private void SetHighlight(bool visible)
     {
-        if (!visible && selectionOutline == null) return;
         if (visible && selectionOutline == null) CreateOutline();
-        if (selectionOutline == null) return;
-        selectionOutline.gameObject.SetActive(visible);
-        PulseOutline();
+        if (selectionOutline != null)
+        {
+            selectionOutline.gameObject.SetActive(visible);
+            PulseOutline();
+        }
+        RefreshIdleOutline();
+    }
+
+    private void RefreshIdleOutline()
+    {
+        if (idleOutline == null) return;
+        bool highlighted = selectionOutline != null && selectionOutline.gameObject.activeSelf;
+        bool visible = !isWater && !IsPlowed && !IsFenced && !highlighted;
+        if (idleOutline.activeSelf != visible) idleOutline.SetActive(visible);
     }
 
     private void PulseOutline()
@@ -532,7 +547,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     {
         if (isWater || IsPlowed || IsFenced || !IsEmpty || Animal != AnimalKind.None) return;
         IsFenced = true;
-        if (fenceParts != null && fenceBasePositions != null) FormFencePerimeter();
+        if (fenceParts != null && fenceBasePositions != null) FormFencePerimeter(true);
+        else AudioManager.Play(SoundCue.FenceBuilt);
         RefreshJoinedPlots();
         StateChanged?.Invoke();
     }
@@ -622,10 +638,11 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         }
     }
 
-    private void FormFencePerimeter()
+    private void FormFencePerimeter(bool playBuiltSound = false)
     {
         fenceInitialized = true;
         Plot[] neighbors = FencedNeighbors();
+        Tween lastArrival = null;
         for (int i = 0; i < fenceParts.Length; i++)
         {
             GameObject part = fenceParts[i];
@@ -644,7 +661,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             {
                 piece.localPosition = position - Vector3.up * 0.45f;
                 piece.localScale = scale;
-                DOTween.Sequence().SetTarget(piece)
+                lastArrival = DOTween.Sequence().SetTarget(piece)
                     .AppendInterval(i * fencePieceDelay)
                     .AppendCallback(() => part.SetActive(true))
                     .Append(piece.DOLocalMove(position, fencePieceDuration + 0.1f)
@@ -658,6 +675,12 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             piece.DOScale(scale, fencePieceDuration + 0.1f).SetDelay(0.12f)
                 .SetEase(Ease.OutSine);
         }
+        if (!playBuiltSound) return;
+        if (lastArrival == null) AudioManager.Play(SoundCue.FenceBuilt);
+        else lastArrival.OnComplete(() =>
+        {
+            if (this != null && isActiveAndEnabled) AudioManager.Play(SoundCue.FenceBuilt);
+        });
     }
 
     public bool PlaceAnimal(AnimalKind kind)
@@ -746,7 +769,9 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         if (plowedVisual != null && plowedVisual.activeSelf != showPlowed)
             plowedVisual.SetActive(showPlowed);
         if (surfaceRenderer != null)
-            surfaceRenderer.enabled = joinedVisual == null && !showPlowed && !UsesPlowedGround;
+            surfaceRenderer.enabled = joinedVisual == null && !showPlowed && !UsesPlowedGround &&
+                (idleOutline == null || IsPlowed || IsFenced);
+        RefreshIdleOutline();
     }
 
     private static void RefreshJoinedPlots()
@@ -958,6 +983,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
 
         public void SetHovered(bool value)
         {
+            if (value && !hovered && Time.timeScale > 0f && outline != null && outline.gameObject.activeSelf)
+                AudioManager.Play(SoundCue.PlotHover);
             hovered = value;
             PulseOutline();
         }

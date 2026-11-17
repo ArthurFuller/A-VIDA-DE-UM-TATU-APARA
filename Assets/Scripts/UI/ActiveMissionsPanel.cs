@@ -208,6 +208,7 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
             return;
         }
 
+        AudioManager.Play(SoundCue.UiPaper);
         if (isOpen)
         {
             PrepareCards();

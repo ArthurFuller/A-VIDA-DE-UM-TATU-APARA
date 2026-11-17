@@ -235,7 +235,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         else CollectEditorCards();
         if (Application.isPlaying && SyncTestCards()) Refresh();
         Layout(true);
-        if (Application.isPlaying && selected != null && shown.Contains(selected)) SetHover(selected);
+        if (Application.isPlaying && selected != null && shown.Contains(selected)) SetHover(selected, false);
     }
 #endif
 
@@ -818,13 +818,14 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         InspectCard(CardAt(eventData.position, eventData.pressEventCamera));
     }
 
-    private void SetHover(ActivityCardDrag card)
+    private void SetHover(ActivityCardDrag card, bool playSound = true)
     {
         if (selectionLocked || IsDraggingCard || card != null && card.IsReturning) return;
         if (card == hovered) return;
         ClearHover(false);
         hovered = card;
         if (hovered == null) return;
+        if (playSound && Time.timeScale > 0f) AudioManager.Play(SoundCue.CardHover);
         RectTransform rect = hovered.GetComponent<RectTransform>();
         CardHoverOutline.Ensure(rect)?.SetHighlighted(true);
         rect.SetAsLastSibling();
@@ -956,7 +957,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         ducked = selectionLocked;
         Layout(true, true);
         if (pointerInside && !selectionLocked)
-            SetHover(CardAt(eventData.position, eventData.enterEventCamera));
+            SetHover(CardAt(eventData.position, eventData.enterEventCamera), false);
     }
 
 }

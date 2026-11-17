@@ -46,6 +46,8 @@ public sealed class GS2FrontEnd : MonoBehaviour
         SetInitialPage(optionsPage, optionsGroup, false);
         SetInitialPage(leaderboardPage, leaderboardGroup, false);
         mainItems = CaptureItems(mainPage);
+        if (optionsPage != null && optionsPage.TryGetComponent(out AudioSettingsUI audioSettings))
+            audioSettings.PrepareWeatherControls();
         optionsItems = CaptureItems(optionsPage);
         if (mainPage != null) mainPage.localScale = Vector3.one * enteringScale;
         if (playButton != null) playButton.onClick.AddListener(Play);
@@ -56,6 +58,29 @@ public sealed class GS2FrontEnd : MonoBehaviour
         if (leaderboardBackButton != null) leaderboardBackButton.onClick.AddListener(Back);
         current = Page.Main;
         locked = true;
+        if (!GS2Profile.HasNickname && root != null && optionsPage != null &&
+            optionsPage.TryGetComponent(out GS2Profile profile) &&
+            profile.ShowFirstRun(root.transform, CompleteFirstRun))
+        {
+            SetInitialPage(mainPage, mainGroup, false);
+            motion = DOTween.Sequence().SetUpdate(true)
+                .Append(root.DOFade(1f, fadeSeconds))
+                .OnComplete(() => root.interactable = true);
+            return;
+        }
+        AnimateMainEntrance();
+    }
+
+    private void CompleteFirstRun()
+    {
+        SetInitialPage(mainPage, mainGroup, true);
+        AnimateMainEntrance();
+    }
+
+    private void AnimateMainEntrance()
+    {
+        locked = true;
+        if (mainPage != null) mainPage.localScale = Vector3.one * enteringScale;
         motion = DOTween.Sequence().SetUpdate(true);
         if (root != null) motion.Join(root.DOFade(1f, fadeSeconds));
         if (mainPage != null)
@@ -81,7 +106,8 @@ public sealed class GS2FrontEnd : MonoBehaviour
 
     public void Play()
     {
-        if (locked || root == null || sceneFade == null) return;
+        if (locked || root == null || sceneFade == null ||
+            !Application.CanStreamedLevelBeLoaded("PrototypeLayout")) return;
         locked = true;
         root.interactable = false;
         root.blocksRaycasts = false;
@@ -101,6 +127,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
         CanvasGroup fromGroup = PageGroup(current);
         CanvasGroup toGroup = PageGroup(destination);
         if (from == null || to == null || fromGroup == null || toGroup == null) return;
+        AudioManager.Play(SoundCue.UiPaper);
         locked = true;
         Canvas.ForceUpdateCanvases();
         float distance = SlideDistance(from, to);

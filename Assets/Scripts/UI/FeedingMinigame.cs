@@ -103,6 +103,7 @@ public sealed class FeedingMinigame : MonoBehaviour
     public void Begin(WorkerAssignment[] dayWorkers, Action<SaleItem?[]> onCompleted,
         Action onCancelled = null)
     {
+        AudioManager.Play(SoundCue.UiPaper);
         // Activate the parent first so Awake initializes the panel and its buttons.
         if (!gameObject.activeSelf) gameObject.SetActive(true);
         transition?.Kill();
@@ -381,7 +382,7 @@ public sealed class FeedingMinigame : MonoBehaviour
             character.Play(icon.Kind == SaleItem.Food ? "Boa" : "Ok", 0, 0f);
         FeedingReaction reaction = workerTargets[target].GetComponentInChildren<FeedingReaction>(true);
         if (reaction != null) reaction.Show(icon.Kind == SaleItem.Food);
-        AudioManager.Play(SoundCue.FeedingAssigned);
+        if (icon.Kind != SaleItem.Milk) AudioManager.Play(SoundCue.FeedingAssigned);
         RectTransform worker = workerTargets[target];
         worker.DOKill();
         worker.DOPunchScale(worker.localScale * 0.12f, 0.3f, 1);
@@ -478,13 +479,13 @@ public sealed class FeedingMinigame : MonoBehaviour
     public void Finish()
     {
         if (!open || transitioning) return;
+        AudioManager.Play(SoundCue.UiPaper);
         open = false;
         transitioning = true;
         group.blocksRaycasts = true;
         if (reservedIcon != null) CancelReservation(reservedIcon);
         foreach (FeedingFoodIcon icon in foodIcons)
             if (icon != null) icon.StopAnimation();
-        AudioManager.Play(SoundCue.FeedingCompleted);
         Action<SaleItem?[]> callback = completed;
         completed = null;
         cancelled = null;
@@ -508,6 +509,7 @@ public sealed class FeedingMinigame : MonoBehaviour
     public void Cancel()
     {
         if (!open || transitioning) return;
+        AudioManager.Play(SoundCue.UiPaper);
         open = false;
         if (reservedIcon != null) CancelReservation(reservedIcon);
         foreach (SaleItem? food in chosenFood)

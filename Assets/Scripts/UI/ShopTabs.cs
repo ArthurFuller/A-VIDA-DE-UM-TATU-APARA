@@ -185,7 +185,7 @@ public sealed class ShopTabs : MonoBehaviour
 
     private void Select(CanvasGroup page, bool playSound = true)
     {
-        if (playSound) AudioManager.Play(SoundCue.PanelOpen);
+        if (playSound && page != selectedPage) AudioManager.Play(SoundCue.UiPaper);
         StopAnimations();
         selectedPage = page;
         SetPage(buyPage, page == buyPage);

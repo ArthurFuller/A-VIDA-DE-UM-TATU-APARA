@@ -52,6 +52,7 @@ public sealed class DayCounterMotion : MonoBehaviour
             topBar?.CloseFromDayCounter();
         if (over == hovering) return;
         hovering = over;
+        if (over) AudioManager.Play(SoundCue.UiHover);
 
         hoverMotion?.Kill();
         if (label != null)

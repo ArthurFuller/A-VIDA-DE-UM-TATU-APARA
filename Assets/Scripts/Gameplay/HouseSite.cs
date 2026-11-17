@@ -13,6 +13,8 @@ public sealed class HouseSite : MonoBehaviour, IPointerClickHandler, IPointerEnt
     }
 
     [SerializeField] private ActionResolver actions;
+    [SerializeField, Tooltip("Contorno discreto do lote enquanto ele está livre.")]
+    private GameObject idleOutline;
     [Tooltip("Visual da Casa 2 deste lote. Fica visível no editor para ajustar o Transform e oculto até a construção durante o jogo.")]
     [SerializeField] private Transform houseVisualPreview;
     [Tooltip("Ponto editável da porta deste lote, usado para a saída do novo morador.")]
@@ -90,6 +92,12 @@ public sealed class HouseSite : MonoBehaviour, IPointerClickHandler, IPointerEnt
     {
         if (Application.isPlaying && houseVisualPreview != null)
             houseVisualPreview.gameObject.SetActive(false);
+        if (idleOutline != null)
+        {
+            Renderer surface = GetComponent<Renderer>();
+            if (surface != null) surface.enabled = false;
+            RefreshIdleOutline();
+        }
     }
 
     public void OnPointerClick(PointerEventData eventData)
@@ -113,6 +121,8 @@ public sealed class HouseSite : MonoBehaviour, IPointerClickHandler, IPointerEnt
 
     public void OnPointerEnter(PointerEventData eventData)
     {
+        if (!pointerOver && Time.timeScale > 0f && selectionOutline != null && selectionOutline.gameObject.activeSelf)
+            AudioManager.Play(SoundCue.PlotHover);
         pointerOver = true;
         PulseOutline();
     }
@@ -145,9 +155,20 @@ public sealed class HouseSite : MonoBehaviour, IPointerClickHandler, IPointerEnt
     private void SetHighlight(bool visible)
     {
         if (visible && selectionOutline == null) CreateOutline();
-        if (selectionOutline == null) return;
-        selectionOutline.gameObject.SetActive(visible);
-        PulseOutline();
+        if (selectionOutline != null)
+        {
+            selectionOutline.gameObject.SetActive(visible);
+            PulseOutline();
+        }
+        RefreshIdleOutline();
+    }
+
+    private void RefreshIdleOutline()
+    {
+        if (idleOutline == null) return;
+        bool highlighted = selectionOutline != null && selectionOutline.gameObject.activeSelf;
+        bool visible = !IsBuilt && !highlighted;
+        if (idleOutline.activeSelf != visible) idleOutline.SetActive(visible);
     }
 
     private void PulseOutline()
@@ -205,6 +226,13 @@ public sealed class HouseSite : MonoBehaviour, IPointerClickHandler, IPointerEnt
         triangles[t + 5] = v + 2;
     }
 
+    internal void PlayConstructionSmoke(float duration)
+    {
+        Collider lot = GetComponent<Collider>();
+        Bounds bounds = lot != null ? lot.bounds : new Bounds(transform.position, new Vector3(2f, 0.1f, 2f));
+        ConstructionSmoke.Play(transform, bounds, duration);
+    }
+
     public bool Build(int day)
     {
         if (IsBuilt || houseVisualPreview == null || doorwayMarker == null ||
@@ -212,7 +240,13 @@ public sealed class HouseSite : MonoBehaviour, IPointerClickHandler, IPointerEnt
         IsBuilt = true;
         SetHighlight(false);
         builtDay = day;
+        Vector3 finalScale = houseVisualPreview.localScale;
+        houseVisualPreview.localScale = finalScale * 0.08f;
         houseVisualPreview.gameObject.SetActive(true);
+        DOTween.Sequence().SetLink(houseVisualPreview.gameObject)
+            .Append(houseVisualPreview.DOScale(finalScale, 0.45f).SetEase(Ease.OutCubic))
+            .Append(houseVisualPreview.DOPunchScale(finalScale * 0.065f, 0.25f, 3, 0.55f))
+            .OnComplete(() => houseVisualPreview.localScale = finalScale);
         Renderer surface = GetComponent<Renderer>();
         if (surface != null) surface.enabled = false;
         Collider target = GetComponent<Collider>();

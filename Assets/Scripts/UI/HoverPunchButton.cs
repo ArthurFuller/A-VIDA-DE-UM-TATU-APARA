@@ -94,7 +94,6 @@ public sealed class HoverPunchButton : MonoBehaviour, IPointerEnterHandler,
     {
         if (rect == null || animating) return;
         pressedEligible = false;
-        AudioManager.Play(SoundCue.UiClick);
         rect.DOKill();
         animating = true;
         DOTween.Sequence().SetTarget(rect).SetUpdate(true)

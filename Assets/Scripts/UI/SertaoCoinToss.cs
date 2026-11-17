@@ -99,7 +99,6 @@ public sealed class SertaoCoinToss : MonoBehaviour
         choices.interactable = choices.blocksRaycasts = false;
         EventSystem.current?.SetSelectedGameObject(null);
         began?.Invoke();
-        AudioManager.Play(SoundCue.GambleSpin);
 
         bool headsUp = UnityEngine.Random.value < 0.5f;
         bool won = headsUp == selectedHeads;
@@ -111,10 +110,12 @@ public sealed class SertaoCoinToss : MonoBehaviour
             .Append(choices.DOFade(0f, 0.12f))
             .Join(coin.DOAnchorPosY(-34f, 0.13f).SetEase(Ease.InQuad))
             .Join(DOVirtual.Float(0f, 1f, 0.13f, FlipVertically).SetEase(Ease.InOutSine))
+            .AppendCallback(() => AudioManager.Play(SoundCue.GambleSpin))
             .Append(arc)
             .Join(DOVirtual.Float(angle, target, airtime, DrawFace).SetEase(Ease.OutSine))
             .AppendCallback(() => Impact(headsUp, won, target))
             .Append(coin.DOAnchorPosY(18f, 0.085f).SetEase(Ease.OutQuad))
+            .AppendCallback(() => AudioManager.Play(won ? SoundCue.GambleWin : SoundCue.GambleLose))
             .Append(coin.DOAnchorPosY(0f, 0.12f).SetEase(Ease.InQuad))
             .AppendInterval(0.52f)
             .Append(screen.DOFade(0f, 0.17f))
@@ -130,7 +131,7 @@ public sealed class SertaoCoinToss : MonoBehaviour
         coin.DOPunchScale(Vector3.one * 0.11f, 0.19f, 4, 0.45f).SetLink(gameObject);
         stage.DOShakeAnchorPos(0.17f, new Vector2(7f, 4f), 8, 55f).SetLink(gameObject);
         SertaoCoinImpact.Play();
-        AudioManager.Play(won ? SoundCue.GambleWin : SoundCue.GambleLose);
+        AudioManager.Play(SoundCue.GambleLand);
     }
 
     private void FlipVertically(float amount)
@@ -189,6 +190,7 @@ public sealed class SertaoCoinToss : MonoBehaviour
         button.colors = states;
         Label(target, value, 0f, 26);
         button.onClick.AddListener(() => Pick(isHeads));
+        SertaoButtonAudio.Bind(button);
         return button;
     }
 

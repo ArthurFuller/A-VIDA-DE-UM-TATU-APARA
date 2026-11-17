@@ -159,6 +159,7 @@ public sealed class TopBarAutoHide : MonoBehaviour
             (resourceHud != null && resourceHud.HasFlyingResources) ||
             (hand != null && (hand.IsDraggingCard || hand.IsSelectionLocked))) return;
 
+        AudioManager.Play(SoundCue.UiPaper);
         missionsPanel?.Close();
         waitForPointerExit = true;
         CloseAfterTimeline();
@@ -289,7 +290,7 @@ public sealed class TopBarAutoHide : MonoBehaviour
         {
             bar.anchoredPosition = destination;
             if (separateArt) background.anchoredPosition = destination * artScale;
-            timeline?.FollowHud(bar.anchoredPosition - openPosition);
+            timeline?.FollowHud();
             onComplete?.Invoke();
             return;
         }
@@ -298,7 +299,7 @@ public sealed class TopBarAutoHide : MonoBehaviour
         if (separateArt)
             motion.Insert(0f, background.DOAnchorPos(destination * artScale, slideDuration)
                 .SetEase(Ease.InOutCubic));
-        motion.OnUpdate(() => timeline?.FollowHud(bar.anchoredPosition - openPosition));
+        motion.OnUpdate(() => timeline?.FollowHud());
         motion.OnComplete(() => onComplete?.Invoke());
     }
 }

@@ -1,10 +1,9 @@
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
+public sealed class WorkerAssignment : MonoBehaviour
 {
     [SerializeField] private GameObject selectionMarker;
     [SerializeField] private Text statusText;
@@ -55,7 +54,6 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
     public int AssignmentVersion => actionResolver != null ? actionResolver.AssignmentVersion : 0;
 
     private int nextDayProductionReduction;
-    private bool hovered;
     private int absenceDaysRemaining;
     private int actionsRemaining = 1;
     private int nextDayExtraActions;
@@ -70,6 +68,8 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
     private Vector3 initialHomePosition;
     private Vector3 previousPosition;
     private bool isWorking;
+    private Vector3? workFacingTarget;
+    private float walkedSinceStep;
     private enum AnimationState { Idle, Run, Work }
     private static readonly int StateParameter = Animator.StringToHash("State");
     private static readonly int IdleSpeedParameter = Animator.StringToHash("IdleSpeed");
@@ -134,7 +134,18 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
         UpdateFacing(destination - transform.position);
     }
 
-    public void SetWorking(bool value) => isWorking = value;
+    public void SetWorking(bool value)
+    {
+        isWorking = value;
+        workFacingTarget = null;
+    }
+
+    public void SetWorkingTowards(Vector3 target)
+    {
+        SetWorking(true);
+        workFacingTarget = target;
+        FaceTowards(target);
+    }
 
     public void RestoreHomeFacing()
     {
@@ -164,7 +175,24 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
         float deltaTime = Time.deltaTime;
         if (deltaTime <= 0f) return;
         bool moving = movement.sqrMagnitude > 0.0025f * deltaTime * deltaTime;
-        if (moving) UpdateFacing(movement);
+        if (moving)
+        {
+            UpdateFacing(movement);
+            movement.y = 0f;
+            float distance = movement.magnitude;
+            if (distance < 0.9f)
+            {
+                walkedSinceStep += distance;
+                if (walkedSinceStep >= 0.72f)
+                {
+                    walkedSinceStep -= 0.72f;
+                    AudioManager.Play(SoundCue.WorkerStep);
+                }
+            }
+            else walkedSinceStep = 0f;
+        }
+        else if (isWorking && workFacingTarget is Vector3 target)
+            UpdateFacing(target - transform.position);
         AnimationState state = AnimationState.Idle;
         if (moving) state = AnimationState.Run;
         else if (isWorking) state = AnimationState.Work;
@@ -178,8 +206,7 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
 
     private void OnEnable()
     {
-        if (selectionMarker != null)
-            selectionMarker.SetActive(false);
+        SetHovered(false);
     }
 
     private void OnDisable()
@@ -188,31 +215,12 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
             Selected = null;
     }
 
-    public void OnPointerClick(PointerEventData eventData)
-    {
-        TutorialHints.Once("workers", "Clique em um trabalhador para inspecioná-lo e depois use as cartas para escolher sua tarefa.");
-        Select();
-    }
-
-    public void Select()
-    {
-        if (Selected != null && Selected.selectionMarker != null)
-            Selected.UpdateMarker(false);
-
-        Selected = this;
-        UpdateMarker(true);
-    }
+    public void Select() => Selected = this;
 
     public void SetHovered(bool value)
     {
-        hovered = value;
-        UpdateMarker(Selected == this);
-    }
-
-    private void UpdateMarker(bool selected)
-    {
-        if (selectionMarker != null)
-            selectionMarker.SetActive(selected || hovered);
+        if (selectionMarker != null && selectionMarker.activeSelf != value)
+            selectionMarker.SetActive(value);
     }
 
     public void TryAssign(ActivityKind activity, string activityName, ActivityCardDrag card = null)
@@ -328,13 +336,11 @@ public sealed class WorkerAssignment : MonoBehaviour, IPointerClickHandler
         coffeeActions = 0;
         coffeeExcludedActivity = null;
         LastActivity = null;
-        hovered = false;
         ProductionReduction = nextDayProductionReduction;
         nextDayProductionReduction = 0;
         SetStatus(IsUnavailableToday ? "ausente" : ProductionReduction > 0 ? "produção reduzida" :
             "livre");
-        if (selectionMarker != null)
-            selectionMarker.SetActive(false);
+        SetHovered(false);
         if (Selected == this)
             Selected = null;
     }

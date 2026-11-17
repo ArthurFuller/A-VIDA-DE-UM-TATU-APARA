@@ -32,6 +32,7 @@ public sealed class TimelineCardHover : MonoBehaviour, IPointerEnterHandler,
         restingSibling = transform.GetSiblingIndex();
         transform.SetAsLastSibling();
         outline?.SetHighlighted(true);
+        if (Time.timeScale > 0f) AudioManager.Play(SoundCue.CardHover);
         rect.DOKill();
         rect.DOScale(hoverScale, 0.18f).SetEase(Ease.OutCubic);
         rect.DOAnchorPosY(restingY + 12f, 0.18f).SetEase(Ease.OutCubic);

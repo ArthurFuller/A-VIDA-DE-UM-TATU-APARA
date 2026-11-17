@@ -31,6 +31,7 @@ public sealed class ActivityPanelToggle : MonoBehaviour
         if (cardsPanel == null || cardsGroup == null)
             return;
         isOpen = !isOpen;
+        AudioManager.Play(SoundCue.UiPaper);
         cardsPanel.DOKill();
         cardsGroup.DOKill();
         cardsPanel.DOAnchorPos(isOpen ? openPosition : openPosition + Vector2.up * hiddenOffset,

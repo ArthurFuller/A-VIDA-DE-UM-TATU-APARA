@@ -138,7 +138,7 @@ public sealed class EventCardView : MonoBehaviour
         if (descriptionRect != null)
             descriptionRect.anchoredPosition = descriptionHomePosition + Vector2.left * descriptionSlideOffset;
         backdrop.gameObject.SetActive(true);
-        AudioManager.Play(SoundCue.EventReveal);
+        AudioManager.Play(SoundCue.UiPaper);
         backdrop.transform.SetAsLastSibling();
         backdrop.alpha = 1f;
         backdrop.blocksRaycasts = true;
@@ -160,6 +160,7 @@ public sealed class EventCardView : MonoBehaviour
     public void Flip()
     {
         if (!IsOpen || flipped || card == null || descriptionGroup == null) return;
+        AudioManager.Play(SoundCue.UiPaper);
         flipped = true;
         card.DOKill();
         if (revealButton != null)
@@ -189,6 +190,7 @@ public sealed class EventCardView : MonoBehaviour
     public void Close()
     {
         if (!IsOpen) return;
+        AudioManager.Play(SoundCue.UiPaper);
         IsOpen = false;
         revealMotion?.Kill();
         if (descriptionText != null) descriptionText.DOKill();

@@ -155,7 +155,7 @@ public sealed class SeedMerchant : MonoBehaviour
         if (activeMissionsPanel != null) activeMissionsPanel.Close();
         if (timeline != null) timeline.ClosePanel();
         if (shopTabs != null) shopTabs.ShowDefault(CanTrade);
-        AudioManager.Play(SoundCue.PanelOpen);
+        AudioManager.Play(SoundCue.UiPaper);
 
         if (backdropGroup != null)
         {
@@ -196,7 +196,7 @@ public sealed class SeedMerchant : MonoBehaviour
         if (shopGroup == null) return;
         bool wasOpen = IsOpen;
         bool wasClosing = panelTransition != null;
-        if (wasOpen) AudioManager.Play(SoundCue.PanelClose);
+        if (wasOpen) AudioManager.Play(SoundCue.UiPaper);
         if (shopTabs != null) shopTabs.OnShopClosed();
         shopGroup.blocksRaycasts = false;
         shopGroup.interactable = false;

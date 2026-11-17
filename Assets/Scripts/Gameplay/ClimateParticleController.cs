@@ -64,6 +64,8 @@ public sealed class ClimateParticleController : MonoBehaviour
         }
     }
 
+    private void Start() => AudioManager.SetRain(raining);
+
     private void OnEnable()
     {
         rain?.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -77,6 +79,7 @@ public sealed class ClimateParticleController : MonoBehaviour
     private void OnDisable()
     {
         if (events != null) events.WeatherChanged -= Refresh;
+        AudioManager.SetRain(false);
         tintFade?.Kill();
         rain?.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         droughtDust?.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -89,6 +92,7 @@ public sealed class ClimateParticleController : MonoBehaviour
     {
         bool nextRain = events != null && events.IsRaining;
         bool nextDrought = events != null && events.IsDrought;
+        AudioManager.SetRain(nextRain);
         if (nextRain != raining)
         {
             raining = nextRain;

@@ -40,6 +40,7 @@ public sealed class CardRewardChoice : MonoBehaviour
     private readonly CardChoiceHitArea[] hitAreas = new CardChoiceHitArea[2];
     private Action completed;
     private int currentDay;
+    private int hoveredChoice = -1;
     private RectTransform panel;
     private RectTransform innerViewport;
     private RectMask2D innerMask;
@@ -149,6 +150,7 @@ public sealed class CardRewardChoice : MonoBehaviour
         {
             int index = i;
             choiceButtons[i].onClick.AddListener(() => Choose(index));
+            SertaoButtonAudio.Bind(choiceButtons[i], true);
         }
         for (int i = 0; i < choiceNames.Length && i < 2; i++)
             if (choiceNames[i] != null) defaultNames[i] = new NameStyle(choiceNames[i]);
@@ -190,24 +192,32 @@ public sealed class CardRewardChoice : MonoBehaviour
     {
         if (group == null || transitioning || !group.interactable || Mouse.current == null) return;
         Vector2 pointer = Mouse.current.position.ReadValue();
+        int pointedChoice = -1;
         if (rootCanvas == null) rootCanvas = group.GetComponentInParent<Canvas>()?.rootCanvas;
         RectTransform root = rootCanvas != null ? rootCanvas.transform as RectTransform : null;
         Camera camera = rootCanvas != null && rootCanvas.renderMode != RenderMode.ScreenSpaceOverlay ?
             rootCanvas.worldCamera : null;
         for (int i = 0; i < descriptions.Length; i++)
         {
-            if (descriptions[i] == null || choiceCards[i] == null) continue;
+            if (choiceCards[i] == null) continue;
             bool inside = hitAreas[i] != null && hitAreas[i].IsRaycastLocationValid(pointer, camera);
             if (inside && i < rerollButtons.Length && rerollButtons[i] != null &&
                 rerollButtons[i].gameObject.activeInHierarchy &&
                 RectTransformUtility.RectangleContainsScreenPoint(
                     (RectTransform)rerollButtons[i].transform, pointer))
                 inside = false;
+            if (inside && offered[i] != null && pointedChoice < 0) pointedChoice = i;
+            if (descriptions[i] == null) continue;
             RectTransform tip = (RectTransform)descriptions[i].transform.parent;
             bool visible = inside && offered[i] != null &&
                 !string.IsNullOrWhiteSpace(offered[i].Description);
             if (tip.gameObject.activeSelf != visible) tip.gameObject.SetActive(visible);
             if (visible) KeepDescriptionOnScreen(tip, i, root);
+        }
+        if (hoveredChoice != pointedChoice)
+        {
+            hoveredChoice = pointedChoice;
+            if (hoveredChoice >= 0) AudioManager.Play(SoundCue.CardHover);
         }
     }
 
@@ -296,6 +306,8 @@ public sealed class CardRewardChoice : MonoBehaviour
             onCompleted?.Invoke();
             return;
         }
+        AudioManager.Play(SoundCue.UiPaper);
+        hoveredChoice = -1;
         if (!gameObject.activeSelf) gameObject.SetActive(true);
         for (int i = 0; i < 2; i++)
         {
@@ -500,6 +512,7 @@ public sealed class CardRewardChoice : MonoBehaviour
             .AppendInterval(transitionDuration)
             .OnComplete(() =>
             {
+                AudioManager.Play(SoundCue.UiPaper);
                 Hide();
                 callback?.Invoke();
             });

@@ -57,6 +57,7 @@ public sealed class GameFeedback : MonoBehaviour
     {
         if (summaryGroup == null || summaryText == null)
             return;
+        AudioManager.Play(SoundCue.UiPaper);
         if (!summaryGroup.gameObject.activeSelf) summaryGroup.gameObject.SetActive(true);
         summaryExitSequence?.Kill();
         summaryRevealSequence?.Kill();
@@ -107,6 +108,7 @@ public sealed class GameFeedback : MonoBehaviour
             return;
         }
         if (summaryExitSequence != null && summaryExitSequence.IsActive()) return;
+        AudioManager.Play(SoundCue.UiPaper);
 
         IsSummaryTransitioning = true;
         summaryRevealSequence?.Kill();

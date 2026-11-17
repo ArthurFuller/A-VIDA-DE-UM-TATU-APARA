@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
-// Biblioteca configurável no Inspector. Não cria objetos nem gera áudio.
+// A biblioteca compartilhada se sobrepõe às entradas antigas nas duas cenas.
 public sealed class AudioManager : MonoBehaviour
 {
     [Serializable]
-    private sealed class CueEntry
+    public sealed class CueEntry
     {
         public SoundCue cue;
         public AudioClip[] clips;
@@ -24,9 +25,12 @@ public sealed class AudioManager : MonoBehaviour
     [SerializeField, Range(0.02f, 0.4f)] private float fishingFadeDuration = 0.12f;
     [Header("Biblioteca de efeitos (atribuir clips aqui)")]
     [SerializeField] private CueEntry[] effects = Array.Empty<CueEntry>();
+    [SerializeField] private SertaoAudioLibrary library;
 
     private const string MusicKey = "Sertao_MusicVolume_v1";
     private const string EffectsKey = "Sertao_EffectsVolume_v1";
+    private const string WeatherKey = "Sertao_WeatherVolume_v1";
+    private const string WeatherMuteKey = "Sertao_WeatherMute_v1";
     private const string MusicMuteKey = "Sertao_MusicMute_v1";
     private const string EffectsMuteKey = "Sertao_EffectsMute_v1";
     private readonly Dictionary<SoundCue, CueEntry> entries = new();
@@ -34,15 +38,28 @@ public sealed class AudioManager : MonoBehaviour
     private readonly Dictionary<SoundCue, int> lastVariant = new();
     private float musicVolume;
     private float effectsVolume;
+    private float weatherVolume;
+    private bool weatherMuted;
+    private AudioSource weatherEffectsSource;
     private bool musicMuted;
     private bool effectsMuted;
     private float fishingPullUntil;
     private float fishingPullFade;
     private float fishingPullCueVolume = 1f;
+    private AudioSource rainSource;
+    private bool rainWanted;
+    private float rainBlend;
+    private static AudioSource uiSource;
+    private static float musicTransitionGain = 1f;
+    private static AudioSource sharedOpening;
+    private static AudioSource sharedLoop;
+    private bool UsesSoundtrack => library != null && library.musicLoop != null;
 
     public static AudioManager Instance { get; private set; }
     public float MusicVolume => musicVolume;
     public float EffectsVolume => effectsVolume;
+    public float WeatherVolume => weatherVolume;
+    public bool WeatherMuted => weatherMuted;
     public bool MusicMuted => musicMuted;
     public bool EffectsMuted => effectsMuted;
 
@@ -57,14 +74,57 @@ public sealed class AudioManager : MonoBehaviour
         Instance = this;
         musicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(MusicKey, 0.7f));
         effectsVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(EffectsKey, 0.85f));
+        weatherVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(WeatherKey, 0.4f));
+        weatherMuted = PlayerPrefs.GetInt(WeatherMuteKey, 0) != 0;
         musicMuted = PlayerPrefs.GetInt(MusicMuteKey, 0) != 0;
         effectsMuted = PlayerPrefs.GetInt(EffectsMuteKey, 0) != 0;
         foreach (CueEntry entry in effects)
             if (entry != null && !entries.ContainsKey(entry.cue))
                 entries.Add(entry.cue, entry);
-        if (musicSource != null) { musicSource.loop = true; musicSource.spatialBlend = 0f; }
+        if (library == null) library = Resources.Load<SertaoAudioLibrary>("SertaoAudioLibrary");
+        if (library != null && library.effects != null)
+        {
+            foreach (CueEntry entry in library.effects)
+                if (entry != null) entries[entry.cue] = entry;
+        }
+        if (musicSource != null)
+        {
+            musicSource.loop = true;
+            musicSource.spatialBlend = 0f;
+            if (UsesSoundtrack)
+            {
+                musicSource.playOnAwake = false;
+                musicSource.Stop();
+            }
+        }
         if (effectsSource != null) { effectsSource.loop = false; effectsSource.spatialBlend = 0f; }
-        if (ambienceSource != null) { ambienceSource.loop = true; ambienceSource.spatialBlend = 0f; }
+        if (ambienceSource != null)
+        {
+            ambienceSource.loop = true;
+            ambienceSource.spatialBlend = 0f;
+            if (library != null)
+            {
+                ambienceSource.playOnAwake = false;
+                ambienceSource.Stop();
+                ambienceSource.clip = library.wind;
+            }
+        }
+        weatherEffectsSource = gameObject.AddComponent<AudioSource>();
+        weatherEffectsSource.playOnAwake = false;
+        weatherEffectsSource.spatialBlend = 0f;
+        if (ambienceSource != null)
+            weatherEffectsSource.outputAudioMixerGroup = ambienceSource.outputAudioMixerGroup;
+
+        if (library != null && library.rain != null)
+        {
+            rainSource = gameObject.AddComponent<AudioSource>();
+            rainSource.playOnAwake = false;
+            rainSource.loop = true;
+            rainSource.spatialBlend = 0f;
+            rainSource.clip = library.rain;
+            if (ambienceSource != null)
+                rainSource.outputAudioMixerGroup = ambienceSource.outputAudioMixerGroup;
+        }
         if (fishingPullSource != null)
         {
             fishingPullSource.loop = true;
@@ -73,22 +133,96 @@ public sealed class AudioManager : MonoBehaviour
             if (entries.TryGetValue(SoundCue.FishingPull, out CueEntry pull))
             {
                 fishingPullCueVolume = pull.volume;
-                if (fishingPullSource.clip == null && pull.clips != null)
+                if ((library != null || fishingPullSource.clip == null) && pull.clips != null)
                     foreach (AudioClip clip in pull.clips)
                         if (clip != null) { fishingPullSource.clip = clip; break; }
             }
             fishingPullSource.Stop();
         }
+        PrepareUiAudio();
         ApplyVolumes();
+    }
+
+    private void PrepareUiAudio()
+    {
+        if (uiSource == null)
+        {
+            var audio = new GameObject("Áudio da interface");
+            DontDestroyOnLoad(audio);
+            uiSource = audio.AddComponent<AudioSource>();
+            uiSource.playOnAwake = false;
+            uiSource.ignoreListenerPause = true;
+            uiSource.spatialBlend = 0f;
+            uiSource.priority = 64;
+        }
+        uiSource.outputAudioMixerGroup = effectsSource != null ? effectsSource.outputAudioMixerGroup : null;
     }
 
     private void Start()
     {
-        // A música existente pode ser atribuída diretamente no AudioSource da cena.
-        if (musicSource != null && musicSource.clip != null && !musicSource.isPlaying)
-            musicSource.Play();
+        if (Instance != this) return;
+        StartMusic();
+        foreach (Button button in FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            SertaoButtonAudio.Bind(button);
         if (ambienceSource != null && ambienceSource.clip != null && !ambienceSource.isPlaying)
             ambienceSource.Play();
+    }
+
+    private void StartMusic()
+    {
+        AudioClip loop = UsesSoundtrack ? library.musicLoop : null;
+        if (loop != null && sharedLoop != null && sharedLoop.clip == loop) return;
+
+        if (sharedLoop != null)
+        {
+            sharedLoop.Stop();
+            if (sharedOpening != null) sharedOpening.Stop();
+            Destroy(sharedLoop.gameObject);
+            sharedOpening = sharedLoop = null;
+        }
+        if (loop == null)
+        {
+            if (musicSource != null && musicSource.clip != null && !musicSource.isPlaying)
+                musicSource.Play();
+            return;
+        }
+
+        var track = new GameObject("Trilha do Sertão");
+        DontDestroyOnLoad(track);
+        sharedLoop = AddMusicSource(track, loop, true);
+        if (library.musicOpening != null)
+            sharedOpening = AddMusicSource(track, library.musicOpening, false);
+        ApplyMusicVolume();
+
+        ScheduleSoundtrack(0.18);
+    }
+
+    private static void ScheduleSoundtrack(double leadTime)
+    {
+        double begins = AudioSettings.dspTime + leadTime;
+        if (sharedOpening != null)
+        {
+            sharedOpening.PlayScheduled(begins);
+            begins += (double)sharedOpening.clip.samples / sharedOpening.clip.frequency;
+        }
+        sharedLoop.PlayScheduled(begins);
+    }
+
+    private AudioSource AddMusicSource(GameObject root, AudioClip clip, bool loop)
+    {
+        var source = root.AddComponent<AudioSource>();
+        source.playOnAwake = false;
+        source.spatialBlend = 0f;
+        source.loop = loop;
+        source.clip = clip;
+        if (musicSource != null)
+            source.outputAudioMixerGroup = musicSource.outputAudioMixerGroup;
+        return source;
+    }
+
+    public static void SetRain(bool active)
+    {
+        if (Instance != null) Instance.rainWanted = active;
     }
 
     // A pesca mantém um único som em loop enquanto o jogador continua puxando.
@@ -107,11 +241,24 @@ public sealed class AudioManager : MonoBehaviour
     {
         if (fishingPullSource == null || fishingPullSource.clip == null ||
             effectsMuted || effectsVolume <= 0f || Time.timeScale <= 0f) return;
-        fishingPullUntil = Time.unscaledTime + fishingIdleDelay;
+        fishingPullUntil = Time.unscaledTime + (library != null ? library.reelInputHold : fishingIdleDelay);
         if (!fishingPullSource.isPlaying) fishingPullSource.Play();
     }
 
     private void Update()
+    {
+        if (rainSource != null)
+        {
+            if (rainWanted && !rainSource.isPlaying) rainSource.Play();
+            rainBlend = Mathf.MoveTowards(rainBlend, rainWanted ? 1f : 0f,
+                Time.unscaledDeltaTime / Mathf.Max(0.05f, library.weatherFade));
+            ApplyWeatherVolumes();
+            if (!rainWanted && rainBlend <= 0f && rainSource.isPlaying) rainSource.Stop();
+        }
+        UpdateFishingPull();
+    }
+
+    private void UpdateFishingPull()
     {
         if (fishingPullSource == null) return;
         if (Time.timeScale <= 0f) fishingPullUntil = 0f;
@@ -132,7 +279,21 @@ public sealed class AudioManager : MonoBehaviour
 
     private void PlayEffect(SoundCue cue)
     {
-        if (effectsSource == null || effectsMuted || effectsVolume <= 0f ||
+        if (cue == SoundCue.FishingPull) return;
+        if (cue is SoundCue.PanelOpen or SoundCue.PanelClose or
+            SoundCue.CardInspectOpen or SoundCue.CardInspectClose)
+            cue = SoundCue.UiPaper;
+        bool weatherCue = cue is SoundCue.EventRain or SoundCue.EventDrought;
+        AudioSource source = cue switch
+        {
+            SoundCue.UiClick or SoundCue.UiHover or SoundCue.UiPaper or SoundCue.UiRejected or
+            SoundCue.CardHover or SoundCue.CardPick or SoundCue.CardReturn or SoundCue.CardDrag or
+            SoundCue.CardReward => uiSource,
+            SoundCue.EventRain or SoundCue.EventDrought => weatherEffectsSource,
+            _ => effectsSource
+        };
+        float level = weatherCue ? WeatherLevel : effectsMuted ? 0f : effectsVolume;
+        if (source == null || !source.isActiveAndEnabled || level <= 0f ||
             !entries.TryGetValue(cue, out CueEntry entry) || entry.clips == null || entry.clips.Length == 0)
             return;
         float now = Time.unscaledTime;
@@ -147,7 +308,7 @@ public sealed class AudioManager : MonoBehaviour
         if (clip == null) return;
         lastPlay[cue] = now;
         lastVariant[cue] = pick;
-        effectsSource.PlayOneShot(clip, Mathf.Clamp01(entry.volume));
+        source.PlayOneShot(clip, Mathf.Clamp01(entry.volume));
     }
 
     public void SetMusicVolume(float value)
@@ -176,11 +337,82 @@ public sealed class AudioManager : MonoBehaviour
         PlayerPrefs.SetInt(EffectsMuteKey, muted ? 1 : 0);
         ApplyVolumes();
     }
+    public void SetWeatherVolume(float value)
+    {
+        weatherVolume = Mathf.Clamp01(value);
+        PlayerPrefs.SetFloat(WeatherKey, weatherVolume);
+        ApplyWeatherVolumes();
+    }
+
+    public void SetWeatherMuted(bool muted)
+    {
+        weatherMuted = muted;
+        PlayerPrefs.SetInt(WeatherMuteKey, muted ? 1 : 0);
+        ApplyWeatherVolumes();
+    }
+
+    private float WeatherLevel => weatherMuted ? 0f : weatherVolume;
+
+    private void ApplyWeatherVolumes()
+    {
+        float master = WeatherLevel;
+        if (weatherEffectsSource != null) weatherEffectsSource.volume = master;
+        if (ambienceSource != null)
+            ambienceSource.volume = master * (library != null
+                ? library.windVolume * Mathf.Lerp(1f, library.windInRain, rainBlend) : 1f);
+        if (rainSource != null)
+            rainSource.volume = master * library.rainVolume * rainBlend;
+    }
+
+    internal static float MusicTransitionGain => musicTransitionGain;
+
+    internal static void SetMusicTransitionGain(float gain)
+    {
+        musicTransitionGain = Mathf.Clamp01(gain);
+        if (Instance != null) Instance.ApplyMusicVolume();
+    }
+
+    internal static void RestartMusicAfterTransition()
+    {
+        var audio = Instance;
+        if (audio == null)
+        {
+            musicTransitionGain = 1f;
+            return;
+        }
+
+        if (audio.UsesSoundtrack && sharedLoop != null)
+        {
+            sharedLoop.Stop();
+            if (sharedOpening != null) sharedOpening.Stop();
+            ScheduleSoundtrack(0.05);
+        }
+        else if (audio.musicSource != null && audio.musicSource.clip != null)
+        {
+            audio.musicSource.Stop();
+            audio.musicSource.Play();
+        }
+        SetMusicTransitionGain(1f);
+    }
+
+    private void ApplyMusicVolume()
+    {
+        float volume = musicMuted ? 0f : musicVolume * musicTransitionGain;
+        if (musicSource != null)
+            musicSource.volume = UsesSoundtrack ? 0f : volume;
+        if (!UsesSoundtrack) return;
+        float gain = volume * library.musicGain;
+        if (sharedOpening != null) sharedOpening.volume = gain;
+        if (sharedLoop != null) sharedLoop.volume = gain;
+    }
+
     private void ApplyVolumes()
     {
-        if (musicSource != null) musicSource.volume = musicMuted ? 0f : musicVolume;
-        if (effectsSource != null) effectsSource.volume = effectsMuted ? 0f : effectsVolume;
-        if (ambienceSource != null) ambienceSource.volume = effectsMuted ? 0f : effectsVolume;
+        ApplyMusicVolume();
+        float level = effectsMuted ? 0f : effectsVolume;
+        if (effectsSource != null) effectsSource.volume = level;
+        if (uiSource != null) uiSource.volume = level;
+        ApplyWeatherVolumes();
         if (fishingPullSource != null)
             fishingPullSource.volume = fishingPullFade * fishingPullCueVolume *
                 (effectsMuted ? 0f : effectsVolume);
@@ -195,7 +427,13 @@ public sealed class AudioManager : MonoBehaviour
     }
     private void OnDisable()
     {
+        if (Instance != this) return;
         if (fishingPullSource != null) fishingPullSource.Stop();
+        fishingPullUntil = fishingPullFade = 0f;
+        rainBlend = 0f;
+        if (rainSource != null) rainSource.Stop();
+        if (weatherEffectsSource != null) weatherEffectsSource.Stop();
+        ApplyVolumes();
     }
     private void OnDestroy()
     {

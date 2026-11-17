@@ -225,12 +225,12 @@ public sealed class ActionResolver : MonoBehaviour
         if (replayAnimations > 0 && !replayAnimationComplete) return;
         if (pendingFoodWorker != null)
         {
-            feedback.ShowMessage("Confirme ou cancele o preparo de comida primeiro.");
+            RejectAction("Confirme ou cancele o preparo de comida primeiro.");
             return;
         }
         if (pendingPlotWorker != null)
         {
-            feedback.ShowMessage("Escolha um terreno ou cancele a carta ativa primeiro.");
+            RejectAction("Escolha um terreno ou cancele a carta ativa primeiro.");
             return;
         }
         if (activity == ActivityKind.BuySeeds)
@@ -240,13 +240,13 @@ public sealed class ActionResolver : MonoBehaviour
         }
         if (worker.IsUnavailableToday)
         {
-            feedback.ShowMessage("Esse trabalhador está ausente hoje.");
+            RejectAction("Esse trabalhador está ausente hoje.");
             return;
         }
         if (working.Contains(worker) || busyMovements.Contains(worker) ||
             HasAssignedWorker(forestTasks, worker) || HasAssignedWorker(fishingTasks, worker))
         {
-            feedback.ShowMessage("Aguarde esse trabalhador concluir a ação atual.");
+            RejectAction("Aguarde esse trabalhador concluir a ação atual.");
             return;
         }
         bool replaying = activity == ActivityKind.Replay;
@@ -255,7 +255,7 @@ public sealed class ActionResolver : MonoBehaviour
             ActivityKind? repeated = worker.LastActivity;
             if (repeated == null || !CanReplay(repeated.Value))
             {
-                feedback.ShowMessage("Replay exige uma ação anterior desse trabalhador.");
+                RejectAction("Replay exige uma ação anterior desse trabalhador.");
                 card?.PlayRejectedReplay();
                 return;
             }
@@ -267,7 +267,7 @@ public sealed class ActionResolver : MonoBehaviour
                     repeated == ActivityKind.BuildHouse;
                 if (disposable && (hand == null || !hand.HasDisposable(repeated.Value)))
                 {
-                    feedback.ShowMessage("Replay precisa da carta descartável na mão.");
+                    RejectAction("Replay precisa da carta descartável na mão.");
                     card.PlayRejectedReplay();
                     return;
                 }
@@ -305,7 +305,7 @@ public sealed class ActionResolver : MonoBehaviour
         }
         if (!replaying && !worker.CanAct(activity))
         {
-            feedback.ShowMessage(worker.UsedToday ? "Esse trabalhador já agiu hoje." :
+            RejectAction(worker.UsedToday ? "Esse trabalhador já agiu hoje." :
                 "Cafézinho exige uma ação diferente.");
             return;
         }
@@ -329,7 +329,7 @@ public sealed class ActionResolver : MonoBehaviour
             fishActivity ? FreeTask(fishingTasks) : null;
         if ((woodActivity || fishActivity) && task == null)
         {
-            feedback.ShowMessage("Todos os postos dessa área já estão ocupados.");
+            RejectAction("Todos os postos dessa área já estão ocupados.");
             return;
         }
 
@@ -355,7 +355,7 @@ public sealed class ActionResolver : MonoBehaviour
 
         if (task == null)
         {
-            feedback.ShowMessage("Essa carta ainda precisa de um alvo válido.");
+            RejectAction("Essa carta ainda precisa de um alvo válido.");
             return;
         }
 
@@ -374,12 +374,12 @@ public sealed class ActionResolver : MonoBehaviour
     {
         if (activeMinigame != null)
         {
-            feedback.ShowMessage("Conclua o minigame atual antes de apostar.");
+            RejectAction("Conclua o minigame atual antes de apostar.");
             return;
         }
         if (resources == null || (long)resources.Coins - gambleStake < int.MinValue)
         {
-            feedback.ShowMessage("Aposta acima do limite de moedas.");
+            RejectAction("Aposta acima do limite de moedas.");
             return;
         }
 
@@ -401,7 +401,7 @@ public sealed class ActionResolver : MonoBehaviour
             });
         if (coinToss == null)
         {
-            feedback.ShowMessage("Cara ou coroa indisponível.");
+            RejectAction("Cara ou coroa indisponível.");
             return;
         }
         busyWorkers++;
@@ -416,7 +416,6 @@ public sealed class ActionResolver : MonoBehaviour
             CardPlayed?.Invoke(dayCycle.CurrentDay, card);
         card?.PrepareDelivery(worker);
         CardUsed?.Invoke(card);
-        AudioManager.Play(SoundCue.CardPlaced);
     }
 
     private static bool CanReplay(ActivityKind activity) =>
@@ -481,7 +480,7 @@ public sealed class ActionResolver : MonoBehaviour
         bool canWaitForPlowing = IsPlanting(activity) && plotsBeingPlowed.Count > 0;
         if (!available && !canWaitForPlowing)
         {
-            feedback.ShowMessage("Não há alvo disponível para essa carta.");
+            RejectAction("Não há alvo disponível para essa carta.");
             card?.PlayRejectedReplay();
             return;
         }
@@ -580,7 +579,7 @@ public sealed class ActionResolver : MonoBehaviour
             return;
         if (pendingFoodWorker != null)
         {
-            feedback.ShowMessage("Confirme ou cancele o preparo de comida primeiro.");
+            RejectAction("Confirme ou cancele o preparo de comida primeiro.");
             return;
         }
         if (pendingPlotWorker == null)
@@ -609,9 +608,10 @@ public sealed class ActionResolver : MonoBehaviour
     {
         if (plot.Animal == AnimalKind.None)
         {
-            feedback.ShowMessage("Escolha um cercado com animal.");
+            RejectAction("Escolha um cercado com animal.");
             return;
         }
+        SoundCue feedingCue = plot.Animal == AnimalKind.Chicken ? SoundCue.FeedChicken : SoundCue.FeedAnimals;
         ActivityCardDrag card = pendingPlotCard;
         WorkerAssignment worker = TakePendingWorker();
         CommitAction(worker, ActivityKind.FeedAnimals, "distribuindo ração", card);
@@ -619,7 +619,7 @@ public sealed class ActionResolver : MonoBehaviour
         {
             if (dayCycle.TryRepeatAnimalProduction(out int milk, out int eggs))
                 feedback.ShowMessage("Ração: +" + milk + " leite e +" + eggs + " ovos.");
-            AudioManager.Play(SoundCue.FeedAnimals);
+            AudioManager.Play(feedingCue);
             SendWorkerHome(worker);
         });
     }
@@ -628,7 +628,7 @@ public sealed class ActionResolver : MonoBehaviour
     {
         if (!plot.IsFenced || !plot.IsEmpty || plot.Animal != AnimalKind.None)
         {
-            feedback.ShowMessage("Escolha um cercado vazio para o animal.");
+            RejectAction("Escolha um cercado vazio para o animal.");
             return;
         }
         ActivityCardDrag card = pendingPlotCard;
@@ -637,9 +637,12 @@ public sealed class ActionResolver : MonoBehaviour
             ActivityKind.PlaceChicken, "levando animal ao cercado", card);
         MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
-            plot.PlaceAnimal(animal);
-            AudioManager.Play(animal == AnimalKind.Cow ? SoundCue.CowArrive : SoundCue.ChickenArrive);
-            feedback.ShowMessage(animal == AnimalKind.Cow ? "Vaca no cercado." : "Galinha no cercado.");
+            if (plot != null && plot.PlaceAnimal(animal))
+            {
+                AudioManager.Play(animal == AnimalKind.Cow ? SoundCue.CowArrive : SoundCue.ChickenArrive);
+                feedback.ShowMessage(animal == AnimalKind.Cow ? "Vaca no cercado." : "Galinha no cercado.");
+            }
+            else RejectAction("O cercado já está ocupado ou indisponível.");
             SendWorkerHome(worker);
         });
     }
@@ -648,7 +651,7 @@ public sealed class ActionResolver : MonoBehaviour
     {
         if (!plot.CanUse(ActivityKind.BuildFence, dayCycle.CurrentDay, seedCatalog))
         {
-            feedback.ShowMessage("A cerca exige um terreno vazio e não arado.");
+            RejectAction("A cerca exige um terreno vazio e não arado.");
             return;
         }
         ActivityCardDrag card = pendingPlotCard;
@@ -657,11 +660,10 @@ public sealed class ActionResolver : MonoBehaviour
         MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
             plot.BuildFence();
-            AudioManager.Play(SoundCue.FenceBuilt);
             worker.SetStatus("cerca construída");
             feedback.ShowMessage("Terreno cercado.");
             SendWorkerHome(worker);
-        });
+        }, () => ConstructionSmoke.Play(plot.transform, plot.PlowedGroundBounds, plowWorkDuration));
     }
 
     public void TryBuildHouse(HouseSite site)
@@ -682,7 +684,7 @@ public sealed class ActionResolver : MonoBehaviour
                 feedback.ShowMessage("Casa construída. O novo trabalhador chegará amanhã.");
             }
             SendWorkerHome(builder);
-        });
+        }, () => site.PlayConstructionSmoke(plowWorkDuration));
     }
 
     public void RegisterWorker(WorkerAssignment worker)
@@ -697,7 +699,7 @@ public sealed class ActionResolver : MonoBehaviour
         ActivityKind activity = pendingPlotAction;
         if (!plot.CanUse(activity, dayCycle.CurrentDay, seedCatalog))
         {
-            feedback.ShowMessage(activity == ActivityKind.Fertilizer ?
+            RejectAction(activity == ActivityKind.Fertilizer ?
                 "Escolha uma plantação que ainda não recebeu adubo." :
                 "Escolha uma plantação ainda em crescimento.");
             return;
@@ -744,12 +746,12 @@ public sealed class ActionResolver : MonoBehaviour
     {
         if (plotsBeingPlowed.Contains(plot))
         {
-            feedback.ShowMessage("Esse terreno já está sendo arado.");
+            RejectAction("Esse terreno já está sendo arado.");
             return;
         }
         if (plot.IsPlowed || plot.IsFenced || plot.Animal != AnimalKind.None)
         {
-            feedback.ShowMessage("Escolha um terreno livre para arar.");
+            RejectAction("Escolha um terreno livre para arar.");
             return;
         }
         ActivityCardDrag card = pendingPlotCard;
@@ -779,7 +781,7 @@ public sealed class ActionResolver : MonoBehaviour
     {
         if (!plot.IsPlowed || plot.IsFenced || !plot.IsEmpty || plot.Animal != AnimalKind.None)
         {
-            feedback.ShowMessage("Plante em um terreno arado e vazio.");
+            RejectAction("Plante em um terreno arado e vazio.");
             return;
         }
         if (seedCatalog == null)
@@ -804,7 +806,7 @@ public sealed class ActionResolver : MonoBehaviour
     {
         if (seedCatalog == null || resources == null || !plot.IsReady(dayCycle.CurrentDay, seedCatalog))
         {
-            feedback.ShowMessage("A plantação ainda não está pronta.");
+            RejectAction("A plantação ainda não está pronta.");
             return;
         }
         ActivityCardDrag card = pendingPlotCard;
@@ -1027,13 +1029,14 @@ public sealed class ActionResolver : MonoBehaviour
         else MoveWorker(worker, worker.HomePosition, Arrived, false, true, travelSpeed);
     }
 
-    private void MoveAndWork(WorkerAssignment worker, Plot plot, float workDuration, System.Action onFinished) =>
+    private void MoveAndWork(WorkerAssignment worker, Plot plot, float workDuration,
+        System.Action onFinished, System.Action onStarted = null) =>
         MoveAndWork(worker, plot.WorkPosition, plot.transform.position,
-            plot.WorkWaypoints, plot.WorkTravelSpeed, workDuration, true, onFinished);
+            plot.WorkWaypoints, plot.WorkTravelSpeed, workDuration, true, onFinished, onStarted);
 
     private void MoveAndWork(WorkerAssignment worker, Vector3 destination, Vector3 facingTarget,
         Vector3[] waypoints, float travelSpeed, float workDuration, bool useGeneralAccess,
-        System.Action onFinished)
+        System.Action onFinished, System.Action onStarted = null)
     {
         bool continuing = workOriginRoutes.TryGetValue(worker, out Vector3[] originRoute);
         if (!continuing)
@@ -1055,6 +1058,7 @@ public sealed class ActionResolver : MonoBehaviour
         void BeginWork()
         {
             worker.FaceTowards(facingTarget);
+            onStarted?.Invoke();
             WorkAtStation(worker, workDuration, onFinished);
         }
         if (Vector3.Distance(worker.transform.position, destination) <= 0.15f)
@@ -1083,11 +1087,25 @@ public sealed class ActionResolver : MonoBehaviour
              worker.LastActivity.Value == ActivityKind.Fertilizer ||
              worker.LastActivity.Value == ActivityKind.WateringCan);
         if (worker.Progress != null) worker.Progress.Show(soilWork);
+        SoundCue? workSound = worker.LastActivity switch
+        {
+            ActivityKind.BuildFence or ActivityKind.BuildHouse => SoundCue.HammerWork,
+            ActivityKind.Plow => SoundCue.PlowWork,
+            ActivityKind.PlantCorn or ActivityKind.PlantPumpkin or ActivityKind.PlantJerimum => SoundCue.SoilWork,
+            _ => null
+        };
+        float nextStrike = 0.16f;
         float progress = 0;
         DOTween.To(() => progress, value =>
         {
             progress = value;
             if (worker.Progress != null) worker.Progress.SetProgress(value);
+            float elapsed = value * workDuration;
+            if (workSound.HasValue && value < 0.94f && elapsed >= nextStrike)
+            {
+                AudioManager.Play(workSound.Value);
+                nextStrike = elapsed + (workSound == SoundCue.HammerWork ? 0.57f : 0.75f);
+            }
         }, 1f, workDuration).SetEase(Ease.Linear).OnComplete(() =>
         {
             if (worker.Progress != null) worker.Progress.Hide();
@@ -1096,6 +1114,12 @@ public sealed class ActionResolver : MonoBehaviour
             worker.SetWorking(false);
             onFinished?.Invoke();
         });
+    }
+
+    private void RejectAction(string message)
+    {
+        AudioManager.Play(SoundCue.UiRejected);
+        feedback.ShowMessage(message);
     }
 
     private void MoveToGatheringArea(GatheringTask task)
@@ -1191,8 +1215,13 @@ public sealed class ActionResolver : MonoBehaviour
         if (forestVisitButton != null) forestVisitButton.gameObject.SetActive(false);
         if (fishingVisitButton != null) fishingVisitButton.gameObject.SetActive(false);
         busyWorkers++;
-        worker.FaceTowards(task.Destination.position);
-        worker.SetWorking(true);
+        if (wood && forestTrees != null && forestTrees.TryGetFacingPosition(worker.transform.position, out Vector3 treePosition))
+            worker.SetWorkingTowards(treePosition);
+        else
+        {
+            worker.FaceTowards(task.Destination.position);
+            worker.SetWorking(true);
+        }
         worker.SetStatus("atividade interativa");
         gatheringGame.Begin(task.SelectedActivity, rating =>
         {

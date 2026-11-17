@@ -99,6 +99,7 @@ public sealed class FoodPreparationPanel : MonoBehaviour
     public void Show(bool usePlus = false)
     {
         if (panel == null || group == null) return;
+        AudioManager.Play(SoundCue.UiPaper);
         if (!panel.gameObject.activeSelf) panel.gameObject.SetActive(true);
         transition?.Kill();
         RestoreHomes();
@@ -247,6 +248,7 @@ public sealed class FoodPreparationPanel : MonoBehaviour
     private void Hide()
     {
         if (panel == null) { HideImmediate(); return; }
+        AudioManager.Play(SoundCue.UiPaper);
         transitioning = true;
         transition?.Kill();
         transition = DOTween.Sequence().SetTarget(this)

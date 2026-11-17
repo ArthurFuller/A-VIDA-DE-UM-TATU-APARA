@@ -24,6 +24,8 @@ public sealed class GS2LeaderboardOnline : MonoBehaviour
         public string user_id;
     }
 
+    internal const string NicknameTaken = "Esse nickname já está em uso.";
+
     private const string RefreshKey = "GS2.FirebaseRefreshToken";
     private static GS2LeaderboardOnline instance;
     private GS2LeaderboardSettings settings;
@@ -93,6 +95,7 @@ public sealed class GS2LeaderboardOnline : MonoBehaviour
 
         using (var request = UnityWebRequest.Post(url, body, contentType))
         {
+            request.timeout = 6;
             yield return request.SendWebRequest();
             if (request.result == UnityWebRequest.Result.Success)
             {
@@ -115,8 +118,8 @@ public sealed class GS2LeaderboardOnline : MonoBehaviour
 
     private IEnumerator ClaimNickname(string nickname, Action<bool, string> done)
     {
-        if (nickname.Length < 2 || nickname.Length > 18)
-        { done(false, "Use entre 2 e 18 caracteres."); yield break; }
+        if (!GS2Profile.IsValidNickname(nickname))
+        { done(false, GS2Profile.NicknameHelp); yield break; }
         bool authenticated = false;
         yield return Authenticate(ok => authenticated = ok);
         if (!authenticated)
@@ -125,22 +128,24 @@ public sealed class GS2LeaderboardOnline : MonoBehaviour
         string path = "nicknames/" + NameKey(nickname);
         using (var get = UnityWebRequest.Get(DatabaseUrl(path)))
         {
+            get.timeout = 6;
             yield return get.SendWebRequest();
             if (get.result != UnityWebRequest.Result.Success)
             { done(false, "Não foi possível verificar o nickname."); yield break; }
             string owner = get.downloadHandler.text.Trim(' ', '\n', '\r', '"');
             if (owner == uid) { done(true, null); yield break; }
             if (owner != "null")
-            { done(false, "Esse nickname já está em uso."); yield break; }
+            { done(false, NicknameTaken); yield break; }
         }
 
         using (var put = UnityWebRequest.Put(DatabaseUrl(path), "\"" + uid + "\""))
         {
+            put.timeout = 6;
             put.SetRequestHeader("Content-Type", "application/json");
             put.SetRequestHeader("If-Match", "null_etag");
             yield return put.SendWebRequest();
             if (put.responseCode == 412)
-            { done(false, "Esse nickname já está em uso."); yield break; }
+            { done(false, NicknameTaken); yield break; }
             if (put.result != UnityWebRequest.Result.Success)
             { done(false, "Não foi possível salvar o nickname."); yield break; }
         }

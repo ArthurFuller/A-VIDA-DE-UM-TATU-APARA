@@ -313,6 +313,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             .Append(ghost.DOAnchorPos(Vector2.zero, dissolveMoveDuration).SetEase(Ease.OutCubic))
             .Join(ghost.DOScale(dissolveCenterScale, dissolveMoveDuration).SetEase(Ease.OutCubic))
             .AppendInterval(dissolvePause)
+            .AppendCallback(() => AudioManager.Play(SoundCue.CardDissolve))
             .Append(DOTween.To(() => ghostMaterial.GetFloat("_Cutoff"),
                 value => ghostMaterial.SetFloat("_Cutoff", value), 1f, dissolveDuration))
             .OnComplete(() =>
@@ -502,6 +503,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         if (activity != ActivityKind.BuySeeds && Hand != null && Hand.ContainsCard(this)) return;
         if (activity != ActivityKind.BuySeeds && Hand != null && Hand.IsSelectionLocked) return;
         hovered = true;
+        if (Time.timeScale > 0f) AudioManager.Play(SoundCue.CardHover);
         if (activity == ActivityKind.BuySeeds)
         {
             if (!shopClicking)
@@ -679,7 +681,10 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         ClearDrag();
         if (target != null)
         {
+            int assignmentVersion = target.AssignmentVersion;
             target.TryAssign(activity, activityName, this);
+            if (target.AssignmentVersion != assignmentVersion)
+                AudioManager.Play(SoundCue.CardPlaced);
         }
         ActivityCardAvailability hand = transform.parent != null ?
             transform.parent.GetComponentInChildren<ActivityCardAvailability>(true) : null;

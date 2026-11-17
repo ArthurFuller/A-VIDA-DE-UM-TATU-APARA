@@ -50,6 +50,10 @@ public sealed class DayTimeline : MonoBehaviour
     [SerializeField, Range(0f, 35f)] private float inspectionTilt = 22f;
     [SerializeField, Min(0f)] private float inspectionShift = 14f;
     [SerializeField, Min(0.1f)] private float inspectionFollowSpeed = 12f;
+    [SerializeField, Range(0f, 0.05f), Tooltip("Deslocamento relativo da arte dentro da moldura.")]
+    private float inspectionArtDepth = 0.033f;
+    [SerializeField, Range(0f, 0.6f), Tooltip("Intensidade do reflexo da carta em inspeção. Zero desliga.")]
+    private float inspectionSheenStrength = 0.30f;
 
     private sealed class PlayedCard
     {
@@ -90,19 +94,28 @@ public sealed class DayTimeline : MonoBehaviour
     private Sequence inspectionTween;
     private bool inspectionFromTimeline;
     private TopBarAutoHide topBarMotion;
-    private Vector2 hudOffset;
 
     public RectTransform PanelClip => panelClip;
     public RectTransform TimelinePanel => panel;
     public Vector2 PanelHomePosition => panelHomePosition;
     public bool IsOpen => open;
-    public Vector2 PanelClipPosition => new Vector2(-2f,
-        -Mathf.Max(topBarHeight, topBar != null ? topBar.rect.height : 0f)) +
-        panelOffset + hudOffset;
-
-    public void FollowHud(Vector2 offset)
+    public Vector2 PanelClipPosition
     {
-        hudOffset = offset;
+        get
+        {
+            if (panelClip == null || panelClip.parent is not RectTransform parent || missionsButton == null)
+                return new Vector2(-2f, -topBarHeight) + panelOffset;
+
+            Vector3 corner = missionsButton.TransformPoint(missionsButton.rect.xMax,
+                missionsButton.rect.yMin, 0f);
+            Vector2 position = parent.InverseTransformPoint(corner);
+            return new Vector2(Mathf.Min(position.x + panelOffset.x, parent.rect.xMax - 4f),
+                position.y + panelOffset.y) - parent.rect.max;
+        }
+    }
+
+    public void FollowHud()
+    {
         if (panelClip != null) panelClip.anchoredPosition = PanelClipPosition;
     }
 
@@ -164,7 +177,7 @@ public sealed class DayTimeline : MonoBehaviour
                 inspectionCard.GetComponent<TimelineCardInspection>();
             if (inspection != null)
                 inspection.Configure(inspectionTilt, inspectionShift,
-                    inspectionFollowSpeed);
+                    inspectionFollowSpeed, inspectionArtDepth, inspectionSheenStrength);
             return;
         }
         if (open && viewedDay > 0 && cardScroll != null &&
@@ -237,6 +250,7 @@ public sealed class DayTimeline : MonoBehaviour
         triggerButton = trigger.GetComponent<Button>();
         triggerButton.onClick.RemoveAllListeners();
         triggerButton.onClick.AddListener(Toggle);
+        SertaoButtonAudio.Bind(triggerButton);
 
         panelClip = transform.Find("Recorte da linha do tempo") as RectTransform;
         if (panelClip == null)
@@ -345,7 +359,9 @@ public sealed class DayTimeline : MonoBehaviour
         backButton = back.GetComponent<Button>();
         backButton.onClick.RemoveAllListeners();
         backButton.onClick.AddListener(BackToDays);
+        SertaoButtonAudio.Bind(backButton);
         if (created) Layout();
+        FollowHud();
         if (!Application.isPlaying || daysPanelSize == Vector2.zero)
         {
             daysPanelSize = panel.sizeDelta;
@@ -434,6 +450,7 @@ public sealed class DayTimeline : MonoBehaviour
                 Button button = node.GetComponent<Button>();
                 button.onClick.RemoveAllListeners();
                 button.onClick.AddListener(() => ShowDay(day));
+                SertaoButtonAudio.Bind(button);
                 dayNodes.Add(node);
             }
         }
@@ -509,6 +526,8 @@ public sealed class DayTimeline : MonoBehaviour
         if (activeMissionsPanel != null) activeMissionsPanel.Close();
         if (merchant != null && merchant.IsOpen) merchant.HideShop();
         EnsureUI();
+        if (panel == null) return;
+        AudioManager.Play(SoundCue.UiPaper);
         open = true;
         dayButtonsReady = false;
         viewedDay = 0;
@@ -541,6 +560,7 @@ public sealed class DayTimeline : MonoBehaviour
 
     private void Close(System.Action onClosed = null)
     {
+        AudioManager.Play(SoundCue.UiPaper);
         CloseInspection(true);
         if (viewedDay > 0 && onClosed == null)
             topBarMotion?.ReturnFromTimelineDay(null);
@@ -575,6 +595,7 @@ public sealed class DayTimeline : MonoBehaviour
     private void ShowDay(int day)
     {
         if (!dayButtonsReady || viewedDay != 0 || days != null && day > days.CurrentDay) return;
+        AudioManager.Play(SoundCue.UiPaper);
         dayButtonsReady = false;
         viewedDay = day;
         title.text = "DIA " + day;
@@ -614,6 +635,7 @@ public sealed class DayTimeline : MonoBehaviour
     private void BackToDays()
     {
         if (viewedDay == 0 || !cardScroll.gameObject.activeSelf) return;
+        AudioManager.Play(SoundCue.UiPaper);
         viewedDay = 0;
         dayButtonsReady = false;
         scroll.enabled = false;
@@ -681,6 +703,7 @@ public sealed class DayTimeline : MonoBehaviour
 
     private void OnRectTransformDimensionsChange()
     {
+        FollowHud();
         if (Application.isPlaying && open && viewedDay > 0 &&
             cardScroll != null && cardScroll.gameObject.activeInHierarchy)
             FitCardViewport();
@@ -918,6 +941,7 @@ public sealed class DayTimeline : MonoBehaviour
             hand?.SuspendHoverForInspection();
         }
         if (fromTimeline) scroll.enabled = false;
+        AudioManager.Play(SoundCue.CardInspectOpen);
         inspectionTween = DOTween.Sequence()
             .Join(inspectionShade.GetComponent<Image>().DOFade(0.52f, 0.38f))
             .Join(inspectionCard.DOAnchorPos(Vector2.zero, 0.45f)
@@ -930,7 +954,7 @@ public sealed class DayTimeline : MonoBehaviour
                 TimelineCardInspection inspection =
                     inspectionCard.gameObject.AddComponent<TimelineCardInspection>();
                 inspection.Configure(inspectionTilt, inspectionShift,
-                    inspectionFollowSpeed);
+                    inspectionFollowSpeed, inspectionArtDepth, inspectionSheenStrength);
                 inspection.Begin(canvas);
             });
         if (inspectionDescription != null)
@@ -983,6 +1007,7 @@ public sealed class DayTimeline : MonoBehaviour
             target.TransformPoint(target.rect.center));
         RectTransformUtility.ScreenPointToLocalPointInRectangle(root,
             screen, camera, out Vector2 destination);
+        AudioManager.Play(SoundCue.CardInspectClose);
         inspectionTween = DOTween.Sequence()
             .Join(card.DOAnchorPos(destination, 0.32f).SetEase(Ease.InOutCubic))
             .Join(card.DOScale(1f, 0.32f).SetEase(Ease.InCubic))
