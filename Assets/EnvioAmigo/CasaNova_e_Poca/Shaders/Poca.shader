@@ -107,7 +107,7 @@ Shader "Sertao/Poca"
             #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; float2 margemLivre : TEXCOORD1; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings
             {
                 float4 positionCS : SV_POSITION;
@@ -115,6 +115,7 @@ Shader "Sertao/Poca"
                 float3 normalWS   : TEXCOORD1;
                 float2 uv         : TEXCOORD2;
                 float  fog        : TEXCOORD3;
+                float  margemLivre : TEXCOORD4;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -128,6 +129,7 @@ Shader "Sertao/Poca"
                 o.positionCS = TransformWorldToHClip(p);
                 o.normalWS = TransformObjectToWorldNormal(v.normalOS);
                 o.uv = v.uv;
+                o.margemLivre = v.margemLivre.x;
                 o.fog = ComputeFogFactor(o.positionCS.z);
                 return o;
             }
@@ -259,13 +261,17 @@ Shader "Sertao/Poca"
                 corLama *= lerp(float3(1, 1, 1), saturate(luz.color), _InfluenciaLuz);
                 float alfaLama = 1.0 - smoothstep(1.0 - _LamaSome, 1.0, t + (nl - 0.5) * 0.25);
                 alfaLama *= step(0.001, _LarguraLama);
+                if (i.margemLivre > 0.5)
+                    alfaLama *= 1.0 - smoothstep(0.83, 1.0, -d / max(_LarguraLama, 1e-3));
 
                 // ---------- junta ----------
                 float3 cor = lerp(corLama, corAgua, agua);
                 float linha = (1.0 - smoothstep(0.0, aaD * 2.0, abs(d) - aaD * 0.5)) * _LinhaBeirada;
                 cor = lerp(cor, _CorTraco.rgb, linha * 0.85);
                 float alfa = max(agua, alfaLama);
-                alfa *= smoothstep(1.0, 0.92, max(abs(P.x), abs(P.y)));                // nunca corta reto na borda do plano
+                // A malha do lago central tem UV estendida. Só o limite da lama governa sua margem.
+                if (i.margemLivre <= 0.5)
+                    alfa *= smoothstep(1.0, 0.92, max(abs(P.x), abs(P.y)));
                 if (_Pontilhado > 0.5 && agua < 0.5) alfa = step(Ruido(W.xz * _TamanhoPonto), alfa * 1.05);
                 clip(alfa - 0.003);
 
