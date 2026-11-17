@@ -42,6 +42,7 @@ public sealed class AudioManager : MonoBehaviour
     private bool weatherMuted;
     private AudioSource weatherEffectsSource;
     private bool musicMuted;
+    private bool sceneMusicPaused;
     private bool effectsMuted;
     private float fishingPullUntil;
     private float fishingPullFade;
@@ -53,6 +54,8 @@ public sealed class AudioManager : MonoBehaviour
     private static float musicTransitionGain = 1f;
     private static AudioSource sharedOpening;
     private static AudioSource sharedLoop;
+    private static double soundtrackStartDsp = double.NaN;
+    private static double soundtrackPausedAt;
     private bool UsesSoundtrack => library != null && library.musicLoop != null;
 
     public static AudioManager Instance { get; private set; }
@@ -62,6 +65,7 @@ public sealed class AudioManager : MonoBehaviour
     public bool WeatherMuted => weatherMuted;
     public bool MusicMuted => musicMuted;
     public bool EffectsMuted => effectsMuted;
+    public event Action MusicMuteChanged;
 
     private void Awake()
     {
@@ -91,7 +95,7 @@ public sealed class AudioManager : MonoBehaviour
         {
             musicSource.loop = true;
             musicSource.spatialBlend = 0f;
-            if (UsesSoundtrack)
+            if (UsesSoundtrack || musicMuted)
             {
                 musicSource.playOnAwake = false;
                 musicSource.Stop();
@@ -171,7 +175,11 @@ public sealed class AudioManager : MonoBehaviour
     private void StartMusic()
     {
         AudioClip loop = UsesSoundtrack ? library.musicLoop : null;
-        if (loop != null && sharedLoop != null && sharedLoop.clip == loop) return;
+        if (loop != null && sharedLoop != null && sharedLoop.clip == loop)
+        {
+            ApplySoundtrackPause();
+            return;
+        }
 
         if (sharedLoop != null)
         {
@@ -182,7 +190,7 @@ public sealed class AudioManager : MonoBehaviour
         }
         if (loop == null)
         {
-            if (musicSource != null && musicSource.clip != null && !musicSource.isPlaying)
+            if (!musicMuted && musicSource != null && musicSource.clip != null && !musicSource.isPlaying)
                 musicSource.Play();
             return;
         }
@@ -194,18 +202,50 @@ public sealed class AudioManager : MonoBehaviour
             sharedOpening = AddMusicSource(track, library.musicOpening, false);
         ApplyMusicVolume();
 
-        ScheduleSoundtrack(0.18);
+        soundtrackStartDsp = double.NaN;
+        soundtrackPausedAt = 0d;
+        if (!musicMuted) ScheduleSoundtrack(0.18);
     }
 
     private static void ScheduleSoundtrack(double leadTime)
     {
         double begins = AudioSettings.dspTime + leadTime;
-        if (sharedOpening != null)
+        soundtrackStartDsp = begins - soundtrackPausedAt;
+        AudioClip opening = sharedOpening != null ? sharedOpening.clip : null;
+        double openingDuration = opening != null ? (double)opening.samples / opening.frequency : 0d;
+        if (soundtrackPausedAt < openingDuration)
         {
+            int startSample = Math.Min(opening.samples - 1,
+                (int)(soundtrackPausedAt * opening.frequency));
+            sharedOpening.timeSamples = startSample;
             sharedOpening.PlayScheduled(begins);
-            begins += (double)sharedOpening.clip.samples / sharedOpening.clip.frequency;
+            begins += (double)(opening.samples - startSample) / opening.frequency;
+            sharedLoop.timeSamples = 0;
+        }
+        else
+        {
+            AudioClip loop = sharedLoop.clip;
+            double loopTime = soundtrackPausedAt - openingDuration;
+            sharedLoop.timeSamples = (int)((loopTime * loop.frequency) % loop.samples);
         }
         sharedLoop.PlayScheduled(begins);
+    }
+
+    private void ApplySoundtrackPause()
+    {
+        if (sharedLoop == null) return;
+        if (!musicMuted)
+        {
+            if (double.IsNaN(soundtrackStartDsp)) ScheduleSoundtrack(0.05);
+            return;
+        }
+
+        if (double.IsNaN(soundtrackStartDsp)) return;
+        // Cancela também a entrada já agendada do loop enquanto a introdução toca.
+        soundtrackPausedAt = Math.Max(0d, AudioSettings.dspTime - soundtrackStartDsp);
+        soundtrackStartDsp = double.NaN;
+        sharedOpening?.Stop();
+        sharedLoop.Stop();
     }
 
     private AudioSource AddMusicSource(GameObject root, AudioClip clip, bool loop)
@@ -326,9 +366,29 @@ public sealed class AudioManager : MonoBehaviour
     }
     public void SetMusicMuted(bool muted)
     {
+        if (musicMuted == muted) return;
         musicMuted = muted;
         PlayerPrefs.SetInt(MusicMuteKey, muted ? 1 : 0);
-        ApplyVolumes();
+        ApplyMusicVolume();
+        if (UsesSoundtrack)
+        {
+            ApplySoundtrackPause();
+        }
+        else if (musicSource != null && musicSource.clip != null)
+        {
+            if (muted && musicSource.isPlaying)
+            {
+                musicSource.Pause();
+                sceneMusicPaused = true;
+            }
+            else if (!muted)
+            {
+                if (sceneMusicPaused) musicSource.UnPause();
+                else if (!musicSource.isPlaying) musicSource.Play();
+                sceneMusicPaused = false;
+            }
+        }
+        MusicMuteChanged?.Invoke();
     }
     public void SetEffectsMuted(bool muted)
     {
@@ -385,12 +445,15 @@ public sealed class AudioManager : MonoBehaviour
         {
             sharedLoop.Stop();
             if (sharedOpening != null) sharedOpening.Stop();
-            ScheduleSoundtrack(0.05);
+            soundtrackStartDsp = double.NaN;
+            soundtrackPausedAt = 0d;
+            if (!audio.musicMuted) ScheduleSoundtrack(0.05);
         }
         else if (audio.musicSource != null && audio.musicSource.clip != null)
         {
             audio.musicSource.Stop();
-            audio.musicSource.Play();
+            audio.sceneMusicPaused = false;
+            if (!audio.musicMuted) audio.musicSource.Play();
         }
         SetMusicTransitionGain(1f);
     }

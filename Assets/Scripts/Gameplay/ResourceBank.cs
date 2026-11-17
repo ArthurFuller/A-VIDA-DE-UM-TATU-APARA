@@ -49,15 +49,6 @@ public sealed class ResourceBank : MonoBehaviour
 
     private void Awake()
     {
-#if UNITY_EDITOR
-        if (SertaoPlayModeTests.UseTestResources)
-        {
-            const int testStock = 99;
-            Wood = Food = Coins = Fish = Corn = Pumpkin = Jerimum = testStock;
-            Milk = Eggs = CornSeeds = PumpkinSeeds = JerimumSeeds = testStock;
-            return;
-        }
-#endif
         GameBalance balance = GameBalance.Current;
         if (balance != null)
         {

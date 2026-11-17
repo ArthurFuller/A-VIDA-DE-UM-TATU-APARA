@@ -233,9 +233,13 @@ public sealed class FoodPreparationPanel : MonoBehaviour
 
     public void Confirm()
     {
-        if (transitioning) return;
-        if (actions != null && actions.ConfirmFoodPreparation(fish, corn, pumpkin, jerimum,
-            milk, eggs)) Hide();
+        if (transitioning || actions == null) return;
+        transitioning = true;
+        if (group != null) group.interactable = false;
+        RectTransform origin = resultText != null ? resultText.rectTransform : prepareButton;
+        if (actions.ConfirmFoodPreparation(fish, corn, pumpkin, jerimum, milk, eggs, origin, Hide)) return;
+        transitioning = false;
+        if (group != null) group.interactable = true;
     }
 
     public void Cancel()

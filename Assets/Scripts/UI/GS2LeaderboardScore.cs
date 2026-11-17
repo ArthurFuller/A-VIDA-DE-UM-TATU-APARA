@@ -11,9 +11,6 @@ public static class GS2LeaderboardScore
 
     public static void RecordFinishedGame(int coins)
     {
-#if UNITY_EDITOR
-        if (SertaoPlayModeTests.UseTestResources) return;
-#endif
         if (coins <= 0 || (HasLocalScore && coins <= LocalBestCoins)) return;
         PlayerPrefs.SetInt(ScoreKey, coins);
         PlayerPrefs.SetInt(HasScoreKey, 1);

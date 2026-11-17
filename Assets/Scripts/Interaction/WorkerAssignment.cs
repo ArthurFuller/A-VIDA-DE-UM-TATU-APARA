@@ -156,14 +156,19 @@ public sealed class WorkerAssignment : MonoBehaviour
 
     private void UpdateFacing(Vector3 direction)
     {
-        if (spriteVisual == null || direction.sqrMagnitude < 0.000001f) return;
-        if (spriteRenderer == null) return;
+        direction.y = 0f;
+        if (spriteRenderer == null || direction.sqrMagnitude < 0.000001f) return;
         if (spriteCamera == null) spriteCamera = Camera.main;
-        Vector3 right = spriteCamera != null ? spriteCamera.transform.right : Vector3.right;
-        Vector3 forward = spriteCamera != null ? spriteCamera.transform.forward : Vector3.forward;
-        float horizontal = Vector3.Dot(direction, right);
-        if (Mathf.Abs(horizontal) < direction.magnitude * 0.1f)
-            horizontal = Vector3.Dot(direction, Vector3.ProjectOnPlane(forward, Vector3.up));
+        float horizontal = direction.x;
+        if (spriteCamera != null)
+        {
+            Vector3 origin = transform.position;
+            Vector3 screenDirection = spriteCamera.WorldToScreenPoint(origin + direction) -
+                spriteCamera.WorldToScreenPoint(origin);
+            // A arte é lateral. Trechos em profundidade mantêm a última orientação.
+            if (Mathf.Abs(screenDirection.x) <= Mathf.Abs(screenDirection.y) * 0.12f) return;
+            horizontal = screenDirection.x;
+        }
         if (Mathf.Abs(horizontal) > 0.0001f)
             spriteRenderer.flipX = horizontal > 0f; // A arte original olha para a esquerda.
     }
@@ -267,17 +272,8 @@ public sealed class WorkerAssignment : MonoBehaviour
         actionsRemaining++;
         RefreshActionDots(true);
         coffeeActions++;
-        coffeeExcludedActivity = LastActivity;
+        if (LastActivity != ActivityKind.Coffee) coffeeExcludedActivity = LastActivity;
         LastActivity = ActivityKind.Coffee;
-    }
-
-    public void ReplaceCoffeeWithReplay()
-    {
-        // Replay cancels the pending coffee restriction and leaves two actions.
-        actionsRemaining = 2;
-        RefreshActionDots(true);
-        coffeeActions = 0;
-        coffeeExcludedActivity = null;
     }
 
     public void ScheduleExtraAction() => nextDayExtraActions++;

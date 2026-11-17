@@ -1,38 +1,40 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-// Botao da barra superior: o Animator da arte reage ao estado geral do som.
+// Botão da barra superior: a arte acompanha a pausa da trilha.
 public sealed class AudioLizardButton : MonoBehaviour
 {
     [SerializeField] private Button button;
     [SerializeField] private AudioLizardVisual visual;
+    private AudioManager audioManager;
 
     private void Awake()
     {
-        if (button != null) button.onClick.AddListener(ToggleSound);
+        if (button != null) button.onClick.AddListener(ToggleMusic);
     }
 
-    private void Start() => Refresh();
+    private void Start()
+    {
+        audioManager = AudioManager.Instance;
+        if (audioManager == null) return;
+        audioManager.MusicMuteChanged += Refresh;
+        Refresh();
+    }
 
     private void OnDestroy()
     {
-        if (button != null) button.onClick.RemoveListener(ToggleSound);
+        if (button != null) button.onClick.RemoveListener(ToggleMusic);
+        if (audioManager != null) audioManager.MusicMuteChanged -= Refresh;
     }
 
-    private void ToggleSound()
+    private void ToggleMusic()
     {
-        AudioManager audio = AudioManager.Instance;
-        if (audio == null) return;
-        bool mute = !(audio.MusicMuted && audio.EffectsMuted);
-        audio.SetMusicMuted(mute);
-        audio.SetEffectsMuted(mute);
-        Refresh();
+        if (audioManager != null) audioManager.SetMusicMuted(!audioManager.MusicMuted);
     }
 
     private void Refresh()
     {
-        AudioManager audio = AudioManager.Instance;
-        if (audio != null && visual != null)
-            visual.SetMuted(audio.MusicMuted && audio.EffectsMuted);
+        if (audioManager != null && visual != null)
+            visual.SetMuted(audioManager.MusicMuted);
     }
 }

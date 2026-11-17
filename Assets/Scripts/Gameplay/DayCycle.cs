@@ -47,7 +47,6 @@ public sealed class DayCycle : MonoBehaviour
     private int missedMeals;
 #if UNITY_EDITOR
     private int? previewFinalBalance;
-    private int dayBeforePreview;
 
     internal bool TryPreviewFinalDay(int finalBalance)
     {
@@ -58,7 +57,7 @@ public sealed class DayCycle : MonoBehaviour
 
         previewFinalBalance = finalBalance;
         finishDayButton.onClick.Invoke();
-        if (feedingOpen) return true;
+        if (gameOver) return true;
         previewFinalBalance = null;
         return false;
     }
@@ -222,7 +221,7 @@ public sealed class DayCycle : MonoBehaviour
 #if UNITY_EDITOR
         finalDay |= previewFinalBalance.HasValue;
 #endif
-        if (feedingGame == null)
+        if (!finalDay && feedingGame == null)
         {
             feedback?.ShowMessage("Minigame de alimentação não configurado.");
             return;
@@ -236,7 +235,6 @@ public sealed class DayCycle : MonoBehaviour
 #if UNITY_EDITOR
         if (previewFinalBalance.HasValue)
         {
-            dayBeforePreview = currentDay;
             currentDay = totalDays;
             UpdateDayLabel();
         }
@@ -248,21 +246,20 @@ public sealed class DayCycle : MonoBehaviour
         if (finishDayFeedback != null) finishDayFeedback.PlayAcceptedClick();
         if (finishDayButton != null) finishDayButton.enabled = false;
         DayClosing?.Invoke();
-        void OpenFeeding() => feedingGame.Begin(workers, FinishFeeding, CancelFeeding, finalDay);
+        if (finalDay)
+        {
+            if (hand != null) hand.ExitForDay(null);
+            FinishMatch();
+            return;
+        }
+
+        void OpenFeeding() => feedingGame.Begin(workers, FinishFeeding, CancelFeeding);
         if (hand != null) hand.ExitForDay(OpenFeeding);
         else OpenFeeding();
     }
 
     private void CancelFeeding()
     {
-#if UNITY_EDITOR
-        if (previewFinalBalance.HasValue)
-        {
-            previewFinalBalance = null;
-            currentDay = dayBeforePreview;
-            UpdateDayLabel();
-        }
-#endif
         feedingOpen = false;
         if (finishDayButton != null) finishDayButton.enabled = true;
         if (hand != null) hand.ReturnAfterCancelledDay();
@@ -271,26 +268,18 @@ public sealed class DayCycle : MonoBehaviour
 
     private void FinishFeeding(SaleItem?[] chosenFood)
     {
-        if (!feedingOpen || gameOver || lastClosedDay == currentDay) return;
+        if (!feedingOpen || gameOver || lastClosedDay == currentDay || currentDay >= totalDays) return;
         lastClosedDay = currentDay;
-        bool finalDay = currentDay >= totalDays;
 
-        int missedMealsToday = 0;
         for (int i = 0; i < workers.Length; i++)
         {
             WorkerAssignment worker = workers[i];
             if (worker == null || worker.IsUnavailableToday) continue;
             SaleItem? received = i < chosenFood.Length ? chosenFood[i] : null;
-            if (!received.HasValue) missedMealsToday++;
-            else if (!finalDay && received == SaleItem.Food) worker.ScheduleExtraAction();
+            if (!received.HasValue) missedMeals++;
+            else if (received == SaleItem.Food) worker.ScheduleExtraAction();
         }
 
-        if (finalDay)
-        {
-            FinishMatch(missedMealsToday);
-            return;
-        }
-        missedMeals += missedMealsToday;
         if (cardChoice != null) cardChoice.Begin(currentDay, ContinueToNextDay);
         else ContinueToNextDay();
     }
@@ -307,15 +296,14 @@ public sealed class DayCycle : MonoBehaviour
         return true;
     }
 
-    private void FinishMatch(int missedMealsToday)
+    private void FinishMatch()
     {
         gameOver = true;
         feedingOpen = false;
 #if UNITY_EDITOR
         if (previewFinalBalance is int finalBalance)
         {
-            resultsView.Show(SertaoMatchResult.CreatePreview(finalBalance, missedMealsToday,
-                GameBalance.Current), null);
+            resultsView.Show(SertaoMatchResult.CreatePreview(finalBalance, 0, GameBalance.Current), null);
             return;
         }
 #endif
@@ -339,7 +327,7 @@ public sealed class DayCycle : MonoBehaviour
                 if (site.IsBuilt) builtHouses++;
             }
 
-        var result = new SertaoMatchResult(resources, missedMeals + missedMealsToday,
+        var result = new SertaoMatchResult(resources, missedMeals,
             missionBoard != null ? missionBoard.DeliveredCount : 0,
             missionBoard != null ? missionBoard.UndeliveredCount : 0,
             developedPlots, totalPlots, builtHouses, totalHouses, GameBalance.Current);

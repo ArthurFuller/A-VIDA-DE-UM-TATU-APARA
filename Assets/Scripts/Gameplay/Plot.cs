@@ -10,6 +10,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
 {
     // Na grade de PrototypeLayout, a areia desce até cerca de 0,084 m abaixo da origem dos slots.
     private const float FenceFootOffset = -0.09f;
+    private static readonly System.Random chickenFacingRandom = new System.Random();
 
     [SerializeField] private ActionResolver actionResolver;
     [Tooltip("Pontos opcionais do trajeto, na ordem da ida. A volta usa a ordem inversa.")]
@@ -34,6 +35,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     [SerializeField] private GameObject joinedFenceModel; // Modelo FBX para cercas unificadas.
     [SerializeField, Min(0f)] private float fencePieceDelay = 0.06f;
     [SerializeField, Min(0.01f)] private float fencePieceDuration = 0.28f;
+    [SerializeField, Tooltip("Direção do bico na arte original da galinha, antes de aplicar o espelhamento.")]
+    private bool chickenSpriteFacesRight = true;
     [SerializeField] private Transform growthFill;
     [SerializeField, Min(0.01f)] private float growthFillWidth = 0.84f;
     [SerializeField] private Color readyGrowthColor = new Color(0.16f, 0.75f, 0.2f);
@@ -723,12 +726,46 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             AddAnimalPart(root.transform, "Bico", new Vector3(0.31f, 0.51f, 0f),
                 new Vector3(0.12f, 0.07f, 0.12f), new Color(0.95f, 0.39f, 0.12f));
         }
+        PositionAnimals(root.transform, kind, frames);
         root.transform.localScale = Vector3.zero;
         root.transform.DOScale(1f, 0.32f).SetEase(Ease.OutBack)
             .OnComplete(() => root.transform.DOPunchScale(Vector3.one * 0.08f, 0.2f));
         RefreshFencedPlots();
         StateChanged?.Invoke();
         return true;
+    }
+
+    private void PositionAnimals(Transform group, AnimalKind kind, Sprite[] frames)
+    {
+        var animals = new List<SpriteRenderer>();
+        float lowestPoint = float.PositiveInfinity;
+        foreach (Renderer renderer in group.GetComponentsInChildren<Renderer>())
+        {
+            if (renderer is SpriteRenderer sprite)
+            {
+                if (sprite.sprite != null &&
+                    (frames == null || Array.IndexOf(frames, sprite.sprite) < 0)) continue;
+                animals.Add(sprite);
+                if (sprite.sprite == null) continue;
+            }
+            lowestPoint = Mathf.Min(lowestPoint, renderer.bounds.min.y);
+        }
+
+        if (kind == AnimalKind.Chicken && animals.Count == 3)
+        {
+            int facingLeft = chickenFacingRandom.Next(animals.Count);
+            for (int i = 0; i < animals.Count; i++)
+            {
+                bool facesRight = i != facingLeft;
+                animals[i].flipX = facesRight != chickenSpriteFacesRight;
+            }
+        }
+
+        // Usa a areia dentro da cerca como referência para o pé dos animais.
+        float groundY = transform.position.y + FenceFootOffset + 0.04f;
+        float drop = float.IsPositiveInfinity(lowestPoint) ? -FenceFootOffset :
+            Mathf.Clamp(lowestPoint - groundY, 0f, 0.32f);
+        group.position -= Vector3.up * drop;
     }
 
     public void PulseAnimal()

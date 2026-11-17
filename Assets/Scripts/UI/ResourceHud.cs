@@ -194,17 +194,19 @@ public sealed class ResourceHud : MonoBehaviour
     }
 
     public void FlyFromRect(ResourceKind kind, int amount, RectTransform origin,
-        System.Action onLastDeparture = null, int maxIcons = int.MaxValue)
+        System.Action onLastDeparture = null, int maxIcons = int.MaxValue, System.Action onAllArrived = null)
     {
         if (origin == null)
         {
             onLastDeparture?.Invoke();
+            onAllArrived?.Invoke();
             return;
         }
 
         Vector2 screenOrigin = RectTransformUtility.WorldToScreenPoint(UiCamera,
             origin.TransformPoint(origin.rect.center));
-        FlyFromScreen(kind, amount, screenOrigin, onLastDeparture: onLastDeparture, maxIcons: maxIcons);
+        FlyFromScreen(kind, amount, screenOrigin, onAllArrived: onAllArrived,
+            onLastDeparture: onLastDeparture, maxIcons: maxIcons);
     }
 
     public DropBatch CreateDropBatch(ResourceKind kind) => new DropBatch(kind);

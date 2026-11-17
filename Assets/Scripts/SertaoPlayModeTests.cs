@@ -8,11 +8,7 @@ internal static class SertaoPlayModeTests
 {
     private const string MenuScene = "Assets/Scenes/MainMenu.unity";
     private const string PreviewKey = "Sertao.PlayMode.PreviewNickname";
-    private const string ResourcesKey = "Sertao.PlayMode.Resources99";
     private const string PreviewMenu = "Sertão/Testes/Simular primeiro acesso";
-    private const string ResourcesMenu = "Sertão/Testes/Iniciar com 99 de cada recurso";
-
-    internal static bool UseTestResources => SessionState.GetBool(ResourcesKey, true);
 
     internal static bool TakeNicknamePreview()
     {
@@ -74,19 +70,6 @@ internal static class SertaoPlayModeTests
         }
 
         return true;
-    }
-
-    [MenuItem(ResourcesMenu, false, 11)]
-    private static void ToggleTestResources()
-    {
-        SessionState.SetBool(ResourcesKey, !UseTestResources);
-    }
-
-    [MenuItem(ResourcesMenu, true)]
-    private static bool ValidateTestResources()
-    {
-        UnityEditor.Menu.SetChecked(ResourcesMenu, UseTestResources);
-        return !EditorApplication.isPlayingOrWillChangePlaymode;
     }
 }
 #endif

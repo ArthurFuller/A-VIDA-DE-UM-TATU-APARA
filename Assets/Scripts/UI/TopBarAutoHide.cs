@@ -122,10 +122,11 @@ public sealed class TopBarAutoHide : MonoBehaviour
 
         if (Mouse.current == null) return;
         Vector2 pointer = Mouse.current.position.ReadValue();
-        bool overBar = RectTransformUtility.RectangleContainsScreenPoint(bar, pointer, uiCamera);
+        bool overBar = open ? RectTransformUtility.RectangleContainsScreenPoint(bar, pointer, uiCamera) :
+            IsOverRevealTab(pointer);
         if (waitForPointerExit)
         {
-            if (overBar) return;
+            if (IsMoving || overBar) return;
             waitForPointerExit = false;
         }
         if ((timeline != null && timeline.IsOpen) ||
@@ -142,6 +143,28 @@ public sealed class TopBarAutoHide : MonoBehaviour
         }
         else if (open && Time.unscaledTime - lastHoverTime >= idleSeconds)
             SetOpen(false, false);
+    }
+
+    private bool IsOverRevealTab(Vector2 pointer)
+    {
+        if (background == null || !background.gameObject.activeInHierarchy ||
+            pointer.x < 0f || pointer.y < 0f || pointer.x >= Screen.width || pointer.y >= Screen.height ||
+            !RectTransformUtility.ScreenPointToLocalPointInRectangle(background, pointer, uiCamera,
+                out Vector2 point)) return false;
+
+        Rect rect = background.rect;
+        if (rect.width <= 0f || rect.height <= 0f) return false;
+        // Contorno da lingueta na arte do HUD, medido a partir do topo da imagem.
+        const float tabStart = 280f / 1080f;
+        const float tabShoulder = 408f / 1080f;
+        const float tabEnd = 409f / 1080f;
+        float y = (rect.yMax - point.y) / rect.height;
+        if (y < tabStart || y > tabEnd) return false;
+        float halfWidth = y <= tabShoulder
+            ? Mathf.Lerp(0.142f, 0.080f, Mathf.InverseLerp(tabStart, tabShoulder, y))
+            : Mathf.Lerp(0.080f, 0.028f, Mathf.InverseLerp(tabShoulder, tabEnd, y));
+        float x = (point.x - rect.center.x) / rect.width;
+        return Mathf.Abs(x) <= halfWidth;
     }
 
     public void RevealForResources() => PrepareResourceFeedback();

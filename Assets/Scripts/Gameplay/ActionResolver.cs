@@ -19,7 +19,6 @@ public sealed class ActionResolver : MonoBehaviour
     [SerializeField] private Text fishingVisitLabel;
     [SerializeField] private FoodPreparationPanel foodPreparationPanel;
     [SerializeField] private InventoryTrading inventoryTrading;
-    [SerializeField, Min(0.01f)] private float foodPreparationDuration = 5f;
     [SerializeField] private WorkerAssignment[] workers;
     [SerializeField] private Transform forestDestination;
     [SerializeField] private ForestTreeFall forestTrees;
@@ -89,6 +88,7 @@ public sealed class ActionResolver : MonoBehaviour
     private WorkerAssignment pendingFoodWorker;
     private ActivityCardDrag pendingFoodCard;
     private bool pendingFoodPlus;
+    private bool servingPreparedFood;
     private GatheringTask[] forestTasks;
     private GatheringTask[] fishingTasks;
     private GatheringTask activeMinigame;
@@ -103,7 +103,7 @@ public sealed class ActionResolver : MonoBehaviour
     [SerializeField] private Button cancelSelectionButton;
 
     public bool IsBusy => housePreviewBusy || busyWorkers > 0 || replayAnimations > 0 || pendingFoodWorker != null ||
-        pendingPlotWorker != null ||
+        pendingPlotWorker != null || servingPreparedFood ||
         HasGatheringWorker(forestTasks) || HasGatheringWorker(fishingTasks);
     public bool HasPendingSelection => pendingPlotWorker != null;
     public event System.Action<bool> PendingSelectionChanged;
@@ -223,7 +223,7 @@ public sealed class ActionResolver : MonoBehaviour
         if (dayCycle == null || !dayCycle.CanAcceptActions || SertaoCoinToss.IsOpen)
             return;
         if (replayAnimations > 0 && !replayAnimationComplete) return;
-        if (pendingFoodWorker != null)
+        if (pendingFoodWorker != null || servingPreparedFood)
         {
             RejectAction("Confirme ou cancele o preparo de comida primeiro.");
             return;
@@ -274,21 +274,14 @@ public sealed class ActionResolver : MonoBehaviour
                 AssignmentVersion++;
                 replayAnimations++;
                 ActivityKind revealed = repeated.Value;
-                card.PlayReplay(worker, revealed, () =>
+                bool deliverDuringReplay = !RequiresTargetSelection(revealed) &&
+                    revealed != ActivityKind.PrepareFood && revealed != ActivityKind.FoodPlus;
+                card.PlayReplay(worker, revealed, deliverDuringReplay, () =>
                 {
                     replayAnimations--;
                     TryAssignInternal(worker, ActivityKind.Replay, activityName, card, true);
                 });
                 if (disposable) hand.ConsumeReplayDisposable(revealed);
-                return;
-            }
-            if (repeated == ActivityKind.Coffee)
-            {
-                worker.ReplaceCoffeeWithReplay();
-                worker.Select();
-                worker.SetStatus("duas ações disponíveis");
-                RecordCard(ActivityKind.Replay, worker, card);
-                feedback.ShowMessage("Replay interrompeu o Cafézinho: duas ações disponíveis.");
                 return;
             }
             activity = repeated.Value;
@@ -299,8 +292,9 @@ public sealed class ActionResolver : MonoBehaviour
             AudioManager.Play(SoundCue.Coffee);
             worker.Select();
             worker.SetStatus("ação extra disponível");
-            RecordCard(activity, worker, card);
-            feedback.ShowMessage("Cafézinho: uma ação diferente disponível.");
+            RecordCard(replaying ? ActivityKind.Replay : activity, worker, card);
+            feedback.ShowMessage(replaying ? "Replay do Cafézinho: +1 ação disponível." :
+                "Cafézinho: uma ação diferente disponível.");
             return;
         }
         if (!replaying && !worker.CanAct(activity))
@@ -341,13 +335,7 @@ public sealed class ActionResolver : MonoBehaviour
 
         ClearPendingPlot();
 
-        if (activity == ActivityKind.Plow || activity == ActivityKind.PlantCorn ||
-            activity == ActivityKind.PlantPumpkin || activity == ActivityKind.PlantJerimum ||
-            activity == ActivityKind.Harvest ||
-            activity == ActivityKind.WateringCan || activity == ActivityKind.Fertilizer ||
-            activity == ActivityKind.BuildFence || activity == ActivityKind.BuildHouse ||
-            activity == ActivityKind.PlaceCow || activity == ActivityKind.PlaceChicken ||
-            activity == ActivityKind.FeedAnimals)
+        if (RequiresTargetSelection(activity))
         {
             SelectPlot(worker, activity, activityName, card);
             return;
@@ -421,6 +409,12 @@ public sealed class ActionResolver : MonoBehaviour
     private static bool CanReplay(ActivityKind activity) =>
         activity != ActivityKind.Replay && activity != ActivityKind.BuySeeds;
 
+    private static bool RequiresTargetSelection(ActivityKind activity) => activity is
+        ActivityKind.Plow or ActivityKind.PlantCorn or ActivityKind.PlantPumpkin or
+        ActivityKind.PlantJerimum or ActivityKind.Harvest or ActivityKind.WateringCan or
+        ActivityKind.Fertilizer or ActivityKind.BuildFence or ActivityKind.BuildHouse or
+        ActivityKind.PlaceCow or ActivityKind.PlaceChicken or ActivityKind.FeedAnimals;
+
     private void CommitAction(WorkerAssignment worker, ActivityKind activity, string name,
         ActivityCardDrag card)
     {
@@ -488,7 +482,7 @@ public sealed class ActionResolver : MonoBehaviour
         pendingPlotWorker = worker;
         pendingPlotCard = card;
         pendingPlotAction = activity;
-        card?.FlyToSelection();
+        card?.FlyToSelection(activity);
         if (cancelSelectionButton != null)
         {
             cancelSelectionButton.gameObject.SetActive(true);
@@ -858,9 +852,10 @@ public sealed class ActionResolver : MonoBehaviour
         }
     }
 
-    public bool ConfirmFoodPreparation(int fish, int corn, int pumpkin, int jerimum, int milk, int eggs)
+    public bool ConfirmFoodPreparation(int fish, int corn, int pumpkin, int jerimum, int milk, int eggs,
+        RectTransform resultOrigin = null, System.Action onAllArrived = null)
     {
-        if (pendingFoodWorker == null ||
+        if (servingPreparedFood || pendingFoodWorker == null ||
             (pendingFoodWorker.UsedToday &&
              (pendingFoodCard == null || pendingFoodCard.Kind != ActivityKind.Replay)) ||
             inventoryTrading == null ||
@@ -877,19 +872,24 @@ public sealed class ActionResolver : MonoBehaviour
         pendingFoodWorker = null;
         pendingFoodCard = null;
         pendingFoodPlus = false;
-        CommitAction(worker, plus ? ActivityKind.FoodPlus : ActivityKind.PrepareFood, "preparando comida", card);
-        WorkAtStation(worker, foodPreparationDuration, () =>
+        servingPreparedFood = true;
+        CommitAction(worker, plus ? ActivityKind.FoodPlus : ActivityKind.PrepareFood, "comida preparada", card);
+        resources.AddFood(preparedFood);
+        resources.RecordProduction(SaleItem.Food, preparedFood);
+        FoodGainedToday += preparedFood;
+        AudioManager.Play(SoundCue.FoodPrepared);
+        void CompleteServing()
         {
-            resources.AddFood(preparedFood);
-            resources.RecordProduction(SaleItem.Food, preparedFood);
-            AudioManager.Play(SoundCue.FoodPrepared);
-            if (resourceHud != null) resourceHud.FlyFromWorld(ResourceKind.Food,
-                preparedFood, worker.transform.position + Vector3.up);
-            FoodGainedToday += preparedFood;
-            worker.SetStatus("comida preparada");
-            feedback.ShowMessage("+" + preparedFood + " comida preparada");
-            SendWorkerHome(worker);
-        });
+            servingPreparedFood = false;
+            feedback?.ShowMessage("+" + preparedFood + " comida preparada");
+            onAllArrived?.Invoke();
+        }
+
+        if (resourceHud == null) CompleteServing();
+        else if (resultOrigin != null)
+            resourceHud.FlyFromRect(ResourceKind.Food, preparedFood, resultOrigin, onAllArrived: CompleteServing);
+        else resourceHud.FlyFromWorld(ResourceKind.Food, preparedFood,
+            worker.transform.position + Vector3.up, onAllArrived: CompleteServing);
         return true;
     }
 
