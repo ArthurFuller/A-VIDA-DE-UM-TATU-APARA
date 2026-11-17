@@ -115,7 +115,7 @@ Material:
     - _EnvironmentReflections: 1
     - _EscalaTremido: 7.9
     - _EscalaVariacao: 1
-    - _EspessuraLineArt: 3
+    - _EspessuraLineArt: 1.65
     - _EspessuraTraco: 1
     - _Falhas: 0.77
     - _FecharQuinas: 0.5

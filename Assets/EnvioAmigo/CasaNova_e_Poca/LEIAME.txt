@@ -1,0 +1,20 @@
+CASA NOVA + POÇA — prontas pra usar (Unity 6 / URP)
+
+É SÓ ARRASTAR
+  CasaNova/CasaNova.prefab  -> casa sertaneja já texturizada, com o telhado grande embutido
+  Poca/Poca.prefab          -> poça / lagoinha já com o shader (água, lama em volta, transparente fora)
+
+PASTAS
+  CasaNova/  Modelo (fbx da casa e do telhado), Materiais (um por peça), Texturas (cores do Substance)
+  Poca/      Modelo (plano), Materiais (M_Poca)
+  Shaders/   CasaDetalhes.shader, Poca.shader e o Controle Xilogravura (opcional)
+
+POÇA
+  Coloque 1 ou 2 cm acima do chão. Escale e gire à vontade.
+  Formatos diferentes: duplique o M_Poca e mude a "Semente". Tamanho, oval, contorno torto,
+  largura da lama e cores da água ficam no material.
+
+CASA
+  Cada material tem "Tipo de Detalhe" e "Intensidade dos Detalhes" (0 = só a cor pintada).
+
+Não precisa configurar nada no projeto: funciona em qualquer projeto URP.

@@ -435,7 +435,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             return;
         }
         float progress = Mathf.Clamp01((float)age / Mathf.Max(1, growthDays));
-        if (cropModel != null) SertaoPresentationAssets.AnimateCropGrowth(cropModel, progress);
+        if (cropModel != null) SertaoPresentationAssets.AnimateCropGrowth(cropModel, progress, Crop);
         else if (visual != null)
         {
             visual.transform.DOKill();

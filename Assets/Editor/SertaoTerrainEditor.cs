@@ -26,6 +26,98 @@ public sealed class SertaoTerrainEditor : EditorWindow
     [SerializeField] private int kind;
     [SerializeField] private GameObject customPrefab;
     [SerializeField] private MeshCollider surface;
+    [SerializeField] private MeshFilter brushMesh;
+
+    private Mesh cachedBrushMesh;
+    private Vector3[] brushVertices;
+    private int[] brushTriangles;
+
+    private void CacheBrushMesh(Mesh mesh)
+    {
+        if (cachedBrushMesh == mesh) return;
+
+        using var snapshot = MeshUtility.AcquireReadOnlyMeshData(mesh);
+        var data = snapshot[0];
+        using var vertices = new Unity.Collections.NativeArray<Vector3>(
+            data.vertexCount, Unity.Collections.Allocator.Temp);
+        data.GetVertices(vertices);
+        var triangles = new List<int>();
+        for (int i = 0; i < data.subMeshCount; i++)
+        {
+            var part = data.GetSubMesh(i);
+            if (part.topology != MeshTopology.Triangles) continue;
+            using var indices = new Unity.Collections.NativeArray<int>(
+                part.indexCount, Unity.Collections.Allocator.Temp);
+            data.GetIndices(indices, i);
+            triangles.AddRange(indices.ToArray());
+        }
+        brushVertices = vertices.ToArray();
+        brushTriangles = triangles.ToArray();
+        cachedBrushMesh = mesh;
+    }
+
+    private bool RaycastBrushMesh(Ray ray, MeshFilter filter, out RaycastHit hit, float distance)
+    {
+        hit = default;
+        if (filter.sharedMesh == null) return false;
+        CacheBrushMesh(filter.sharedMesh);
+        Matrix4x4 toLocal = filter.transform.worldToLocalMatrix;
+        Vector3 origin = toLocal.MultiplyPoint3x4(ray.origin);
+        Vector3 direction = toLocal.MultiplyVector(ray.direction);
+        Vector3 normal = Vector3.zero;
+        float nearest = distance;
+        bool found = false;
+
+        for (int i = 0; i < brushTriangles.Length; i += 3)
+        {
+            Vector3 p = brushVertices[brushTriangles[i]];
+            Vector3 e1 = brushVertices[brushTriangles[i + 1]] - p;
+            Vector3 e2 = brushVertices[brushTriangles[i + 2]] - p;
+            Vector3 cross = Vector3.Cross(direction, e2);
+            float det = Vector3.Dot(e1, cross);
+            if (Mathf.Abs(det) < 0.000000001f) continue;
+            float inverse = 1f / det;
+            Vector3 offset = origin - p;
+            float u = Vector3.Dot(offset, cross) * inverse;
+            if (u < 0f || u > 1f) continue;
+            Vector3 edge = Vector3.Cross(offset, e1);
+            float v = Vector3.Dot(direction, edge) * inverse;
+            if (v < 0f || u + v > 1f) continue;
+            float t = Vector3.Dot(e2, edge) * inverse;
+            if (t < 0f || t > nearest) continue;
+            nearest = t;
+            normal = Vector3.Cross(e1, e2);
+            found = true;
+        }
+
+        if (!found) return false;
+        normal = toLocal.transpose.MultiplyVector(normal).normalized;
+        if (Vector3.Dot(normal, ray.direction) > 0f) normal = -normal;
+        hit = new RaycastHit { point = ray.GetPoint(nearest), normal = normal, distance = nearest };
+        return true;
+    }
+
+    private GameObject BrushGround => brushMesh != null ? brushMesh.gameObject :
+        surface != null ? surface.gameObject : null;
+
+    private Bounds BrushBounds
+    {
+        get
+        {
+            if (brushMesh == null) return surface.bounds;
+            var renderer = brushMesh.GetComponent<MeshRenderer>();
+            return renderer != null ? renderer.bounds : new Bounds(brushMesh.transform.position, Vector3.zero);
+        }
+    }
+
+    private bool RaycastBrush(Ray ray, out RaycastHit hit, float distance)
+    {
+        hit = default;
+        if (brushMesh != null)
+            return RaycastBrushMesh(ray, brushMesh, out hit, distance);
+
+        return surface != null && surface.enabled && surface.Raycast(ray, out hit, distance);
+    }
     [SerializeField] private float radius = 0.9f;
     [SerializeField] private int plants = 4;
     [SerializeField] private float height = 0.44f;
@@ -53,7 +145,25 @@ public sealed class SertaoTerrainEditor : EditorWindow
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Vegetação na Scene View", EditorStyles.boldLabel);
-        surface = (MeshCollider)EditorGUILayout.ObjectField("Superfície para pintar", surface, typeof(MeshCollider), true);
+        brushMesh = (MeshFilter)EditorGUILayout.ObjectField("Malha do chão", brushMesh, typeof(MeshFilter), true);
+        if (GUILayout.Button("Usar chão selecionado"))
+        {
+            GameObject selected = Selection.activeGameObject;
+            var candidate = selected != null && selected.scene.IsValid()
+                ? selected.GetComponentInChildren<MeshFilter>() : null;
+            if (candidate != null && candidate.sharedMesh != null && candidate.GetComponent<MeshRenderer>() != null)
+            {
+                brushMesh = candidate;
+                cachedBrushMesh = null;
+                paint = true;
+                status = $"Pincel ligado em {brushMesh.name}. Clique no chão na aba Scene.";
+            }
+            else
+                status = "Selecione na Hierarchy um chão com Mesh Filter e Mesh Renderer.";
+            SceneView.RepaintAll();
+        }
+        if (brushMesh == null)
+            surface = (MeshCollider)EditorGUILayout.ObjectField("Colisor do chão", surface, typeof(MeshCollider), true);
         int next = EditorGUILayout.Popup("Vegetação", kind, Palette);
         if (next != kind)
         {
@@ -160,6 +270,7 @@ public sealed class SertaoTerrainEditor : EditorWindow
         PrefabUtility.RecordPrefabInstancePropertyModifications(renderer);
         if (hideOldGround) HidePreviousGround(scene);
         surface = ground.GetComponent<MeshCollider>();
+        brushMesh = null;
         Physics.SyncTransforms();
         Undo.CollapseUndoOperations(step);
         Selection.activeGameObject = ground;
@@ -290,23 +401,35 @@ public sealed class SertaoTerrainEditor : EditorWindow
     private void PaintInScene(SceneView view)
     {
         Event input = Event.current;
-        if (!paint || EditorApplication.isPlayingOrWillChangePlaymode || surface == null ||
-            !surface.enabled || !surface.gameObject.activeInHierarchy || input.alt) return;
+        var target = BrushGround;
+        if (!paint || EditorApplication.isPlayingOrWillChangePlaymode || target == null ||
+            !target.scene.IsValid() || !target.activeInHierarchy || input.alt) return;
 
         int id = GUIUtility.GetControlID(FocusType.Passive);
+        if (input.type == EventType.Layout)
+        {
+            HandleUtility.AddDefaultControl(id);
+            return;
+        }
         if (input.type == EventType.MouseMove) view.Repaint();
-        if (!surface.Raycast(HandleUtility.GUIPointToWorldRay(input.mousePosition), out RaycastHit hit, 500f)) return;
-        if (input.type == EventType.Layout) HandleUtility.AddDefaultControl(id);
-        if (input.type == EventType.Repaint)
+        bool click = input.type == EventType.MouseDown && input.button == 0;
+        if (!click && input.type != EventType.Repaint) return;
+
+        var ray = HandleUtility.GUIPointToWorldRay(input.mousePosition);
+        bool hitGround = RaycastBrush(ray, out RaycastHit hit, float.PositiveInfinity);
+        if (click)
+        {
+            if (hitGround) PlaceVegetation(hit.point);
+            else status = $"O clique ficou fora da malha de {target.name}.";
+            input.Use();
+            Repaint();
+            return;
+        }
+        if (hitGround)
         {
             Handles.color = new Color(0.79f, 0.86f, 0.54f, 1f);
-            Handles.DrawWireDisc(hit.point + Vector3.up * 0.02f, hit.normal, radius);
+            Handles.DrawWireDisc(hit.point + hit.normal * 0.02f, hit.normal, radius);
         }
-        if (input.type != EventType.MouseDown || input.button != 0 || HandleUtility.nearestControl != id) return;
-
-        PlaceVegetation(hit.point);
-        input.Use();
-        Repaint();
     }
 
     private void PlaceVegetation(Vector3 center)
@@ -318,12 +441,8 @@ public sealed class SertaoTerrainEditor : EditorWindow
             status = "Selecione um prefab de vegetação na pasta Assets.";
             return;
         }
-        Scene scene = surface.gameObject.scene;
-        var plots = new List<Bounds>();
-        foreach (Plot plot in Object.FindObjectsByType<Plot>(FindObjectsSortMode.None))
-            if (plot.gameObject.scene == scene) plots.Add(PlotBounds(plot));
-        plots.Add(LakeBounds(scene, new Vector3(-15.17f, 0f, -3.46f)));
-
+        Scene scene = BrushGround.scene;
+        Bounds groundBounds = BrushBounds;
         int step = BeginUndo("Pintar vegetação");
         Transform group = null;
         var locations = new List<Vector3>(plants);
@@ -331,9 +450,8 @@ public sealed class SertaoTerrainEditor : EditorWindow
         for (int i = 0; i < plants * 9 && locations.Count < plants; i++)
         {
             Vector2 offset = i == 0 ? Vector2.zero : Random.insideUnitCircle * radius;
-            Vector3 above = new Vector3(center.x + offset.x, surface.bounds.max.y + 8f, center.z + offset.y);
-            if (!surface.Raycast(new Ray(above, Vector3.down), out RaycastHit hit, 20f) ||
-                InsideProtectedArea(hit.point, plots) ||
+            Vector3 above = new Vector3(center.x + offset.x, groundBounds.max.y + 8f, center.z + offset.y);
+            if (!RaycastBrush(new Ray(above, Vector3.down), out RaycastHit hit, 20f + groundBounds.size.y) ||
                 locations.Exists(other => (other - hit.point).sqrMagnitude < minGap * minGap)) continue;
             if (group == null) group = LandscapeRoot(scene);
             if (Stamp(source, group, hit.point)) locations.Add(hit.point);
@@ -341,15 +459,7 @@ public sealed class SertaoTerrainEditor : EditorWindow
         Undo.CollapseUndoOperations(step);
         if (locations.Count > 0) EditorSceneManager.MarkSceneDirty(scene);
         status = locations.Count > 0 ? $"{locations.Count} peça(s) colocada(s)." :
-            "Clique no chão livre, fora dos canteiros e da lagoa.";
-    }
-
-    private static bool InsideProtectedArea(Vector3 point, List<Bounds> blocked)
-    {
-        foreach (Bounds area in blocked)
-            if (point.x >= area.min.x - 0.12f && point.x <= area.max.x + 0.12f &&
-                point.z >= area.min.z - 0.12f && point.z <= area.max.z + 0.12f) return true;
-        return false;
+            "Nenhuma peça foi colocada neste ponto da malha.";
     }
 
     private static Transform LandscapeRoot(Scene scene)

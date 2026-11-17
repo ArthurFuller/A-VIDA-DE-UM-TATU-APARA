@@ -1,0 +1,16 @@
+CASA 2 — casa sertaneja (Unity 6 / URP)
+
+ESTRUTURA
+  Casa2.prefab               -> a casa pronta, com o telhado grande: é só arrastar pra cena
+  Modelo/Casa2.fbx           -> o modelo (as cores já vêm ligadas)
+  Modelo/TelhadoCasa.fbx     -> o telhado grande
+  Materiais/M_Casa2_*.mat    -> um material por peça (Paredes, Chao, Telhado, Pilar1..4, Janela...)
+  Texturas/T_Casa2_*_Albedo  -> as cores pintadas no Substance
+  Texturas/Substance_NaoUsadas -> mapas que vieram lisos do Substance (não vão no pacote)
+
+SHADER: Sertao/Casa Detalhes (Assets/Shaders/XiloCartoon/CasaDetalhes.shader)
+  Usa a cor da textura e só acrescenta detalhes (veio da madeira, telhas, manchas,
+  sujeira na base, rachaduras), sem trocar a cor. Em cada material:
+    - Tipo de Detalhe ............ Parede / Madeira / Telha / Chao / Tijolo / Tecido / Liso
+    - Intensidade dos Detalhes ... 0 = só a cor, 0.5 = normal, 1 = forte
+  Também tem sombra cartoon, traço de xilogravura e line art.

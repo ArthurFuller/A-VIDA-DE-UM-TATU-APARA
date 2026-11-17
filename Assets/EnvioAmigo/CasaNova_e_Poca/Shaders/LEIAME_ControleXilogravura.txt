@@ -1,0 +1,4 @@
+CONTROLE XILOGRAVURA (opcional)
+  Crie um objeto vazio na cena e adicione o componente "Sertao/Controle Xilogravura".
+  Ele muda o tamanho, a espessura e a força dos traços de xilogravura de TODOS os materiais
+  dos shaders Sertao/* de uma vez. Sem ele, tudo fica como está em cada material.

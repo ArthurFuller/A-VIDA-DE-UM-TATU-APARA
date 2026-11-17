@@ -77,6 +77,7 @@ Shader "Sertao/XiloCartoon Completo"
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings
@@ -105,8 +106,69 @@ Shader "Sertao/XiloCartoon Completo"
                 return o;
             }
 
+            float XiloEyeDepth(float rawDepth)
+            {
+                if (unity_OrthoParams.w > 0.5)
+                    return LinearDepthToEyeDepth(rawDepth);
+                return LinearEyeDepth(rawDepth, _ZBufferParams);
+            }
+
+            float XiloDepthEdge(float2 pixel, float2 delta, float raw, float2 slope, float eye)
+            {
+                float2 uv = GetNormalizedScreenSpaceUV(pixel + delta);
+                float neighbor = XiloEyeDepth(SampleSceneDepth(uv));
+
+                // Extrapola a profundidade da propria face para ignorar planos inclinados.
+                float predicted = XiloEyeDepth(saturate(raw + dot(slope, delta)));
+                float limit = max(0.08, eye * 0.024);
+                predicted = clamp(predicted, eye - limit, eye + limit);
+
+                float threshold = max(0.018, eye * 0.0018) + max(0.0, _EmpurrarLineArt);
+                return smoothstep(threshold, threshold * 2.4, neighbor - predicted);
+            }
+
+            float4 XiloEdgeRing(float2 pixel, float radius, float raw, float2 slope, float eye)
+            {
+                return float4(
+                    XiloDepthEdge(pixel, float2(-radius, 0), raw, slope, eye),
+                    XiloDepthEdge(pixel, float2( radius, 0), raw, slope, eye),
+                    XiloDepthEdge(pixel, float2(0, -radius), raw, slope, eye),
+                    XiloDepthEdge(pixel, float2(0,  radius), raw, slope, eye));
+            }
+
+            float XiloSilhouetteInk(Varyings i)
+            {
+                float raw = i.positionCS.z;
+                float2 slope = float2(ddx(raw), ddy(raw));
+                if (_EspessuraLineArt <= 0.001) return 0.0;
+
+                float eye = XiloEyeDepth(raw);
+                float2 pixel = i.positionCS.xy;
+                float sceneEye = XiloEyeDepth(SampleSceneDepth(GetNormalizedScreenSpaceUV(pixel)));
+                if (abs(eye - sceneEye) > max(0.02, eye * 0.0018)) return 0.0;
+
+                float variation = sin(dot(i.positionWS, float3(3.1, 5.3, 4.2)) * _EscalaVariacao);
+                float width = min(1.65, _EspessuraLineArt *
+                    (0.72 + variation * _VariacaoLineArt * 0.13));
+
+                float4 nearEdge = XiloEdgeRing(pixel, 1.0, raw, slope, eye);
+                float edge = max(max(nearEdge.x, nearEdge.y), max(nearEdge.z, nearEdge.w));
+                float thin = max(min(nearEdge.x, nearEdge.y), min(nearEdge.z, nearEdge.w));
+                float ink = edge * saturate(width);
+
+                if (width > 1.0 && edge < 0.99)
+                {
+                    float4 farther = XiloEdgeRing(pixel, 2.0, raw, slope, eye);
+                    float farEdge = max(max(farther.x, farther.y), max(farther.z, farther.w));
+                    ink = max(ink, farEdge * (width - 1.0) * 0.75);
+                }
+
+                return ink * lerp(0.96, 0.40, thin);
+            }
+
             half4 frag(Varyings i) : SV_Target
             {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
                 float3 N = normalize(i.normalWS);
                 float3 W = i.positionWS;
 
@@ -156,7 +218,7 @@ Shader "Sertao/XiloCartoon Completo"
                 float ndv = saturate(dot(N, V));
                 float lim = _ContornoInterno * 0.5;
                 float rim = (1.0 - smoothstep(lim - 0.03, lim + 0.03, ndv)) * step(0.001, _ContornoInterno);
-                cor = lerp(cor, _CorLineArt.rgb, rim);
+                cor = lerp(cor, _CorLineArt.rgb * 0.08, max(rim, XiloSilhouetteInk(i)));
 
                 cor = MixFog(cor, i.fog);
                 return half4(cor, 1);
@@ -164,58 +226,6 @@ Shader "Sertao/XiloCartoon Completo"
             ENDHLSL
         }
 
-        // ------------------------------------------------------------------
-        // 2) Line Art: casco invertido (contorno em volta do objeto)
-        // ------------------------------------------------------------------
-        Pass
-        {
-            Name "LineArt"
-            Tags { "LightMode" = "SRPDefaultUnlit" }
-            Cull Front
-            ZWrite Off
-            ZTest LEqual
-
-            HLSLPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
-            #pragma multi_compile_fog
-            #pragma multi_compile_instancing
-
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
-            struct Varyings { float4 positionCS : SV_POSITION; float fog : TEXCOORD0; UNITY_VERTEX_OUTPUT_STEREO };
-
-            Varyings vert(Attributes v)
-            {
-                Varyings o;
-                UNITY_SETUP_INSTANCE_ID(v);
-                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
-                float3 posWS = TransformObjectToWorld(v.positionOS.xyz);
-                float4 cs = TransformWorldToHClip(posWS);
-                float3 normalWS = TransformObjectToWorldNormal(v.normalOS);
-                float4 normalCS = mul(GetWorldToHClipMatrix(), float4(normalWS, 0.0));
-
-                // Derivada da projeção em pixels. O pivô não participa do contorno.
-                float2 pixels = (normalCS.xy - cs.xy * (normalCS.w / max(cs.w, 0.0001)))
-                    * _ScaledScreenParams.xy;
-                float projectedLength = length(pixels);
-                float variation = sin(dot(v.positionOS.xyz, float3(3.1, 5.3, 4.2))
-                    * _EscalaVariacao);
-                float width = clamp(_EspessuraLineArt * (1.0 + variation * _VariacaoLineArt * 0.12),
-                    0.0, 1.75);
-                if (cs.w > 0.0001 && projectedLength > 0.0001)
-                    cs.xy += pixels * (width / projectedLength) * 2.0 / _ScaledScreenParams.xy * cs.w;
-                o.positionCS = cs;
-                o.fog = ComputeFogFactor(cs.z);
-                return o;
-            }
-
-            half4 frag(Varyings i) : SV_Target
-            {
-                clip(_EspessuraLineArt - 0.001);
-                return half4(MixFog(_CorLineArt.rgb, i.fog), 1);
-            }
-            ENDHLSL
-        }
 
         // ------------------------------------------------------------------
         // 3) Sombra projetada

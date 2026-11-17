@@ -1,0 +1,11 @@
+POÇA — pocinha / lagoinha de açude (Unity 6 / URP)
+
+COMO USAR
+  1. Arraste Poca.prefab pra cena, em cima do chão, 1 ou 2 cm acima dele.
+  2. Escale e gire à vontade (o resto do plano é transparente).
+  3. Pra formatos diferentes: duplique o material M_Poca e mude a "Semente".
+
+SHADER: Sertao/Poca (Assets/Shaders/XiloCartoon/Poca.shader)
+  Forma ..... Tamanho, Achatamento (redonda/oval), Contorno Torto, Semente
+  Margem .... Largura da lama, Lama Some na Areia, rachaduras na lama seca
+  Água ...... cor funda / rasa, espuminha, ondas de goiva, reflexos, ondinhas, brilho do sol

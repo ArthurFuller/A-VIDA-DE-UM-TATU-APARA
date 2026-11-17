@@ -46,10 +46,12 @@ public sealed class SertaoPresentationAssets : ScriptableObject
         new PlantingCell(0.035f, -0.20f, 0.35f, 0.31f, 7f)
     };
 
+    private const float JerimumStartScale = 0.68f;
+
     private static readonly PlantingCell[] Pumpkin =
     {
-        new PlantingCell(-0.215f, -0.155f, 0.35f, 0.33f, -16f),
-        new PlantingCell(0.215f, 0.155f, 0.35f, 0.33f, 20f)
+        new PlantingCell(-0.235f, -0.175f, 0.42f, 0.40f, -16f),
+        new PlantingCell(0.235f, 0.175f, 0.42f, 0.40f, 20f)
     };
 
     public Transform CreateCrop(CropType crop, Transform plot, Bounds ground)
@@ -61,7 +63,7 @@ public sealed class SertaoPresentationAssets : ScriptableObject
         {
             case CropType.Corn: prefab = milho; layout = CornRows; height = 1.03f; break;
             case CropType.Pumpkin: prefab = macaxeira; layout = Cassava; height = 0.53f; break;
-            case CropType.Jerimum: prefab = jerimum; layout = Pumpkin; height = 0.47f; break;
+            case CropType.Jerimum: prefab = jerimum; layout = Pumpkin; height = 0.55f; break;
             default: return null;
         }
         if (prefab == null) return null;
@@ -74,9 +76,10 @@ public sealed class SertaoPresentationAssets : ScriptableObject
         var size = new Vector2(
             plotSize.x > 0f ? plotSize.x / Mathf.Max(0.001f, Mathf.Abs(scale.x)) : 1.48f,
             plotSize.z > 0f ? plotSize.z / Mathf.Max(0.001f, Mathf.Abs(scale.z)) : 1.57f);
+        float initialScale = crop == CropType.Jerimum ? JerimumStartScale : 0.38f;
         for (int i = 0; i < layout.Length; i++)
         {
-            if (FitPlant(root, prefab, layout[i], size, height, crop == CropType.Corn, i + 1)) continue;
+            if (FitPlant(root, prefab, layout[i], size, height, crop == CropType.Corn, i + 1, initialScale)) continue;
             Destroy(root.gameObject);
             return null;
         }
@@ -84,7 +87,7 @@ public sealed class SertaoPresentationAssets : ScriptableObject
     }
 
     private static bool FitPlant(Transform root, GameObject prefab, PlantingCell cell,
-        Vector2 plotSize, float maxHeight, bool alignCorn, int number)
+        Vector2 plotSize, float maxHeight, bool alignCorn, int number, float initialScale)
     {
         Vector2 position = Vector2.Scale(cell.Center, plotSize);
         Vector2 span = Vector2.Scale(cell.Span, plotSize);
@@ -109,7 +112,7 @@ public sealed class SertaoPresentationAssets : ScriptableObject
         TryBounds(root, meshes, out bounds);
         var foot = new Vector3(bounds.center.x, bounds.min.y, bounds.center.z);
         model.position += root.TransformVector(basePivot.localPosition - foot);
-        basePivot.localScale = new Vector3(1f, alignCorn ? 1.14f : 1f, 1f) * 0.38f;
+        basePivot.localScale = new Vector3(1f, alignCorn ? 1.14f : 1f, 1f) * initialScale;
         return true;
     }
 
@@ -140,9 +143,9 @@ public sealed class SertaoPresentationAssets : ScriptableObject
         return found;
     }
 
-    public static void AnimateCropGrowth(Transform root, float progress)
+    public static void AnimateCropGrowth(Transform root, float progress, CropType crop = CropType.None)
     {
-        float scale = Mathf.Lerp(0.40f, 1f, progress);
+        float scale = Mathf.Lerp(crop == CropType.Jerimum ? JerimumStartScale : 0.40f, 1f, progress);
         float from = root.GetChild(0).localScale.x;
         if (Mathf.Approximately(from, scale)) return;
         root.DOKill();
