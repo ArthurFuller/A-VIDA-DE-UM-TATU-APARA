@@ -40,6 +40,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     [SerializeField] private Transform growthFill;
     [SerializeField, Min(0.01f)] private float growthFillWidth = 0.84f;
     [SerializeField] private Color readyGrowthColor = new Color(0.16f, 0.75f, 0.2f);
+    [SerializeField] private Color wiltingGrowthColor = new Color(0.90f, 0.20f, 0.16f);
 
     public bool IsPlowed { get; private set; }
     public bool IsFenced { get; private set; }
@@ -66,6 +67,9 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     private Renderer growthFillRenderer;
     private Color growingFillColor;
     private MaterialPropertyBlock growthFillBlock;
+    private Quaternion growthBarRotation;
+    private Tween wiltingMotion;
+    private bool willWilt;
     private Vector3 plowedVisualHome;
     private MandalaPlowedGround mandalaGround;
     internal Bounds PlowedGroundBounds => surfaceBounds;
@@ -108,11 +112,19 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         Gizmos.DrawLine(workPoint.position, transform.position);
     }
     // Mesma regra de vizinhança ortogonal usada pelos cercados.
-    public bool IsAdjacentTo(Plot other)
+    public bool IsAdjacentTo(Plot other) => IsAdjacentTo(other, false);
+
+    internal bool IsAdjacentTo(Plot other, bool includeDiagonals)
     {
         if (other == null || other == this) return false;
         Vector3 d = other.transform.position - transform.position;
         if (Mathf.Abs(d.y) >= 0.2f) return false;
+        if (includeDiagonals)
+        {
+            float x = Mathf.Abs(d.x);
+            float z = Mathf.Abs(d.z);
+            return x < adjacentDistance && z < adjacentDistance && (x > 0.2f || z > 0.2f);
+        }
         return (Mathf.Abs(d.x) < 0.2f && Mathf.Abs(d.z) < adjacentDistance && Mathf.Abs(d.z) > 0.2f) ||
                (Mathf.Abs(d.z) < 0.2f && Mathf.Abs(d.x) < adjacentDistance && Mathf.Abs(d.x) > 0.2f);
     }
@@ -121,6 +133,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
 
     private void Awake()
     {
+        if (growthBar != null) growthBarRotation = growthBar.transform.localRotation;
         if (growthFill != null)
         {
             growthFillRenderer = growthFill.GetComponent<Renderer>();
@@ -172,9 +185,11 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     {
         allPlots.Add(this);
         if (mandalaGround != null) mandalaGround.Invalidate();
+        RefreshWiltingMotion();
     }
     private void OnDisable()
     {
+        StopWiltingMotion();
         allPlots.Remove(this);
         if (mandalaGround != null) mandalaGround.Invalidate();
         if (allPlots.Count == 0)
@@ -456,11 +471,15 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         CropSettings settings = catalog != null ? catalog.Get(Crop) : null;
         int growthDays = settings != null ? settings.growthDays : 2;
         int age = GrowthAge(currentDay);
-        if (settings != null && age >= growthDays + settings.witherDaysAfterMaturity)
+        int witherAge = settings != null ? growthDays + settings.witherDaysAfterMaturity : int.MaxValue;
+        if (settings != null && age >= witherAge)
         {
             Harvest();
             return;
         }
+        bool ready = settings != null && age >= growthDays;
+        willWilt = ready && age == witherAge - 1;
+        RefreshWiltingMotion();
         float progress = Mathf.Clamp01((float)age / Mathf.Max(1, growthDays));
         if (cropModel != null) SertaoPresentationAssets.AnimateCropGrowth(cropModel, progress, Crop);
         else if (visual != null)
@@ -474,8 +493,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             {
                 growthFillBlock ??= new MaterialPropertyBlock();
                 growthFillRenderer.GetPropertyBlock(growthFillBlock);
-                Color fillColor = IsReady(currentDay, catalog) ?
-                    readyGrowthColor : growingFillColor;
+                Color fillColor = willWilt ? wiltingGrowthColor :
+                    ready ? readyGrowthColor : growingFillColor;
                 growthFillBlock.SetColor("_Color", fillColor);
                 growthFillBlock.SetColor("_BaseColor", fillColor);
                 growthFillRenderer.SetPropertyBlock(growthFillBlock);
@@ -489,11 +508,36 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         }
     }
 
+    private void RefreshWiltingMotion()
+    {
+        if (!willWilt || !isActiveAndEnabled)
+        {
+            StopWiltingMotion();
+            return;
+        }
+        if (growthBar == null || wiltingMotion != null) return;
+        Transform bar = growthBar.transform;
+        wiltingMotion = DOVirtual.Float(0f, 2f * Mathf.PI, 1.3f, phase =>
+            bar.localRotation = growthBarRotation *
+                Quaternion.AngleAxis(Mathf.Sin(phase) * 3f, Vector3.forward))
+            .SetEase(Ease.Linear).SetLoops(-1).SetLink(growthBar);
+    }
+
+    private void StopWiltingMotion()
+    {
+        if (wiltingMotion == null) return;
+        wiltingMotion.Kill();
+        wiltingMotion = null;
+        if (growthBar != null) growthBar.transform.localRotation = growthBarRotation;
+    }
+
     public CropType Harvest()
     {
         if (isWater) return CropType.None;
         CropType harvested = Crop;
         Crop = CropType.None;
+        willWilt = false;
+        StopWiltingMotion();
         fertilized = false;
         mandalaGrowthAdjustment = 0;
         lastMandalaGrowthDay = -1;

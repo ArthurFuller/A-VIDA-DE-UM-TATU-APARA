@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 public sealed class TopBarAutoHide : MonoBehaviour
 {
@@ -36,6 +37,21 @@ public sealed class TopBarAutoHide : MonoBehaviour
     private bool MotionLocked => paused || coinTossOpen;
     private bool followingWorker;
     private float lastHoverTime;
+    private bool tutorialRestricted;
+    private bool tutorialVisible;
+    private RectTransform tutorialControl;
+    private TutorialControlState[] tutorialControls;
+
+    private struct TutorialControlState
+    {
+        public CanvasGroup group;
+        public bool interactable;
+        public bool blocksRaycasts;
+    }
+
+    internal bool TutorialRestricted => tutorialRestricted;
+    private Vector2 ClosedDestination => tutorialRestricted && bar != null
+        ? closedPosition + Vector2.up * bar.rect.height : closedPosition;
 
     // Paused transitions still have a temporary layout and should not be captured by the editor.
     public bool IsMoving => motion != null && motion.IsActive() && !motion.IsComplete();
@@ -82,11 +98,90 @@ public sealed class TopBarAutoHide : MonoBehaviour
             dayCycle.DayClosingCancelled -= OpenForNewDay;
         }
         motion?.Kill();
+        RestoreTutorialControls();
+        tutorialRestricted = false;
+        tutorialControl = null;
     }
+
+    internal void SetTutorialHud(bool visible, RectTransform allowedControl = null)
+    {
+        if (!isActiveAndEnabled || bar == null) return;
+        bool entering = !tutorialRestricted;
+        bool visibilityChanged = entering || tutorialVisible != visible;
+        if (!visibilityChanged && tutorialControl == allowedControl) return;
+
+        tutorialRestricted = true;
+        tutorialVisible = visible;
+        tutorialControl = allowedControl;
+        if (entering) CaptureTutorialControls();
+        foreach (TutorialControlState state in tutorialControls)
+        {
+            if (state.group == null) continue;
+            bool allowed = visible && allowedControl != null && state.group.transform == allowedControl;
+            state.group.interactable = allowed && state.interactable;
+            state.group.blocksRaycasts = allowed && state.blocksRaycasts;
+        }
+
+        if (visibilityChanged && !visible) SetOpen(false, entering, force: true);
+        else if (visibilityChanged && dayActive && !followingWorker && !IsHandBusy())
+            SetOpen(true, false);
+    }
+
+    internal void ReleaseTutorialHud()
+    {
+        if (!tutorialRestricted) return;
+        tutorialRestricted = false;
+        tutorialControl = null;
+        RestoreTutorialControls();
+        if (isActiveAndEnabled && !open && bar != null && bar.anchoredPosition != closedPosition)
+            SetOpen(false, false, force: true);
+    }
+
+    private void CaptureTutorialControls()
+    {
+        Selectable[] controls = bar.GetComponentsInChildren<Selectable>(true);
+        tutorialControls = new TutorialControlState[controls.Length];
+        for (int i = 0; i < controls.Length; i++)
+        {
+            CanvasGroup group = controls[i].GetComponent<CanvasGroup>();
+            if (group == null) group = controls[i].gameObject.AddComponent<CanvasGroup>();
+            tutorialControls[i] = new TutorialControlState
+            {
+                group = group,
+                interactable = group.interactable,
+                blocksRaycasts = group.blocksRaycasts
+            };
+        }
+    }
+
+    private void RestoreTutorialControls()
+    {
+        if (tutorialControls == null) return;
+        foreach (TutorialControlState state in tutorialControls)
+        {
+            if (state.group == null) continue;
+            state.group.interactable = state.interactable;
+            state.group.blocksRaycasts = state.blocksRaycasts;
+        }
+        tutorialControls = null;
+    }
+
+    private bool IsHandBusy() => hand != null && (hand.IsDraggingCard || hand.IsSelectionLocked);
 
     private void Update()
     {
-        if (MotionLocked || !dayActive) return;
+        if (MotionLocked) return;
+        if (tutorialRestricted)
+        {
+            if (tutorialVisible && dayActive && !followingWorker && !IsHandBusy() && !closingAfterTimeline)
+            {
+                if (!open) SetOpen(true, false);
+            }
+            else if (open || (!IsMoving && bar != null && bar.anchoredPosition != ClosedDestination))
+                SetOpen(false, false, force: true);
+            return;
+        }
+        if (!dayActive) return;
         if (followingWorker && (resourceHud == null || !resourceHud.HasFlyingResources))
         {
             if (open) SetOpen(false, false);
@@ -183,7 +278,7 @@ public sealed class TopBarAutoHide : MonoBehaviour
     // The day counter is the only manual close target for the top bar.
     public void CloseFromDayCounter()
     {
-        if (MotionLocked || !dayActive || !open || closingAfterTimeline ||
+        if (tutorialRestricted || MotionLocked || !dayActive || !open || closingAfterTimeline ||
             (resourceHud != null && resourceHud.HasFlyingResources) ||
             (hand != null && (hand.IsDraggingCard || hand.IsSelectionLocked))) return;
 
@@ -196,7 +291,7 @@ public sealed class TopBarAutoHide : MonoBehaviour
     // Returns the time remaining before the counter area is fully visible.
     public float PrepareResourceFeedback()
     {
-        if (MotionLocked || !dayActive || closingAfterTimeline || timelineDayOpen ||
+        if ((tutorialRestricted && !tutorialVisible) || MotionLocked || !dayActive || closingAfterTimeline || timelineDayOpen ||
             (timeline != null && timeline.IsOpen) ||
             (hand != null && (hand.IsSelectionLocked || hand.IsDraggingCard))) return 0f;
 
@@ -251,7 +346,7 @@ public sealed class TopBarAutoHide : MonoBehaviour
         if (!Application.isPlaying || coinTossOpen) return;
         motion?.Complete();
         MoveBar(timelineDayOpen ? timelineDayPosition :
-            open ? openPosition : closedPosition, true, null);
+            open ? openPosition : ClosedDestination, true, null);
     }
 
     public void MoveToTimelineDay(System.Action onComplete)
@@ -294,18 +389,19 @@ public sealed class TopBarAutoHide : MonoBehaviour
         SetOpen(false, false);
     }
 
-    private void SetOpen(bool show, bool immediate)
+    private void SetOpen(bool show, bool immediate, bool force = false)
     {
-        if (MotionLocked) return;
+        if (MotionLocked || (show && tutorialRestricted &&
+            (!tutorialVisible || !dayActive || followingWorker || IsHandBusy()))) return;
         bool playWave = show && wavePendingForDay && !immediate;
-        if (open == show && !immediate && !playWave) return;
+        if (open == show && !immediate && !playWave && !force) return;
         open = show;
         timelineDayOpen = false;
         lastHoverTime = Time.unscaledTime;
         motion?.Kill();
         if (bar == null) return;
 
-        Vector2 destination = show ? openPosition : closedPosition;
+        Vector2 destination = show ? openPosition : ClosedDestination;
         float exitDistance = bar.rect.height +
             Mathf.Abs(closedPosition.y - openPosition.y) + widgetOffset;
 

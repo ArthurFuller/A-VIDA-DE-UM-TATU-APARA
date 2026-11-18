@@ -40,6 +40,10 @@ public sealed class EventCardView : MonoBehaviour
     private bool animateBackdropColor;
     private Sequence revealMotion;
     public bool IsOpen { get; private set; }
+    internal bool BlocksCameraZoom => isActiveAndEnabled &&
+        (IsOpen || (backdrop != null && backdrop.isActiveAndEnabled && backdrop.blocksRaycasts));
+    internal bool TutorialRevealReady { get; private set; }
+    internal RectTransform TutorialRevealTarget => revealButton != null ? revealButton.transform as RectTransform : null;
     public RectTransform CardRect => card;
     public event Action Closed;
 
@@ -112,6 +116,7 @@ public sealed class EventCardView : MonoBehaviour
         backdrop.blocksRaycasts = false;
         pendingDescription = description;
         flipped = false;
+        TutorialRevealReady = false;
         revealMotion?.Kill();
         card.DOKill();
         backdrop.DOKill();
@@ -187,8 +192,12 @@ public sealed class EventCardView : MonoBehaviour
         if (backdropImage != null && animateBackdropColor)
             backdropImage.DOColor(backdropColor, duration).SetEase(Ease.OutCubic);
         card.DOAnchorPos(homePosition, duration).SetEase(Ease.OutCubic)
-            .OnComplete(() => card.DORotate(new Vector3(0, 0, swingDegrees), 0.12f)
-                .SetLoops(2, LoopType.Yoyo).OnComplete(() => card.localRotation = Quaternion.identity));
+            .OnComplete(() =>
+            {
+                TutorialRevealReady = true;
+                card.DORotate(new Vector3(0, 0, swingDegrees), 0.12f)
+                    .SetLoops(2, LoopType.Yoyo).OnComplete(() => card.localRotation = Quaternion.identity);
+            });
     }
 
     public void Flip()
@@ -196,6 +205,7 @@ public sealed class EventCardView : MonoBehaviour
         if (!IsOpen || flipped || card == null || descriptionGroup == null) return;
         AudioManager.Play(SoundCue.UiPaper);
         flipped = true;
+        TutorialRevealReady = false;
         card.DOKill();
         if (revealButton != null)
         {
@@ -226,6 +236,7 @@ public sealed class EventCardView : MonoBehaviour
         if (!IsOpen) return;
         AudioManager.Play(SoundCue.UiPaper);
         IsOpen = false;
+        TutorialRevealReady = false;
         revealMotion?.Kill();
         if (descriptionText != null) descriptionText.DOKill();
         if (descriptionGroup != null) descriptionGroup.DOKill();
@@ -237,6 +248,22 @@ public sealed class EventCardView : MonoBehaviour
             HideImmediate();
             Closed?.Invoke();
         });
+    }
+
+    internal void CloseImmediately()
+    {
+        if (!IsOpen && (backdrop == null || !backdrop.blocksRaycasts)) return;
+        IsOpen = false;
+        TutorialRevealReady = false;
+        revealMotion?.Kill();
+        if (card != null) card.DOKill();
+        if (backdrop != null) backdrop.DOKill();
+        if (backdropImage != null) backdropImage.DOKill();
+        if (descriptionText != null) DOTween.Kill(descriptionText);
+        if (descriptionGroup != null) descriptionGroup.DOKill();
+        if (descriptionRect != null) descriptionRect.DOKill();
+        HideImmediate();
+        Closed?.Invoke();
     }
 
     private void HideImmediate()

@@ -23,6 +23,7 @@ public sealed class ResourceCounterHover : MonoBehaviour
     private float[] visibleAlpha;
     private int hovered = -1;
     private Camera uiCamera;
+    private TopBarAutoHide topBar;
 
     public Graphic IconFor(ResourceKind kind)
     {
@@ -34,6 +35,7 @@ public sealed class ResourceCounterHover : MonoBehaviour
     private void Awake()
     {
         if (counters == null) return;
+        topBar = GetComponentInParent<TopBarAutoHide>();
         var canvas = GetComponentInParent<Canvas>();
         uiCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
             ? canvas.worldCamera : null;
@@ -51,6 +53,12 @@ public sealed class ResourceCounterHover : MonoBehaviour
     private void Update()
     {
         if (Time.timeScale == 0f || Mouse.current == null || visibleAlpha == null) return;
+        if (topBar != null && topBar.TutorialRestricted)
+        {
+            if (hovered >= 0) Fade(hovered, false);
+            hovered = -1;
+            return;
+        }
         Vector2 pointer = Mouse.current.position.ReadValue();
         int current = -1;
         float nearest = float.PositiveInfinity;

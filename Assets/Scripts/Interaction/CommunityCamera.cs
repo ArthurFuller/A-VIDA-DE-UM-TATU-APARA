@@ -48,6 +48,12 @@ public sealed class CommunityCamera : MonoBehaviour
     private bool manualActive;
     private bool followLocked;
     private bool heldView;
+    private DayCycle days;
+    private DayTimeline timeline;
+    private SeedMerchant merchant;
+    private EventCardView eventCard;
+    private FoodPreparationPanel foodPreparation;
+    private GatheringMinigame gatheringGame;
     private readonly Vector2[] outerView = new Vector2[4];
     private readonly Vector2[] currentView = new Vector2[4];
 
@@ -81,6 +87,12 @@ public sealed class CommunityCamera : MonoBehaviour
         UseCurrentViewAsHome();
         if (topBar == null) topBar = FindFirstObjectByType<TopBarAutoHide>();
         if (hand == null) hand = FindFirstObjectByType<ActivityCardAvailability>();
+        days = FindFirstObjectByType<DayCycle>(FindObjectsInactive.Include);
+        timeline = FindFirstObjectByType<DayTimeline>(FindObjectsInactive.Include);
+        merchant = FindFirstObjectByType<SeedMerchant>(FindObjectsInactive.Include);
+        eventCard = FindFirstObjectByType<EventCardView>(FindObjectsInactive.Include);
+        foodPreparation = FindFirstObjectByType<FoodPreparationPanel>(FindObjectsInactive.Include);
+        gatheringGame = FindFirstObjectByType<GatheringMinigame>(FindObjectsInactive.Include);
     }
 
     public void UseCurrentViewAsHome()
@@ -115,14 +127,18 @@ public sealed class CommunityCamera : MonoBehaviour
         {
             movement.x = (keyboard.dKey.isPressed ? 1 : 0) - (keyboard.aKey.isPressed ? 1 : 0);
             movement.y = (keyboard.wKey.isPressed ? 1 : 0) - (keyboard.sKey.isPressed ? 1 : 0);
-            zoom = ((keyboard.equalsKey.isPressed || keyboard.numpadPlusKey.isPressed ? 1 : 0) -
-                (keyboard.minusKey.isPressed || keyboard.numpadMinusKey.isPressed ? 1 : 0)) *
-                Time.deltaTime * keyboardZoomSpeed;
         }
-        if (Mouse.current != null)
+        if (!HasGameplayModal)
         {
-            float scroll = Mouse.current.scroll.ReadValue().y;
-            if (scroll != 0) zoom += Mathf.Sign(scroll);
+            if (keyboard != null)
+                zoom = ((keyboard.equalsKey.isPressed || keyboard.numpadPlusKey.isPressed ? 1 : 0) -
+                    (keyboard.minusKey.isPressed || keyboard.numpadMinusKey.isPressed ? 1 : 0)) *
+                    Time.deltaTime * keyboardZoomSpeed;
+            if (Mouse.current != null)
+            {
+                float scroll = Mouse.current.scroll.ReadValue().y;
+                if (scroll != 0f) zoom += Mathf.Sign(scroll);
+            }
         }
 
         if (followed != null && followLocked) return;
@@ -141,6 +157,14 @@ public sealed class CommunityCamera : MonoBehaviour
                 closestDistance, farthestDistance);
         ClampManualView();
     }
+
+    internal bool HasGameplayModal =>
+        (days != null && !days.CanAcceptActions) ||
+        (timeline != null && timeline.BlocksCameraZoom) ||
+        (merchant != null && merchant.BlocksCameraZoom) ||
+        (eventCard != null && eventCard.BlocksCameraZoom) ||
+        (foodPreparation != null && foodPreparation.BlocksCameraZoom) ||
+        (gatheringGame != null && gatheringGame.BlocksCameraZoom);
 
     private void LateUpdate()
     {

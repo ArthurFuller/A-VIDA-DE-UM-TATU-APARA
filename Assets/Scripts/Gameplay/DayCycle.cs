@@ -35,6 +35,9 @@ public sealed class DayCycle : MonoBehaviour
     private static readonly ProfilerMarker ShowFirstEventMarker = new("Sertao.FirstDay.ShowEvent");
 
     private int currentDay = 1;
+    private InitialTutorial tutorial;
+    private bool skipTutorialDayPending;
+    private bool campaignTransitionStarted;
     private bool firstDayOpening = true;
     private bool firstDayEventPresented;
     private HoverPunchButton finishDayFeedback;
@@ -43,14 +46,14 @@ public sealed class DayCycle : MonoBehaviour
     private int todayMilk;
     private int todayEggs;
     private readonly List<(Plot plot, ResourceKind kind, int amount)> animalGains = new();
-    private int lastClosedDay;
+    private int lastClosedDay = -1;
     private int missedMeals;
 #if UNITY_EDITOR
     private int? previewFinalBalance;
 
     internal bool TryPreviewFinalDay(int finalBalance)
     {
-        if (!CanAcceptActions || previewFinalBalance.HasValue || Time.timeScale <= 0f ||
+        if (currentDay == 0 || !CanAcceptActions || previewFinalBalance.HasValue || Time.timeScale <= 0f ||
             SertaoCoinToss.IsOpen || actions == null || actions.IsBusy ||
             (hand != null && hand.IsDraggingCard) || finishDayButton == null ||
             !finishDayButton.isActiveAndEnabled || !finishDayButton.IsInteractable()) return false;
@@ -67,6 +70,12 @@ public sealed class DayCycle : MonoBehaviour
         !feedingOpen && !gameOver &&
         (dayEvents == null || !dayEvents.IsPanelOpen);
     public int CurrentDay => currentDay;
+    internal bool IncludesTutorialDay { get; private set; }
+    internal int TotalDays => totalDays;
+    internal EventCardView TutorialEventCard => dayEvents != null ? dayEvents.TutorialCard : null;
+    internal Button TutorialFinishButton => finishDayButton;
+    internal WorkerAssignment TutorialWorker => workers == null ? null :
+        Array.Find(workers, worker => worker != null && worker.isActiveAndEnabled && !worker.UsedToday);
     internal bool FirstDayPreparationFinished { get; private set; }
 
     public bool TryRepeatAnimalProduction(out int milk, out int eggs)
@@ -162,11 +171,40 @@ public sealed class DayCycle : MonoBehaviour
         if (hand != null) hand.SuspendEntranceForEvent();
     }
 
+    internal bool RegisterTutorial(InitialTutorial guide)
+    {
+        if (FirstDayPreparationFinished || firstDayEventPresented || IncludesTutorialDay) return false;
+
+        tutorial = guide;
+        IncludesTutorialDay = true;
+        currentDay = 0;
+        UpdateDayLabel();
+        return true;
+    }
+
+    internal void SkipTutorialDay()
+    {
+        if (currentDay == 0) skipTutorialDayPending = true;
+    }
+
+    private void Update()
+    {
+        if (!skipTutorialDayPending || currentDay != 0 || campaignTransitionStarted || feedingOpen ||
+            !FirstDayPreparationFinished || GS2SceneFade.IsEnteringGameplay ||
+            (actions != null && actions.IsBusy) || (hand != null && hand.IsDraggingCard)) return;
+
+        if (timeline != null) timeline.ClosePanel();
+        if (activeMissionsPanel != null) activeMissionsPanel.Close();
+        if (merchant != null && merchant.IsOpen) merchant.HideShop();
+        if (hand != null) hand.SuspendEntranceForEvent();
+        BeginCampaignAfterTutorial(false);
+    }
+
     private IEnumerator Start()
     {
-        UpdateDayLabel();
-        // Deixa os outros componentes da cena concluírem o Start ainda sob o loading.
+        // O tutorial registra o Dia 0 no Start, antes de preparar o evento.
         yield return null;
+        UpdateDayLabel();
         try
         {
             using (PrepareFirstDayMarker.Auto())
@@ -276,12 +314,19 @@ public sealed class DayCycle : MonoBehaviour
             WorkerAssignment worker = workers[i];
             if (worker == null || worker.IsUnavailableToday) continue;
             SaleItem? received = i < chosenFood.Length ? chosenFood[i] : null;
-            if (!received.HasValue) missedMeals++;
-            else if (received == SaleItem.Food) worker.ScheduleExtraAction();
+            if (received == SaleItem.Food) worker.ScheduleExtraAction();
+            else if (!received.HasValue && currentDay > 0) missedMeals++;
         }
 
-        if (cardChoice != null) cardChoice.Begin(currentDay, ContinueToNextDay);
-        else ContinueToNextDay();
+        if (cardChoice == null)
+        {
+            ContinueToNextDay();
+            return;
+        }
+
+        Action onPicked = currentDay == 0 && tutorial != null
+            ? tutorial.BeginDayOneFade : null;
+        cardChoice.Begin(currentDay, ContinueToNextDay, onPicked);
     }
 
     private bool FindResultsView()
@@ -341,8 +386,51 @@ public sealed class DayCycle : MonoBehaviour
     public void ContinueToNextDay()
     {
         if (!feedingOpen || gameOver || lastClosedDay != currentDay || currentDay >= totalDays) return;
+        if (currentDay == 0)
+        {
+            BeginCampaignAfterTutorial(!InitialTutorial.SkipRequested);
+            return;
+        }
         actions.ReturnWorkersHome();
         BeginNextDay();
+    }
+
+    private void BeginCampaignAfterTutorial(bool showFarewell)
+    {
+        if (campaignTransitionStarted) return;
+        campaignTransitionStarted = true;
+        skipTutorialDayPending = false;
+        feedingOpen = true;
+        if (finishDayButton != null) finishDayButton.enabled = false;
+        if (tutorial != null)
+            StartCoroutine(tutorial.RevealDayOne(PrepareCampaignDay, StartCampaignEvent, showFarewell));
+        else
+        {
+            PrepareCampaignDay();
+            StartCampaignEvent();
+        }
+    }
+
+    private bool PrepareCampaignDay()
+    {
+        EventCardView practiceCard = TutorialEventCard;
+        if (practiceCard != null && practiceCard.IsOpen) practiceCard.CloseImmediately();
+        actions?.ReturnWorkersHome();
+        currentDay = 1;
+        ProduceAnimalResources();
+        dayEvents?.PrepareFirstDay(currentDay);
+        PrepareDayState(false);
+        if (dayEvents == null || !dayEvents.HasPreparedEvent) return false;
+        dayEvents.RevealPreparedBackdrop();
+        return true;
+    }
+
+    private void StartCampaignEvent()
+    {
+        if (!campaignTransitionStarted) return;
+        campaignTransitionStarted = false;
+        dayEvents?.ShowPreparedEvent();
+        OpenDayAfterEvent(true);
     }
 
     private void BeginNextDay()
@@ -350,6 +438,12 @@ public sealed class DayCycle : MonoBehaviour
         currentDay++;
         ProduceAnimalResources();
         if (dayEvents != null) dayEvents.StartDay(currentDay);
+        PrepareDayState(true);
+        OpenDayAfterEvent(true);
+    }
+
+    private void PrepareDayState(bool announceDay)
+    {
         if (MandalaSynergy.Instance != null)
             MandalaSynergy.Instance.ApplyGrowthBonuses(currentDay, seedCatalog);
         if (dayEvents != null) dayEvents.ApplyPendingPestRegression(seedCatalog);
@@ -371,10 +465,9 @@ public sealed class DayCycle : MonoBehaviour
         foreach (Plot plot in plots)
             if (plot != null) plot.RefreshGrowth(currentDay, seedCatalog);
         UpdateMarket();
-        if (feedback != null) feedback.ShowMessage("Dia " + currentDay + " de " + totalDays);
-        if (finishDayButton != null) finishDayButton.enabled = true;
+        if (announceDay && feedback != null) feedback.ShowMessage("Dia " + currentDay + " de " + totalDays);
+        if (announceDay && finishDayButton != null) finishDayButton.enabled = true;
         UpdateDayLabel();
-        OpenDayAfterEvent(true);
     }
 
     private void OpenDayAfterEvent(bool addAnimalResources)
@@ -390,8 +483,10 @@ public sealed class DayCycle : MonoBehaviour
 
     private void ActivateDay(bool addAnimalResources)
     {
+        if (currentDay == 0 && campaignTransitionStarted) return;
         firstDayOpening = false;
         feedingOpen = false;
+        if (finishDayButton != null) finishDayButton.enabled = true;
         AudioManager.Play(SoundCue.DayStart);
         DayChanged?.Invoke();
         dayEvents?.ReleasePendingReward();

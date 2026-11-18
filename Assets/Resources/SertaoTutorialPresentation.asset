@@ -1,0 +1,545 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c63c58b5238434482b63253fe145da5, type: 3}
+  m_Name: SertaoTutorialPresentation
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialPresentation
+  tips:
+  - offset: {x: -592.1, y: 0}
+    text: "No in\xEDcio de cada dia, acontece um evento. Clique no bot\xE3o para
+      ler a descri\xE7\xE3o"
+    box:
+      size: {x: 293.7, y: 80.39}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.80392164, g: 0.7960785, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 0, y: 0}
+    text: 
+    box:
+      size: {x: 252.4, y: 72.3}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 0, y: 0}
+    text: 
+    box:
+      size: {x: 252.4, y: 72.3}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 0, y: 0}
+    text: 
+    box:
+      size: {x: 272.9, y: 74.6}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: -32.9, y: 0}
+    text: 
+    box:
+      size: {x: 275.2, y: 79.2}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: -17.7, y: 56.31}
+    text: "Para cada dia, voc\xEA consegue ver todas as cartas que utilizou"
+    box:
+      size: {x: 252.4, y: 72.3}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 305.12, y: -59.5}
+    text: 
+    box:
+      size: {x: 275.3, y: 92.2}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 242.78, y: 102.04}
+    text: 
+    box:
+      size: {x: 269.8, y: 72.3}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: -182, y: 99.6}
+    text: 
+    box:
+      size: {x: 252.4, y: 72.3}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 0, y: 26.4}
+    text: 
+    box:
+      size: {x: 252.4, y: 72.3}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 0.24, y: 7.12}
+    text: 
+    box:
+      size: {x: 252.4, y: 72.3}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 0, y: 0}
+    text: 
+    box:
+      size: {x: 252.4, y: 72.3}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 0, y: 0}
+    text: 
+    box:
+      size: {x: 282.3, y: 91.98}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 0, y: 0}
+    text: 
+    box:
+      size: {x: 259.6, y: 72.3}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 0, y: 0}
+    text: 
+    box:
+      size: {x: 252.4, y: 72.3}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 175.8, y: 0}
+    text: 
+    box:
+      size: {x: 271.2, y: 74.6}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 0, y: 11.85}
+    text: 
+    box:
+      size: {x: 252.4, y: 72.3}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 299.4, y: 0}
+    text: "Arraste comida at\xE9 os tatus e conclua. Comida pronta fornece uma a\xE7\xE3o
+      extra."
+    box:
+      size: {x: 283.3, y: 89.5}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 0.4, y: -6.4}
+    text: "No final de cada dia, voc\xEA ter\xE1 que escolher entre duas cartas para
+      adicionar ao seu baralho"
+    box:
+      size: {x: 303.6, y: 83.6}
+      tint: {r: 0, g: 0, b: 0, a: 0.84}
+      sprite: {fileID: 0}
+      useDefaultFrame: 0
+      spriteLayout: 1
+      borderThickness: 0
+      typography:
+        color: {r: 0.8039216, g: 0.79607844, b: 0.70980394, a: 1}
+        font: {fileID: 0}
+        size: 16
+        fontStyle: 0
+        alignment: 3
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 11
+        insets:
+          left: 10
+          right: 10
+          top: 5
+          bottom: 23
+  - offset: {x: 0, y: 0}
+    text: 
+    box:
+      size: {x: 393.2, y: 155.1}
+      tint: {r: 1, g: 1, b: 1, a: 1}
+      sprite: {fileID: 21300000, guid: d378ae67b986f374f853accdc64e7b28, type: 3}
+      useDefaultFrame: 0
+      spriteLayout: 2
+      borderThickness: 0.09
+      typography:
+        color: {r: 0.03529412, g: 0.03529412, b: 0.027450982, a: 1}
+        font: {fileID: 0}
+        size: 20
+        fontStyle: 1
+        alignment: 4
+        lineSpacing: 1
+        fit: 1
+        minimumSize: 13
+        insets:
+          left: 24
+          right: 24
+          top: 18
+          bottom: 38
+  skipSprite: {fileID: 21300000, guid: 20913ec24384dd94ba6eb7ca643ab8cc, type: 2}
+  continueSprite: {fileID: 21300000, guid: 20913ec24384dd94ba6eb7ca643ab8cc, type: 2}
+  showSkipLabel: 1
+  showContinueLabel: 1
+  skipStyle:
+    size: {x: 84.2, y: 21.2}
+    anchor: {x: 0, y: 0}
+    offset: {x: 10, y: 5}
+    spriteLayout: 1
+    borderThickness: 0
+    spriteTint: {r: 1, g: 1, b: 1, a: 1}
+    fillTint: {r: 0.88, g: 0.77, b: 0.56, a: 0.15}
+    colors:
+      m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
+      m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+      m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+      m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+      m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
+      m_ColorMultiplier: 1
+      m_FadeDuration: 0.1
+    caption: Pular tutorial
+    typography:
+      color: {r: 0.80392164, g: 0.7960785, b: 0.70980394, a: 1}
+      font: {fileID: 0}
+      size: 10
+      fontStyle: 0
+      alignment: 4
+      lineSpacing: 1
+      fit: 0
+      minimumSize: 10
+      insets:
+        left: 0
+        right: 0
+        top: 0
+        bottom: 0
+  continueStyle:
+    size: {x: 100.5, y: 32.3}
+    anchor: {x: 1, y: 0}
+    offset: {x: -18.4, y: 17.96}
+    spriteLayout: 1
+    borderThickness: 0
+    spriteTint: {r: 1, g: 1, b: 1, a: 1}
+    fillTint: {r: 0.91, g: 0.78, b: 0.53, a: 1}
+    colors:
+      m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
+      m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+      m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+      m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+      m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
+      m_ColorMultiplier: 1
+      m_FadeDuration: 0.1
+    caption: Continuar
+    typography:
+      color: {r: 0.83921576, g: 0.8313726, b: 0.73333335, a: 1}
+      font: {fileID: 0}
+      size: 16
+      fontStyle: 0
+      alignment: 4
+      lineSpacing: 1
+      fit: 0
+      minimumSize: 10
+      insets:
+        left: 0
+        right: 0
+        top: 0
+        bottom: 0
+  hasAppearance: 1

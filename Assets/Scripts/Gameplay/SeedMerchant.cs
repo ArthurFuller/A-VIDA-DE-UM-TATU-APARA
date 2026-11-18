@@ -41,6 +41,11 @@ public sealed class SeedMerchant : MonoBehaviour
     public bool IsAvailable { get; private set; }
     public bool CanTrade { get; private set; }
     public bool IsOpen => shopGroup != null && shopGroup.interactable;
+    internal bool BlocksCameraZoom => isActiveAndEnabled &&
+        (IsOpen || panelTransition != null ||
+         (backdropGroup != null && backdropGroup.isActiveAndEnabled && backdropGroup.blocksRaycasts));
+    internal RectTransform TutorialPanel => panelRect;
+    internal bool TutorialPanelSettled => panelTransition == null || !panelTransition.IsActive();
     public int FenceWoodCost => fenceWoodCost;
     public int FenceCoinCost => fenceCoinCost;
     public int FenceSlotsAvailable => hand != null ? hand.FreeSlots : 0;
@@ -82,7 +87,7 @@ public sealed class SeedMerchant : MonoBehaviour
 
     public void SetDay(int day, bool hasDeliveryDue = false)
     {
-        bool scheduled = Array.IndexOf(marketDays, day) >= 0;
+        bool scheduled = day == 0 || Array.IndexOf(marketDays, day) >= 0;
         GameBalance balance = GameBalance.Current;
         bool dailyOffers = balance != null && balance.dailyMissionOffers;
         CanTrade = scheduled || day == 12 || (!dailyOffers && hasDeliveryDue);

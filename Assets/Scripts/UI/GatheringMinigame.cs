@@ -22,6 +22,11 @@ public sealed class GatheringMinigame : MonoBehaviour
     [SerializeField, Min(0.2f)] private float minimumCrossingDuration = 0.55f;
     [SerializeField, Min(0f)] private float edgePadding = 8f;
     [SerializeField, Min(0f)] private float targetSidePadding = 12f;
+    [SerializeField, Min(0f), Tooltip("Acrescenta esta margem em cada lado do alvo, em unidades da barra.")]
+    private float woodHitPaddingPerSide = 3f;
+    [SerializeField, Tooltip("Imagem que recebe o flash de erro. Vazio usa a imagem da pista de madeira.")]
+    private Image woodMissFill;
+    [SerializeField] private Color woodMissColor = new Color(1f, 0.19f, 0.17f);
     [SerializeField, Min(2)] private int rounds = 3;
     [SerializeField, Min(0f)] private float minimumTargetSeparation = 45f;
     [SerializeField, Min(0f)] private float nearTargetSpeedBoost = 1.1f;
@@ -78,8 +83,17 @@ public sealed class GatheringMinigame : MonoBehaviour
     private float difficultyMultiplier, initialTargetWidth, previousTargetCenter;
     private float markerX, markerMin, markerMax, markerPivotOffset, markerDirection;
     private float fishingProgress, fishingElapsed;
+    private Tween woodMissFlash;
+    private Image flashingWoodFill;
+    private Color woodFillRestingColor;
 
     public bool CanStart() => ResolveReferences();
+    internal bool BlocksCameraZoom => isActiveAndEnabled && completed != null;
+    internal bool TutorialReady => completed != null && !entering && !resolving;
+    internal bool TutorialFishing => fishing;
+    internal RectTransform TutorialActionButton => TutorialReady ? buttonRect : null;
+    internal RectTransform TutorialTrack => !TutorialReady ? null :
+        fishing && fishingFill != null ? fishingFill.rectTransform.parent as RectTransform : woodTrack ?? bar;
     public Vector2 FishDropScreenPosition
     {
         get
@@ -99,6 +113,9 @@ public sealed class GatheringMinigame : MonoBehaviour
         Hide();
     }
 
+    private void OnDisable() => ClearWoodMissFlash();
+
+    // A madeira devolve a classificação da rodada. A pesca devolve o total de peixes.
     public void Begin(ActivityKind activity, Action<int> onCompleted, int fishingDifficulty = 0,
         Action onWoodHit = null, Action<bool> onFishingTension = null,
         Action onFishDropped = null)
@@ -249,8 +266,9 @@ public sealed class GatheringMinigame : MonoBehaviour
         }
         Bounds markerBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(bar, marker);
         Bounds targetBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(bar, greenTarget);
-        bool hit = markerBounds.center.x >= targetBounds.min.x &&
-            markerBounds.center.x <= targetBounds.max.x;
+        float padding = Mathf.Max(0f, woodHitPaddingPerSide);
+        bool hit = markerBounds.center.x >= targetBounds.min.x - padding &&
+            markerBounds.center.x <= targetBounds.max.x + padding;
         if (hit)
         {
             hits++;
@@ -267,6 +285,7 @@ public sealed class GatheringMinigame : MonoBehaviour
             bar.DOKill();
             bar.anchoredPosition = barLayout.Position;
             bar.DOShakeAnchorPos(0.22f, missShakeStrength, 12, 90f, false, true);
+            FlashWoodMiss();
         }
         round++;
         if (round < rounds) StartWoodRound();
@@ -300,7 +319,29 @@ public sealed class GatheringMinigame : MonoBehaviour
             if (i < fishCount - 1) sequence.AppendInterval(fishDropPunchGap);
         }
         sequence.AppendInterval(0.2f);
-        sequence.OnComplete(() => Complete(rating));
+        sequence.OnComplete(() => Complete(rating, fishCount));
+    }
+
+    private void FlashWoodMiss()
+    {
+        ClearWoodMissFlash();
+        flashingWoodFill = woodMissFill != null ? woodMissFill :
+            woodTrack != null ? woodTrack.GetComponent<Image>() : null;
+        if (flashingWoodFill == null) return;
+        woodFillRestingColor = flashingWoodFill.color;
+        Color flash = woodMissColor;
+        flash.a = woodFillRestingColor.a;
+        flashingWoodFill.color = flash;
+        woodMissFlash = flashingWoodFill.DOColor(woodFillRestingColor, 0.20f)
+            .SetEase(Ease.InQuad).SetLink(gameObject);
+    }
+
+    private void ClearWoodMissFlash()
+    {
+        woodMissFlash?.Kill();
+        woodMissFlash = null;
+        if (flashingWoodFill != null) flashingWoodFill.color = woodFillRestingColor;
+        flashingWoodFill = null;
     }
 
     private void CheckFishingTension()
@@ -356,7 +397,7 @@ public sealed class GatheringMinigame : MonoBehaviour
         if (fishingFill != null) fishingFill.fillAmount = fishingProgress;
     }
 
-    private void Complete(int rating)
+    private void Complete(int rating, int fishCount = 0)
     {
         if (fishing)
             AudioManager.Play(rating > 0 ? SoundCue.FishingCaught : SoundCue.FishingFailed);
@@ -366,12 +407,13 @@ public sealed class GatheringMinigame : MonoBehaviour
         fishingTensionChanged = null;
         fishDropped = null;
         Hide();
-        callback?.Invoke(rating);
+        callback?.Invoke(fishing ? fishCount : rating);
     }
 
     private void Hide()
     {
         AudioManager.StopFishingPull();
+        ClearWoodMissFlash();
         entering = false;
         if (group == null) return;
         group.alpha = 0f;

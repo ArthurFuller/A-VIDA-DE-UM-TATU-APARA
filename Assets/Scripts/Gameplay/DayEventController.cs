@@ -39,6 +39,7 @@ public sealed class DayEventController : MonoBehaviour
     }
 
     [SerializeField] private EventCardView card;
+    internal EventCardView TutorialCard => card;
     [SerializeField] private ResourceBank resources;
     [SerializeField] private ResourceHud resourceHud;
     [SerializeField] private Plot[] plots;
@@ -197,7 +198,7 @@ public sealed class DayEventController : MonoBehaviour
 
         if (!IsActive(SertaoEventKind.Pests)) pestTarget = CropType.None;
         SertaoEventKind announced = SertaoEventKind.None;
-        if (lastAnnounced != SertaoEventKind.Comadre && activeComadre.Count == 0 &&
+        if (day > 0 && lastAnnounced != SertaoEventKind.Comadre && activeComadre.Count == 0 &&
             forestExploitation >= forestExploitationThreshold && Random.value < comadreChance)
         {
             var candidates = new System.Collections.Generic.List<WorkerAssignment>();
@@ -214,7 +215,7 @@ public sealed class DayEventController : MonoBehaviour
                 announced = SertaoEventKind.Comadre;
             }
         }
-        if (announced == SertaoEventKind.None &&
+        if (day > 0 && announced == SertaoEventKind.None &&
             day - Mathf.Max(lastWoodCollectionDay, lastReforestationDay) >=
                 daysWithoutWoodForReforestation)
         {
@@ -222,7 +223,7 @@ public sealed class DayEventController : MonoBehaviour
             lastReforestationDay = day;
             pendingWoodReward = reforestationWood;
         }
-        if (announced == SertaoEventKind.None && Random.value < generalEventChance)
+        if (day > 0 && announced == SertaoEventKind.None && Random.value < generalEventChance)
         {
             var options = new List<SertaoEventKind>();
             foreach (SertaoEventKind kind in new[] { SertaoEventKind.Drought, SertaoEventKind.Pests,

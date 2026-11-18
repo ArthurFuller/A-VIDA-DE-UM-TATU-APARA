@@ -13,6 +13,13 @@ public sealed class ShopTabs : MonoBehaviour
     [SerializeField] private Button buyTab;
     [SerializeField] private Button sellTab;
     [SerializeField] private Button ordersTab;
+    internal RectTransform TutorialOrderDetails => orderDetails;
+    internal RectTransform TutorialOrdersTab => ordersTab != null ? ordersTab.transform as RectTransform : null;
+    internal bool TutorialOrdersSelected => shopOpen && ordersPage != null && selectedPage == ordersPage;
+    internal bool TutorialTabsReady => shopOpen && (headerSequence == null || !headerSequence.IsActive());
+    internal bool TutorialOrderReady => TutorialOrdersSelected &&
+        (pageSequence == null || !pageSequence.IsActive()) &&
+        (orderSequence == null || !orderSequence.IsActive());
     [SerializeField] private ShopSellPanel sellPanel;
     [Header("Saldo e destaque da aba atual (somente visual)")]
     [SerializeField] private ResourceBank resources;

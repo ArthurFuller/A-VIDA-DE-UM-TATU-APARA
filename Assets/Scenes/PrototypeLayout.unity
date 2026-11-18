@@ -6487,6 +6487,7 @@ MonoBehaviour:
   growthFill: {fileID: 1499566527}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &47309145
 GameObject:
   m_ObjectHideFlags: 0
@@ -9174,6 +9175,7 @@ MonoBehaviour:
   growthFill: {fileID: 1006090629}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1001 &98207568
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -30139,7 +30141,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0.00000059604645, y: -79.14047}
+  m_AnchoredPosition: {x: 0.00000058545265, y: -79.14052}
   m_SizeDelta: {x: 472.71, y: 320}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!1 &226304125
@@ -34925,12 +34927,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::InitialTutorial
   overlay: {fileID: 300000104}
   description: {fileID: 300000123}
-  continueButton: {fileID: 300000134}
-  disabledDuringTutorial:
-  - {fileID: 1909094346}
-  - {fileID: 300000024}
-  firstDescription: "Aqui est\xE3o os recursos, o dia e seu dinheiro. Use os bot\xF5es
-    \xE0 direita para ver as miss\xF5es ou pausar."
 --- !u!1 &300000110
 GameObject:
   m_ObjectHideFlags: 0
@@ -42589,6 +42585,9 @@ MonoBehaviour:
   minimumCrossingDuration: 0.55
   edgePadding: 8
   targetSidePadding: 12
+  woodHitPaddingPerSide: 3
+  woodMissFill: {fileID: 0}
+  woodMissColor: {r: 1, g: 0.19, b: 0.17, a: 1}
   rounds: 3
   minimumTargetSeparation: 45
   nearTargetSpeedBoost: 1.1
@@ -71269,7 +71268,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 67.99997, y: -92.99997}
+  m_AnchoredPosition: {x: 69.18051, y: -93.767365}
   m_SizeDelta: {x: 402.03, y: 200}
   m_Pivot: {x: 1, y: 1}
 --- !u!114 &610870232
@@ -73151,6 +73150,7 @@ MonoBehaviour:
   growthFill: {fileID: 1481647737}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1001 &640873034
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -98187,6 +98187,7 @@ MonoBehaviour:
   growthFill: {fileID: 1122626688}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &846409521
 GameObject:
   m_ObjectHideFlags: 0
@@ -104119,6 +104120,7 @@ MonoBehaviour:
   growthFill: {fileID: 30069109}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &867013375
 GameObject:
   m_ObjectHideFlags: 0
@@ -110897,6 +110899,7 @@ MonoBehaviour:
   growthFill: {fileID: 1034740531}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &993689339
 GameObject:
   m_ObjectHideFlags: 0
@@ -140885,6 +140888,7 @@ MonoBehaviour:
   growthFill: {fileID: 1658676117}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &1275548011
 GameObject:
   m_ObjectHideFlags: 0
@@ -147755,6 +147759,7 @@ MonoBehaviour:
   growthFill: {fileID: 669935870}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!4 &1319160285 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 637bd529021bd8e4ca7addf8a4ebc622, type: 3}
@@ -151468,6 +151473,7 @@ MonoBehaviour:
   rowWaveDelay: 0.06
   footerDuration: 0.32
   offscreenPadding: 80
+  blockedIngredientOpacity: 0.4
   resources: {fileID: 1231229570}
   actions: {fileID: 467295183}
   trading: {fileID: 1105058367}
@@ -172333,6 +172339,7 @@ MonoBehaviour:
   growthFill: {fileID: 273202963}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!4 &1614641688 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 637bd529021bd8e4ca7addf8a4ebc622, type: 3}
@@ -194787,6 +194794,7 @@ MonoBehaviour:
   growthFill: {fileID: 1664930606}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &1754958417
 GameObject:
   m_ObjectHideFlags: 0
@@ -195027,6 +195035,7 @@ MonoBehaviour:
   growthFill: {fileID: 1074358760}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1001 &1757753885
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -223199,6 +223208,7 @@ MonoBehaviour:
   growthFill: {fileID: 922687772}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &1922887615
 GameObject:
   m_ObjectHideFlags: 0
@@ -225113,6 +225123,7 @@ MonoBehaviour:
   growthFill: {fileID: 523467775}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1001 &1950173828
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -231582,6 +231593,7 @@ MonoBehaviour:
   growthFill: {fileID: 307250888}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &2080753607
 GameObject:
   m_ObjectHideFlags: 0
@@ -234045,6 +234057,7 @@ MonoBehaviour:
   growthFill: {fileID: 348164463}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &2134196486
 GameObject:
   m_ObjectHideFlags: 0
@@ -262363,7 +262376,7 @@ MonoBehaviour:
   daysHeight: 96
   cardsHeight: 200
   topBarHeight: 192.1875
-  panelOffset: {x: 67.99994, y: 97.957535}
+  panelOffset: {x: 68.85809, y: 97.51204}
   dayButtonWidth: 34
   dayButtonHeight: 22
   dayLineHeight: 3
@@ -269393,6 +269406,7 @@ MonoBehaviour:
   growthFill: {fileID: 9500000012}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &9500000044
 GameObject:
   m_ObjectHideFlags: 0
@@ -271464,6 +271478,7 @@ MonoBehaviour:
   growthFill: {fileID: 9500000104}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &9500000136
 GameObject:
   m_ObjectHideFlags: 0
@@ -273535,6 +273550,7 @@ MonoBehaviour:
   growthFill: {fileID: 9500000196}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &9500000228
 GameObject:
   m_ObjectHideFlags: 0
@@ -275606,6 +275622,7 @@ MonoBehaviour:
   growthFill: {fileID: 9500000288}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &9500000320
 GameObject:
   m_ObjectHideFlags: 0
@@ -277677,6 +277694,7 @@ MonoBehaviour:
   growthFill: {fileID: 9500000380}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &9500000412
 GameObject:
   m_ObjectHideFlags: 0
@@ -279748,6 +279766,7 @@ MonoBehaviour:
   growthFill: {fileID: 9500000472}
   growthFillWidth: 0.84
   readyGrowthColor: {r: 0.16, g: 0.75, b: 0.2, a: 1}
+  wiltingGrowthColor: {r: 0.9, g: 0.2, b: 0.16, a: 1}
 --- !u!1 &9500000504
 GameObject:
   m_ObjectHideFlags: 0
@@ -291538,7 +291557,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: -23}
+  m_AnchoredPosition: {x: -5.9998, y: -23}
   m_SizeDelta: {x: 57, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &9812160000002
@@ -291750,7 +291769,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: -23}
+  m_AnchoredPosition: {x: -5.9998, y: -23}
   m_SizeDelta: {x: 57, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &9812160000012
@@ -291962,7 +291981,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: -23}
+  m_AnchoredPosition: {x: -5.9998, y: -23}
   m_SizeDelta: {x: 57, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &9812160000022
@@ -292174,7 +292193,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: -23}
+  m_AnchoredPosition: {x: -5.9998, y: -23}
   m_SizeDelta: {x: 57, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &9812160000032
@@ -292386,7 +292405,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: -23}
+  m_AnchoredPosition: {x: -5.9998, y: -23}
   m_SizeDelta: {x: 57, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &9812160000042
@@ -292598,7 +292617,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: -23}
+  m_AnchoredPosition: {x: -5.9998, y: -23}
   m_SizeDelta: {x: 57, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &9812160000052
@@ -292810,7 +292829,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: -23}
+  m_AnchoredPosition: {x: -5.9998, y: -23}
   m_SizeDelta: {x: 57, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &9812160000062
@@ -293022,7 +293041,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: -23}
+  m_AnchoredPosition: {x: -5.9998, y: -23}
   m_SizeDelta: {x: 57, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &9812160000072
@@ -293234,7 +293253,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: -23}
+  m_AnchoredPosition: {x: -5.9998, y: -23}
   m_SizeDelta: {x: 57, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &9812160000082
@@ -293446,7 +293465,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: -23}
+  m_AnchoredPosition: {x: -5.9998, y: -23}
   m_SizeDelta: {x: 57, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &9812160000092
@@ -293658,7 +293677,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: -23}
+  m_AnchoredPosition: {x: -5.9998, y: -23}
   m_SizeDelta: {x: 57, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &9812160000102
@@ -293870,7 +293889,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: -23}
+  m_AnchoredPosition: {x: -5.9998, y: -23}
   m_SizeDelta: {x: 57, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!222 &9812160000112
@@ -294987,7 +295006,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &9812160100049
 RectTransform:
   m_ObjectHideFlags: 0
@@ -295062,7 +295081,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &9812160100053
 RectTransform:
   m_ObjectHideFlags: 0

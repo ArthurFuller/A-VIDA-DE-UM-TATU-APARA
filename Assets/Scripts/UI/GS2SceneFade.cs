@@ -50,6 +50,15 @@ public sealed class GS2SceneFade : MonoBehaviour
             .OnComplete(() => blackOverlay.blocksRaycasts = false);
     }
 
+    internal void ReleaseInitialMenuOverlay()
+    {
+        if (loading || blackOverlay == null) return;
+        fade?.Kill();
+        fade = null;
+        blackOverlay.alpha = 0f;
+        blackOverlay.blocksRaycasts = false;
+    }
+
     public void TransitionFromNickname(System.Action showMenu, System.Action finished = null)
     {
         if (blackOverlay == null || loading)

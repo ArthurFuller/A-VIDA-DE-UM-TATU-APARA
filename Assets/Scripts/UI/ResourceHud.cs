@@ -25,6 +25,10 @@ public sealed class ResourceHud : MonoBehaviour
     [SerializeField] private Text coinText;
     [SerializeField] private Text animalText;
     [SerializeField] private Text eggText;
+    internal Text[] TutorialCounters() => new[]
+    {
+        woodText, fishText, cassavaText, pumpkinText, cornText, foodText, coinText, animalText, eggText
+    };
     [Header("Ícones em voo")]
     [SerializeField] private Sprite woodSprite;
     [SerializeField] private Sprite fishSprite;

@@ -39,6 +39,13 @@ public sealed class WorkerAssignment : MonoBehaviour
     public bool UsedToday => HousePreviewActive || IsUnavailableToday || actionsRemaining <= 0;
     public bool HousePreviewActive { get; set; }
     public Transform SpriteVisual => spriteVisual;
+    internal void GetTutorialSprites(List<SpriteRenderer> sprites)
+    {
+        if (spriteRenderer != null) sprites.Add(spriteRenderer);
+        if (actionDotsRoot == null) return;
+        foreach (Transform dot in actionDotsRoot)
+            if (dot.TryGetComponent(out SpriteRenderer icon)) sprites.Add(icon);
+    }
     public int ActionsRemaining => actionsRemaining;
     public ActivityKind? LastActivity { get; private set; }
     public bool IsUnavailableToday { get; private set; }
@@ -68,6 +75,7 @@ public sealed class WorkerAssignment : MonoBehaviour
     private Vector3 initialHomePosition;
     private Vector3 previousPosition;
     private bool isWorking;
+    private bool? routeFlipX;
     private Vector3? workFacingTarget;
     private float walkedSinceStep;
     private enum AnimationState { Idle, Run, Work }
@@ -109,6 +117,7 @@ public sealed class WorkerAssignment : MonoBehaviour
             if (spriteCamera != null)
                 spriteVisual.rotation = Quaternion.Euler(0f, spriteCamera.transform.eulerAngles.y, 0f);
             UpdateSpriteAnimation();
+            if (routeFlipX is bool flip && spriteRenderer != null) spriteRenderer.flipX = flip;
         }
         if (actionDotsRoot != null)
         {
@@ -130,8 +139,16 @@ public sealed class WorkerAssignment : MonoBehaviour
 
     public void FaceTowards(Vector3 destination)
     {
+        routeFlipX = null;
         previousPosition = transform.position;
         UpdateFacing(destination - transform.position);
+    }
+
+    internal void FaceForRoute(bool returning)
+    {
+        routeFlipX = returning;
+        previousPosition = transform.position;
+        if (spriteRenderer != null) spriteRenderer.flipX = returning;
     }
 
     public void SetWorking(bool value)
@@ -149,6 +166,7 @@ public sealed class WorkerAssignment : MonoBehaviour
 
     public void RestoreHomeFacing()
     {
+        routeFlipX = null;
         previousPosition = transform.position;
         if (spriteRenderer != null)
             spriteRenderer.flipX = false; // A arte de repouso original olha para a esquerda.
@@ -182,7 +200,7 @@ public sealed class WorkerAssignment : MonoBehaviour
         bool moving = movement.sqrMagnitude > 0.0025f * deltaTime * deltaTime;
         if (moving)
         {
-            UpdateFacing(movement);
+            if (!routeFlipX.HasValue) UpdateFacing(movement);
             movement.y = 0f;
             float distance = movement.magnitude;
             if (distance < 0.9f)
@@ -351,17 +369,18 @@ public sealed class WorkerAssignment : MonoBehaviour
         nextDayProductionReduction = Mathf.Max(0, productionReduction);
     }
 
-    private void RefreshActionDots(bool animate)
+    private void RefreshActionDots(bool animate, int? previewCount = null)
     {
         if (actionDotsRoot == null) return;
-        int visibleCount = previewActionPoints > 0 ? previewActionPoints : actionsRemaining;
+        int visibleCount = previewCount ?? actionsRemaining;
         while (actionDots.Count > visibleCount)
         {
             Transform dot = actionDots[actionDots.Count - 1];
             actionDots.RemoveAt(actionDots.Count - 1);
             dot.DOKill();
             if (animate)
-                DOTween.Sequence().Append(dot.DOPunchScale(dot.localScale * 0.35f, 0.13f))
+                DOTween.Sequence().SetTarget(dot).SetLink(dot.gameObject)
+                    .Append(dot.DOPunchScale(dot.localScale * 0.35f, 0.13f))
                     .Append(dot.DOScale(Vector3.zero, 0.13f))
                     .OnComplete(() => { if (dot != null) Destroy(dot.gameObject); });
             else Destroy(dot.gameObject);
@@ -381,7 +400,8 @@ public sealed class WorkerAssignment : MonoBehaviour
             Vector3 size = Vector3.one * (actionPointSize / Mathf.Max(0.01f, spriteHeight));
             dot.localScale = animate ? Vector3.zero : size;
             if (animate)
-                DOTween.Sequence().Append(dot.DOScale(size, 0.17f).SetEase(Ease.OutBack))
+                DOTween.Sequence().SetTarget(dot).SetLink(dot.gameObject)
+                    .Append(dot.DOScale(size, 0.17f).SetEase(Ease.OutBack))
                     .Append(dot.DOPunchScale(size * 0.35f, 0.2f));
         }
         for (int i = 0; i < actionDots.Count; i++)
@@ -392,7 +412,7 @@ public sealed class WorkerAssignment : MonoBehaviour
     public void RefreshActionPointAppearance()
     {
         if (actionDotsRoot == null) return;
-        RefreshActionDots(false);
+        RefreshActionDots(false, previewActionPoints > 0 ? previewActionPoints : (int?)null);
         actionDotsRoot.position = transform.position + actionPointOffset;
         float spriteHeight = actionPointSprite != null ?
             actionPointSprite.bounds.size.y : 1f;

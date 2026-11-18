@@ -13,7 +13,7 @@ public sealed class TutorialHints : MonoBehaviour
 
     public static void Once(string key, string message)
     {
-        if (Instance == null || InitialTutorial.SkipRequested ||
+        if (Instance == null || InitialTutorial.SkipRequested || InitialTutorial.IsGuiding ||
             Instance.seen.Contains(key)) return;
         Instance.seen.Add(key);
         // O mesmo aviso não reaparece após reabrir a partida.

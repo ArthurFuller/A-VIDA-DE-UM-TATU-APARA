@@ -54,8 +54,14 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
     private readonly List<Vector2> cardPositions = new List<Vector2>();
     private bool isOpen;
     private Vector2 openPosition;
+    private ActivityCardAvailability hand;
+    private CommunityCamera communityCamera;
 
     public bool IsOpen => isOpen;
+    internal RectTransform TutorialMissionCard(int index) =>
+        cards != null && index >= 0 && index < cards.Length && cards[index] != null
+            ? cards[index].transform as RectTransform : null;
+    internal RectTransform TutorialList => contentRect;
 
 #if UNITY_EDITOR
     public ActiveMissionCard EditorPreviewCard =>
@@ -156,6 +162,8 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
 
     private void Awake()
     {
+        hand = FindFirstObjectByType<ActivityCardAvailability>(FindObjectsInactive.Include);
+        communityCamera = FindFirstObjectByType<CommunityCamera>(FindObjectsInactive.Include);
         if (contentRect != null) openPosition = contentRect.anchoredPosition;
         ApplySharedCardFormatting();
         ApplyCardLayout();
@@ -170,8 +178,19 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
         UpdateToggleText();
     }
 
+    private bool HasCompetingInteraction =>
+        Time.timeScale == 0f || SertaoCoinToss.IsOpen ||
+        (hand != null && (hand.IsDraggingCard || hand.IsSelectionLocked)) ||
+        (communityCamera != null && (communityCamera.HasGameplayModal || communityCamera.IsFollowingWorker));
+
+    private void Update()
+    {
+        if (isOpen && HasCompetingInteraction) Close();
+    }
+
     public void Toggle()
     {
+        if (!isOpen && HasCompetingInteraction) return;
         if (!isOpen)
         {
             if (timeline != null) timeline.ClosePanel();
@@ -225,7 +244,7 @@ public sealed class ActiveMissionsPanel : MonoBehaviour
         else
         {
             contentRect.DOAnchorPos(HiddenPosition, animationDuration)
-                .SetEase(Ease.InCubic).SetId(this)
+                .SetEase(Ease.InCubic).SetId(this).SetUpdate(true)
                 .OnComplete(() => Closed?.Invoke());
         }
     }

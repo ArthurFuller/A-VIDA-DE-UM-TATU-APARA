@@ -86,8 +86,17 @@ public sealed class DayTimeline : MonoBehaviour
     private Vector2 panelHomePosition;
     private bool open;
     private bool dayButtonsReady;
-    private int viewedDay;
+    private const int NoViewedDay = -1;
+    private int viewedDay = NoViewedDay;
+    private bool tutorialDayInLayout;
+    private float tutorialDaySpacing;
+
+    private int FirstTimelineDay => Application.isPlaying && days != null &&
+        days.IncludesTutorialDay && days.CurrentDay == 0 ? 0 : 1;
     private RectTransform inspectionCard;
+    internal bool BlocksCameraZoom => isActiveAndEnabled &&
+        (inspectionCard != null ||
+         (inspectionTween != null && inspectionTween.IsActive() && !inspectionTween.IsComplete()));
     private RectTransform inspectionShade;
     private RectTransform inspectionDescription;
     private CanvasGroup inspectionSource;
@@ -99,6 +108,15 @@ public sealed class DayTimeline : MonoBehaviour
     public RectTransform TimelinePanel => panel;
     public Vector2 PanelHomePosition => panelHomePosition;
     public bool IsOpen => open;
+    internal RectTransform TutorialTrigger => triggerButton != null ? triggerButton.transform as RectTransform : null;
+    internal RectTransform TutorialDay(int day)
+    {
+        int index = day - FirstTimelineDay;
+        return dayButtonsReady && index >= 0 && index < dayNodes.Count ? dayNodes[index] : null;
+    }
+    internal RectTransform TutorialHistory => viewedDay != NoViewedDay && cardScroll != null &&
+        cardScroll.gameObject.activeInHierarchy ? cardScroll : null;
+    internal RectTransform TutorialHandInspection => !inspectionFromTimeline ? inspectionCard : null;
     public Vector2 PanelClipPosition
     {
         get
@@ -179,7 +197,7 @@ public sealed class DayTimeline : MonoBehaviour
                     inspectionFollowSpeed, inspectionArtDepth, inspectionSheenStrength);
             return;
         }
-        if (open && viewedDay > 0 && cardScroll != null &&
+        if (open && viewedDay != NoViewedDay && cardScroll != null &&
             cardScroll.gameObject.activeInHierarchy)
             RenderCards(viewedDay, false);
     }
@@ -210,7 +228,7 @@ public sealed class DayTimeline : MonoBehaviour
             Description = card.Description,
             Art = image != null ? image.sprite : null,
             Key = CardDescriptionCatalog.ActivityKey(card.Kind) });
-        if (open && viewedDay == day) RenderCards(day, false);
+        if (open && viewedDay == day && cardScroll != null && cardScroll.gameObject.activeInHierarchy) RenderCards(day, false);
     }
 
     private void Update()
@@ -381,7 +399,7 @@ public sealed class DayTimeline : MonoBehaviour
         panelClip.anchoredPosition = PanelClipPosition;
         panel.anchorMin = panel.anchorMax = new Vector2(1f, 1f);
         panel.pivot = new Vector2(1f, 1f);
-        panel.sizeDelta = new Vector2(panelWidth, viewedDay > 0 ? cardsHeight : daysHeight);
+        panel.sizeDelta = new Vector2(panelWidth, viewedDay != NoViewedDay ? cardsHeight : daysHeight);
         if (!Application.isPlaying) panel.anchoredPosition = Vector2.zero;
         Fill(dayRow, 16f, 0f);
         dayContent.anchorMin = dayContent.anchorMax = new Vector2(0f, 1f);
@@ -409,31 +427,59 @@ public sealed class DayTimeline : MonoBehaviour
     private void RefreshDays()
     {
         if (dayRow == null) return;
-        if (dayNodes.Count != totalDays || dayLines.Count != Mathf.Max(0, totalDays - 1))
+        int firstDay = FirstTimelineDay;
+        bool includeTutorial = firstDay == 0;
+        int count = totalDays - firstDay + 1;
+        if (tutorialDayInLayout != includeTutorial || dayNodes.Count != count ||
+            dayLines.Count != Mathf.Max(0, count - 1))
         {
             dayNodes.Clear();
             dayLines.Clear();
-            dayHomeY.Clear();
+            RectTransform firstNode = dayContent.Find("Dia 1") as RectTransform;
+            RectTransform secondNode = dayContent.Find("Dia 2") as RectTransform;
+            RectTransform firstLine = dayContent.Find("Ligação do dia 1") as RectTransform;
             float step = dayButtonWidth + 14f;
-            for (int i = 0; i < totalDays - 1; i++)
+            if (firstNode != null && secondNode != null)
             {
-                RectTransform line = dayContent.Find("Ligação do dia " + (i + 1)) as RectTransform;
+                float authoredStep = secondNode.anchoredPosition.x - firstNode.anchoredPosition.x;
+                if (authoredStep > 0f) step = authoredStep;
+            }
+            float shift = includeTutorial == tutorialDayInLayout ? 0f :
+                includeTutorial ? step : -tutorialDaySpacing;
+            for (int day = firstDay; day < totalDays; day++)
+            {
+                string name = "Ligação do dia " + day;
+                RectTransform line = dayContent.Find(name) as RectTransform;
+                if (line == null && day == 0 && firstLine != null)
+                    line = CloneTutorialDayElement(firstLine, name);
                 if (line == null)
                 {
-                    line = Box("Ligação do dia " + (i + 1), dayContent,
+                    line = Box(name, dayContent,
                         new Color(0.32f, 0.28f, 0.2f), false);
                     line.anchorMin = line.anchorMax = new Vector2(0f, 1f);
                     line.pivot = new Vector2(0f, 0.5f);
                     line.sizeDelta = new Vector2(step, dayLineHeight);
                     line.anchoredPosition = new Vector2(
-                        12f + dayButtonWidth * 0.5f + i * step, -60f);
+                        12f + dayButtonWidth * 0.5f + (day - firstDay) * step, -60f);
+                    line.SetAsFirstSibling();
                 }
+                else if (day > 0) line.anchoredPosition += Vector2.right * shift;
+                line.gameObject.SetActive(true);
+                if (day == 0) line.SetAsFirstSibling();
                 dayLines.Add(line);
             }
-            for (int i = 1; i <= totalDays; i++)
+            for (int i = firstDay; i <= totalDays; i++)
             {
                 int day = i;
                 RectTransform node = dayContent.Find("Dia " + day) as RectTransform;
+                if (node == null && day == 0 && firstNode != null)
+                {
+                    node = CloneTutorialDayElement(firstNode, "Dia 0");
+                    Text label = node.GetComponentInChildren<Text>(true);
+                    if (label != null) label.text = "0";
+                    // Os botões da cena são ligados em tempo de execução.
+                    node.GetComponent<Button>().onClick = new Button.ButtonClickedEvent();
+                }
                 if (node == null)
                 {
                     node = Box("Dia " + day, dayContent,
@@ -443,14 +489,24 @@ public sealed class DayTimeline : MonoBehaviour
                     node.pivot = new Vector2(0.5f, 0.5f);
                     node.sizeDelta = new Vector2(dayButtonWidth, dayButtonHeight);
                     node.anchoredPosition = new Vector2(
-                        12f + dayButtonWidth * 0.5f + (i - 1) * step, -60f);
+                        12f + dayButtonWidth * 0.5f + (day - firstDay) * step, -60f);
                 }
+                else if (day > 0) node.anchoredPosition += Vector2.right * shift;
+                node.gameObject.SetActive(true);
                 Button button = node.GetComponent<Button>();
                 button.onClick.RemoveAllListeners();
                 button.onClick.AddListener(() => ShowDay(day));
                 SertaoButtonAudio.Bind(button);
                 dayNodes.Add(node);
             }
+            if (!includeTutorial && tutorialDayInLayout)
+            {
+                RemoveTutorialDayElement("Dia 0");
+                RemoveTutorialDayElement("Ligação do dia 0");
+                history.Remove(0);
+            }
+            tutorialDayInLayout = includeTutorial;
+            if (shift > 0f) tutorialDaySpacing = shift;
         }
         float rightEdge = 0f;
         foreach (RectTransform node in dayNodes)
@@ -470,8 +526,27 @@ public sealed class DayTimeline : MonoBehaviour
             RectTransform node = dayNodes[i];
             if (!Application.isPlaying) continue;
             Button button = node.GetComponent<Button>();
-            button.interactable = days == null || i + 1 <= days.CurrentDay;
+            button.interactable = days == null || i + firstDay <= days.CurrentDay;
         }
+    }
+
+    private RectTransform CloneTutorialDayElement(RectTransform template, string elementName)
+    {
+        RectTransform element = Instantiate(template, dayContent, false);
+        element.name = elementName;
+        if (dayHomeY.TryGetValue(template, out float homeY))
+            element.anchoredPosition = new Vector2(element.anchoredPosition.x, homeY);
+        return element;
+    }
+
+    private void RemoveTutorialDayElement(string elementName)
+    {
+        RectTransform element = dayContent.Find(elementName) as RectTransform;
+        if (element == null) return;
+        element.DOKill();
+        dayHomeY.Remove(element);
+        element.gameObject.SetActive(false);
+        Destroy(element.gameObject);
     }
 
     private void PlaceDaysAbove()
@@ -528,7 +603,7 @@ public sealed class DayTimeline : MonoBehaviour
         AudioManager.Play(SoundCue.UiPaper);
         open = true;
         dayButtonsReady = false;
-        viewedDay = 0;
+        viewedDay = NoViewedDay;
         dayRow.gameObject.SetActive(true);
         cardScroll.gameObject.SetActive(false);
         scroll.enabled = true;
@@ -546,12 +621,12 @@ public sealed class DayTimeline : MonoBehaviour
         panel.DOAnchorPosY(panelHomePosition.y, slideDuration).SetEase(Ease.OutCubic)
             .OnComplete(() =>
             {
-                if (!open || viewedDay != 0) return;
+                if (!open || viewedDay != NoViewedDay) return;
                 AnimateDays(true);
                 DOVirtual.DelayedCall(Mathf.Max(0, dayNodes.Count - 1) * waveDelay +
                     slideDuration * 0.65f, () =>
                 {
-                    if (open && viewedDay == 0) dayButtonsReady = true;
+                    if (open && viewedDay == NoViewedDay) dayButtonsReady = true;
                 }).SetTarget(this);
             });
     }
@@ -560,7 +635,7 @@ public sealed class DayTimeline : MonoBehaviour
     {
         AudioManager.Play(SoundCue.UiPaper);
         CloseInspection(true);
-        if (viewedDay > 0 && onClosed == null)
+        if (viewedDay != NoViewedDay && onClosed == null)
             topBarMotion?.ReturnFromTimelineDay(null);
         open = false;
         DOTween.Kill(this);
@@ -581,7 +656,7 @@ public sealed class DayTimeline : MonoBehaviour
         CloseInspection(true);
         if (panel == null) return;
         open = false;
-        viewedDay = 0;
+        viewedDay = NoViewedDay;
         panelGroup.alpha = 0f;
         panelGroup.interactable = panelGroup.blocksRaycasts = false;
         panel.anchoredPosition = panelHomePosition + Vector2.up * daysPanelSize.y;
@@ -592,7 +667,8 @@ public sealed class DayTimeline : MonoBehaviour
 
     private void ShowDay(int day)
     {
-        if (!dayButtonsReady || viewedDay != 0 || days != null && day > days.CurrentDay) return;
+        if (!dayButtonsReady || viewedDay != NoViewedDay || day < FirstTimelineDay ||
+            days != null && day > days.CurrentDay) return;
         AudioManager.Play(SoundCue.UiPaper);
         dayButtonsReady = false;
         viewedDay = day;
@@ -632,9 +708,9 @@ public sealed class DayTimeline : MonoBehaviour
 
     private void BackToDays()
     {
-        if (viewedDay == 0 || !cardScroll.gameObject.activeSelf) return;
+        if (viewedDay == NoViewedDay || !cardScroll.gameObject.activeSelf) return;
         AudioManager.Play(SoundCue.UiPaper);
-        viewedDay = 0;
+        viewedDay = NoViewedDay;
         dayButtonsReady = false;
         scroll.enabled = false;
         AnimateCardsOut();
@@ -642,7 +718,7 @@ public sealed class DayTimeline : MonoBehaviour
         bool hudReady = topBarMotion == null;
         void ShowDaysWhenReady()
         {
-            if (!panelReady || !hudReady || !open || viewedDay != 0) return;
+            if (!panelReady || !hudReady || !open || viewedDay != NoViewedDay) return;
             dayRow.gameObject.SetActive(true);
             RefreshDays();
             PlaceDaysAbove();
@@ -650,7 +726,7 @@ public sealed class DayTimeline : MonoBehaviour
             DOVirtual.DelayedCall(Mathf.Max(0, dayNodes.Count - 1) * waveDelay +
                 slideDuration * 0.65f, () =>
             {
-                if (open && viewedDay == 0) dayButtonsReady = true;
+                if (open && viewedDay == NoViewedDay) dayButtonsReady = true;
             }).SetTarget(this);
         }
         topBarMotion?.ReturnFromTimelineDay(() =>
@@ -662,7 +738,7 @@ public sealed class DayTimeline : MonoBehaviour
             slideDuration * 0.65f;
         DOVirtual.DelayedCall(end, () =>
         {
-            if (!open || viewedDay != 0) return;
+            if (!open || viewedDay != NoViewedDay) return;
             cardScroll.gameObject.SetActive(false);
             scroll.enabled = true;
             backButton.gameObject.SetActive(false);
@@ -702,7 +778,7 @@ public sealed class DayTimeline : MonoBehaviour
     private void OnRectTransformDimensionsChange()
     {
         FollowHud();
-        if (Application.isPlaying && open && viewedDay > 0 &&
+        if (Application.isPlaying && open && viewedDay != NoViewedDay &&
             cardScroll != null && cardScroll.gameObject.activeInHierarchy)
             FitCardViewport();
     }
@@ -834,6 +910,7 @@ public sealed class DayTimeline : MonoBehaviour
         string description, bool fromTimeline, string key)
     {
         if ((fromTimeline && !open) || source == null || inspectionCard != null) return;
+        if (!fromTimeline) activeMissionsPanel?.Close();
         if (hand == null) hand = FindFirstObjectByType<ActivityCardAvailability>();
         Canvas canvas = GetComponent<Canvas>().rootCanvas;
         RectTransform root = (RectTransform)canvas.transform;

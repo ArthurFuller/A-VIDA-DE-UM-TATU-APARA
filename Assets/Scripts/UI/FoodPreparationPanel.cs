@@ -15,6 +15,16 @@ public sealed class FoodPreparationPanel : MonoBehaviour
         public RectTransform increase;
         public RectTransform quantity;
         public RectTransform quantityBackground;
+
+        public IEnumerable<RectTransform> Elements()
+        {
+            yield return icon;
+            yield return stock != null ? stock.rectTransform : null;
+            yield return decrease;
+            yield return increase;
+            yield return quantity;
+            yield return quantityBackground;
+        }
     }
 
     [SerializeField] private CanvasGroup group;
@@ -37,6 +47,7 @@ public sealed class FoodPreparationPanel : MonoBehaviour
     [SerializeField, Min(0f)] private float rowWaveDelay = 0.06f;
     [SerializeField, Min(0f)] private float footerDuration = 0.32f;
     [SerializeField, Min(0f)] private float offscreenPadding = 80f;
+    [SerializeField, Range(0f, 1f)] private float blockedIngredientOpacity = 0.40f;
     [SerializeField] private ResourceBank resources;
     [SerializeField] private ActionResolver actions;
     [SerializeField] private InventoryTrading trading;
@@ -58,21 +69,33 @@ public sealed class FoodPreparationPanel : MonoBehaviour
     private Vector3 closeScale;
     private Sequence transition;
     private readonly Dictionary<RectTransform, Vector2> homes = new();
+    private List<(CanvasGroup Group, float RestingAlpha)>[] ingredientGroups;
+    private const int MaxIngredientTypes = 2;
+
+    internal bool BlocksCameraZoom => isActiveAndEnabled && group != null &&
+        group.isActiveAndEnabled && group.blocksRaycasts;
 
     private void Awake()
     {
         if (panel != null) panelHome = panel.anchoredPosition;
         if (closeButton != null) closeScale = closeButton.localScale;
         if (rows != null)
-            foreach (IngredientRow row in rows)
+        {
+            ingredientGroups = new List<(CanvasGroup Group, float RestingAlpha)>[rows.Length];
+            for (int i = 0; i < rows.Length; i++)
             {
-                Remember(row.icon);
-                Remember(row.stock != null ? row.stock.rectTransform : null);
-                Remember(row.decrease);
-                Remember(row.increase);
-                Remember(row.quantity);
-                Remember(row.quantityBackground);
+                var rowGroups = new List<(CanvasGroup Group, float RestingAlpha)>(6);
+                ingredientGroups[i] = rowGroups;
+                foreach (RectTransform element in rows[i].Elements())
+                {
+                    Remember(element);
+                    if (element == null) continue;
+                    if (!element.TryGetComponent(out CanvasGroup opacity))
+                        opacity = element.gameObject.AddComponent<CanvasGroup>();
+                    rowGroups.Add((opacity, opacity.alpha));
+                }
             }
+        }
         Remember(prepareButton);
         Remember(resultText != null ? resultText.rectTransform : null);
         if (jerimumPlusButton != null) jerimumPlusButton.onClick.AddListener(AddJerimum);
@@ -204,11 +227,12 @@ public sealed class FoodPreparationPanel : MonoBehaviour
         (pumpkin > 0 ? 1 : 0) + (jerimum > 0 ? 1 : 0) +
         (milk > 0 ? 1 : 0) + (eggs > 0 ? 1 : 0);
 
+    private bool CanSelectType(int selected) => selected > 0 || TypesSelected < MaxIngredientTypes;
+
     private void Add(ref int selected, int stock)
     {
         if (transitioning) return;
-        if (selected < stock && TotalSelected < 3 &&
-            (selected > 0 || TypesSelected < 2)) selected++;
+        if (selected < stock && TotalSelected < 3 && CanSelectType(selected)) selected++;
         Refresh();
     }
 
@@ -297,6 +321,12 @@ public sealed class FoodPreparationPanel : MonoBehaviour
         SetStock(3, "Jerimum", resources.Jerimum);
         SetStock(4, "Leite", resources.Milk);
         SetStock(5, "Ovos", resources.Eggs);
+        RefreshIngredientOpacity(0, fish);
+        RefreshIngredientOpacity(1, corn);
+        RefreshIngredientOpacity(2, pumpkin);
+        RefreshIngredientOpacity(3, jerimum);
+        RefreshIngredientOpacity(4, milk);
+        RefreshIngredientOpacity(5, eggs);
         if (fishCountText != null) fishCountText.text = fish.ToString();
         if (cornCountText != null) cornCountText.text = corn.ToString();
         if (pumpkinCountText != null) pumpkinCountText.text = pumpkin.ToString();
@@ -304,6 +334,14 @@ public sealed class FoodPreparationPanel : MonoBehaviour
         if (milkCountText != null) milkCountText.text = milk.ToString();
         if (eggsCountText != null) eggsCountText.text = eggs.ToString();
         if (resultText != null) resultText.text = "COMIDAS: " + (found ? output : 0);
+    }
+
+    private void RefreshIngredientOpacity(int index, int selected)
+    {
+        if (ingredientGroups == null || index >= ingredientGroups.Length) return;
+        float alpha = CanSelectType(selected) ? 1f : blockedIngredientOpacity;
+        foreach (var (group, restingAlpha) in ingredientGroups[index])
+            if (group != null) group.alpha = restingAlpha * alpha;
     }
 
     private void SetStock(int index, string name, int amount)

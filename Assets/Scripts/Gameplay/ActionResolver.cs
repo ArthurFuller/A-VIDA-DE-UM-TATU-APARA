@@ -106,6 +106,25 @@ public sealed class ActionResolver : MonoBehaviour
         pendingPlotWorker != null || servingPreparedFood ||
         HasGatheringWorker(forestTasks) || HasGatheringWorker(fishingTasks);
     public bool HasPendingSelection => pendingPlotWorker != null;
+    internal bool TutorialGatheringInView => activeMinigame != null ||
+        (communityCamera != null && communityCamera.IsFollowingWorker);
+
+    internal RectTransform TutorialGatheringVisitButton
+    {
+        get
+        {
+            if (TutorialGatheringInView) return null;
+            return VisibleButton(WaitingTask(forestTasks)) ?? VisibleButton(WaitingTask(fishingTasks));
+        }
+    }
+
+    private static RectTransform VisibleButton(GatheringTask task)
+    {
+        Button button = task?.Button;
+        return button != null && button.isActiveAndEnabled && button.IsInteractable()
+            ? button.transform as RectTransform : null;
+    }
+
     public event System.Action<bool> PendingSelectionChanged;
     public bool GatheringNeedsPlayer => NeedsGatheringPlayer(forestTasks) ||
         NeedsGatheringPlayer(fishingTasks);
@@ -527,10 +546,10 @@ public sealed class ActionResolver : MonoBehaviour
         MoveToGatheringArea(task);
     }
 
-    private void CompleteGathering(WorkerAssignment worker, ActivityKind activity, int rating,
+    private void CompleteGathering(WorkerAssignment worker, ActivityKind activity, int result,
         System.Action onResourcesCollected, ResourceHud.DropBatch drops = null)
     {
-        if (rating < 0)
+        if (result < 0)
         {
             worker.SetStatus("ação cancelada");
             feedback.ShowMessage("Minigame de coleta indisponível.");
@@ -540,7 +559,7 @@ public sealed class ActionResolver : MonoBehaviour
         worker.SetStatus("ação concluída");
         if (activity == ActivityKind.CollectWood || activity == ActivityKind.WoodPlus)
         {
-            int gained = woodReward + rating + (activity == ActivityKind.WoodPlus ? 1 : 0);
+            int gained = woodReward + result + (activity == ActivityKind.WoodPlus ? 1 : 0);
             gained = Mathf.Max(0, gained - worker.ProductionReduction);
             resources.AddWood(gained);
             resources.RecordProduction(SaleItem.Wood, gained);
@@ -555,8 +574,7 @@ public sealed class ActionResolver : MonoBehaviour
         }
         else
         {
-            int gained = activity == ActivityKind.FishPlus ?
-                2 + (rating > 0 ? 2 : 0) : 1 + (rating > 0 ? 1 : 0);
+            int gained = result;
             resources.AddFish(gained);
             resources.RecordProduction(SaleItem.Fish, gained);
             if (resourceHud != null && drops != null && drops.Icons.Count > 0)
@@ -968,7 +986,7 @@ public sealed class ActionResolver : MonoBehaviour
         if (isReturn) returningHome.Add(worker);
         float speed = speedOverride > 0f ? speedOverride : movementSpeed;
         float duration = Mathf.Max(0.01f, Vector3.Distance(worker.transform.position, destination) / speed);
-        worker.FaceTowards(destination);
+        worker.FaceForRoute(isReturn);
         Tween travel = worker.transform.DOMove(destination, duration).SetEase(Ease.InOutSine);
         if (braking) travel = DOTween.Sequence().AppendInterval(0.1f).Append(travel);
         movements[worker] = travel;
@@ -1030,7 +1048,7 @@ public sealed class ActionResolver : MonoBehaviour
             var points = new Vector3[returnRoute.Length + 1];
             System.Array.Copy(returnRoute, points, returnRoute.Length);
             points[points.Length - 1] = worker.HomePosition;
-            MoveAlongRoute(worker, points, Arrived, false, travelSpeed);
+            MoveAlongRoute(worker, points, Arrived, false, travelSpeed, isReturn: true);
         }
         else MoveWorker(worker, worker.HomePosition, Arrived, false, true, travelSpeed);
     }
@@ -1230,20 +1248,20 @@ public sealed class ActionResolver : MonoBehaviour
             worker.SetWorking(true);
         }
         worker.SetStatus("atividade interativa");
-        gatheringGame.Begin(task.SelectedActivity, rating =>
+        gatheringGame.Begin(activity, result =>
         {
             worker.SetWorking(false);
             task.Worker = null;
             task.Arrived = false;
             task.Started = false;
             communityCamera.HoldCurrentView();
-            if (wood && rating >= 0)
+            if (wood && result >= 0)
             {
-                ResolveWoodGathering(task, worker, activity, rating);
+                ResolveWoodGathering(task, worker, activity, result);
                 return;
             }
             SendGatheringWorkerHome(worker, activity);
-            CompleteGathering(worker, activity, rating, () =>
+            CompleteGathering(worker, activity, result, () =>
             {
                 FinishGatheringRound(task);
             }, fishDrops);
@@ -1339,7 +1357,7 @@ public sealed class ActionResolver : MonoBehaviour
         {
             worker.RestoreHomeFacing();
             if (dayCycle.CurrentDay == returnDay) worker.SetStatus("em casa");
-        }, false, GatheringTravelSpeed(activity));
+        }, false, GatheringTravelSpeed(activity), isReturn: true);
     }
 
     private float GatheringTravelSpeed(ActivityKind activity) =>
@@ -1383,7 +1401,7 @@ public sealed class ActionResolver : MonoBehaviour
     }
 
     private void MoveAlongRoute(WorkerAssignment worker, Vector3[] points, System.Action onArrived,
-        bool countAsBusy = true, float speedOverride = 0f)
+        bool countAsBusy = true, float speedOverride = 0f, bool isReturn = false)
     {
         bool braking = returningHome.Contains(worker) && countAsBusy;
         StopMovement(worker);
@@ -1402,7 +1420,7 @@ public sealed class ActionResolver : MonoBehaviour
         }
         float speed = speedOverride > 0f ? speedOverride : movementSpeed;
         float duration = Mathf.Max(0.01f, distance / speed);
-        worker.FaceTowards(points[0]);
+        worker.FaceForRoute(isReturn);
         Tween route = points.Length == 1
             ? worker.transform.DOMove(points[0], duration)
             : worker.transform.DOPath(points, duration, PathType.Linear, PathMode.Full3D);

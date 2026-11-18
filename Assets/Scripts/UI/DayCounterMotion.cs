@@ -8,6 +8,7 @@ public sealed class DayCounterMotion : MonoBehaviour
     [SerializeField] private RectTransform label;
     [SerializeField, Tooltip("Imagem visível do contador, sem margens transparentes.")]
     private RectTransform hitArea;
+    internal RectTransform TutorialHitArea => hitArea != null ? hitArea : label;
     [SerializeField] private Image glow;
     [SerializeField, Min(1f)] private float hoverScale = 1.07f;
 
@@ -45,7 +46,8 @@ public sealed class DayCounterMotion : MonoBehaviour
         if (Time.timeScale == 0f) return;
         // The parent RectTransform includes large empty areas. Only the visible
         // artwork should activate the hover, not the entire HUD container.
-        bool over = !SertaoCoinToss.IsOpen && hitArea != null && Mouse.current != null &&
+        bool over = (topBar == null || !topBar.TutorialRestricted) && !SertaoCoinToss.IsOpen &&
+            hitArea != null && Mouse.current != null &&
             RectTransformUtility.RectangleContainsScreenPoint(
                 hitArea, Mouse.current.position.ReadValue(), uiCamera);
         if (over && Mouse.current.leftButton.wasPressedThisFrame)

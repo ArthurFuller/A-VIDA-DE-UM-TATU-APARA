@@ -126,7 +126,13 @@ public sealed class MandalaSynergy : MonoBehaviour
             for (int j = i + 1; j < plots.Length; j++)
             {
                 Plot b = plots[j];
-                if (b == null || !a.IsAdjacentTo(b)) continue;
+                if (b == null) continue;
+                if (a == waterPlot || b == waterPlot)
+                {
+                    Plot neighbor = a == waterPlot ? b : a;
+                    if (!waterPlot.IsAdjacentTo(neighbor, true)) continue;
+                }
+                else if (!a.IsAdjacentTo(b)) continue;
                 AddPair(a, b, waterPlot, next);
                 AddPair(b, a, waterPlot, next);
             }

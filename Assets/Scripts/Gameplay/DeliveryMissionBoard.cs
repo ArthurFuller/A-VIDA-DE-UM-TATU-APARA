@@ -24,6 +24,23 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
     [SerializeField] private Button acceptButton;
     [SerializeField] private Button deliverButton;
     [SerializeField] private Button nextButton;
+    internal event Action<DeliveryMission> MissionAccepted;
+    internal bool TutorialOfferAvailable => marketOpen && missions.Exists(mission => !mission.accepted);
+    internal bool TutorialCanAcceptSelected => acceptButton != null && acceptButton.IsInteractable();
+    internal RectTransform TutorialOfferButton => TutorialCanAcceptSelected
+        ? acceptButton.transform as RectTransform : nextButton != null ? nextButton.transform as RectTransform : null;
+
+    internal int TutorialMissionIndex(DeliveryMission selected)
+    {
+        int index = 0;
+        foreach (DeliveryMission mission in missions)
+        {
+            if (!mission.accepted) continue;
+            if (mission == selected) return index;
+            index++;
+        }
+        return -1;
+    }
     [SerializeField] private ActiveMissionsPanel activePanel;
     [SerializeField] private ShopTabs shopTabs;
     [Header("Comunidade")]
@@ -42,7 +59,7 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
     private readonly HashSet<DeliveryMissionTemplate> shownTemplates = new();
     private int currentDay = 1;
     private int selectedIndex;
-    private int lastGeneratedDay;
+    private int lastGeneratedDay = -1;
     private bool marketOpen;
     private bool delivering;
     private int communityDeliveries;
@@ -95,9 +112,10 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
         marketOpen = isMarketDay;
         if (currentDay != day)
         {
+            if (currentDay > 0)
+                foreach (DeliveryMission mission in missions)
+                    if (!mission.accepted) refusedTemplates.Add(mission.template);
             currentDay = day;
-            foreach (DeliveryMission mission in missions)
-                if (!mission.accepted) refusedTemplates.Add(mission.template);
             missions.RemoveAll(m => !m.accepted);
             int expired = missions.RemoveAll(m => day > m.dueDay);
             expiredAcceptedCount += expired;
@@ -136,6 +154,7 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
         AudioManager.Play(SoundCue.MissionAccepted);
         if (feedback != null) feedback.ShowMessage("Pedido aceito: " + mission.title);
         Refresh();
+        MissionAccepted?.Invoke(mission);
     }
 
     public void Deliver()
@@ -257,9 +276,10 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
         var accepted = missions.FindAll(mission => mission.accepted);
         var candidates = new Dictionary<DeliveryMissionTemplate, DeliveryMission>();
         var estimates = new Dictionary<DeliveryMissionTemplate, DeliveryOfferForecast.Feasibility>();
+        int campaignDay = Mathf.Max(1, currentDay);
         foreach (DeliveryMissionTemplate template in catalog.entries)
         {
-            if (!DeliveryMissionCatalog.IsUsable(template) || template.availableFromDay > currentDay ||
+            if (!DeliveryMissionCatalog.IsUsable(template) || template.availableFromDay > campaignDay ||
                 activeTemplates.Contains(template) || candidates.ContainsKey(template)) continue;
             var requirements = new List<DeliveryRequirement>(template.requirements.Count);
             foreach (DeliveryRequirement requirement in template.requirements)
@@ -270,7 +290,7 @@ public sealed class DeliveryMissionBoard : MonoBehaviour
                 title = template.title,
                 description = template.description,
                 requirements = requirements,
-                dueDay = currentDay + Mathf.Clamp(template.deliveryDays, 0, Mathf.Max(0, campaignDays - currentDay)),
+                dueDay = campaignDay + Mathf.Clamp(template.deliveryDays, 0, Mathf.Max(0, campaignDays - campaignDay)),
                 coinReward = template.coinReward
             };
             candidates.Add(template, mission);

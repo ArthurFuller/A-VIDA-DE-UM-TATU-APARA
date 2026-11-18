@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -34,6 +35,9 @@ public sealed class FeedingMinigame : MonoBehaviour
     [SerializeField] private Sprite milkSprite;
     [SerializeField] private Sprite eggSprite;
     [SerializeField] private Button finishButton;
+    internal RectTransform TutorialPanel => panel;
+    internal bool TutorialOpen => open;
+    internal bool TutorialReady => open && !transitioning;
     private bool lastDay;
     private string normalFinishText;
     private int normalFinishFontSize;
@@ -49,6 +53,8 @@ public sealed class FeedingMinigame : MonoBehaviour
 
     private WorkerAssignment[] workers;
     private SaleItem?[] chosenFood;
+    private int[] workerResultIndices;
+    private int dayWorkerCount;
     private Action<SaleItem?[]> completed;
     private Action cancelled;
     private bool open;
@@ -111,7 +117,18 @@ public sealed class FeedingMinigame : MonoBehaviour
         if (!gameObject.activeSelf) gameObject.SetActive(true);
         transition?.Kill();
         if (panel != null) panel.gameObject.SetActive(true);
-        workers = dayWorkers;
+        dayWorkerCount = dayWorkers.Length;
+        var eligibleWorkers = new List<WorkerAssignment>(dayWorkerCount);
+        var eligibleIndices = new List<int>(dayWorkerCount);
+        for (int i = 0; i < dayWorkerCount; i++)
+        {
+            WorkerAssignment worker = dayWorkers[i];
+            if (worker == null || worker.IsUnavailableToday) continue;
+            eligibleWorkers.Add(worker);
+            eligibleIndices.Add(i);
+        }
+        workers = eligibleWorkers.ToArray();
+        workerResultIndices = eligibleIndices.ToArray();
         lastDay = finalDay;
         if (finishButton != null && finishButton.GetComponentInChildren<Text>(true) is Text finishLabel)
         {
@@ -127,6 +144,8 @@ public sealed class FeedingMinigame : MonoBehaviour
         // O arranjo automático só é necessário para slots adicionais.
         if (workers.Length > workerTargets.Length)
             EnsureWorkerTargets(workers.Length);
+        for (int i = 0; i < workerTargets.Length; i++)
+            if (workerTargets[i] != null) workerTargets[i].gameObject.SetActive(i < workers.Length);
         ApplyWorkerVisuals();
         reservedIcon = null;
         chosenFood = new SaleItem?[workers.Length];
@@ -503,7 +522,9 @@ public sealed class FeedingMinigame : MonoBehaviour
         Action<SaleItem?[]> callback = completed;
         completed = null;
         cancelled = null;
-        SaleItem?[] result = chosenFood;
+        var result = new SaleItem?[dayWorkerCount];
+        for (int i = 0; i < chosenFood.Length; i++)
+            result[workerResultIndices[i]] = chosenFood[i];
         transition?.Kill();
         RectTransform parent = panel.parent as RectTransform;
         float left = parent != null ? (parent.rect.width + panel.rect.width) * 0.5f +

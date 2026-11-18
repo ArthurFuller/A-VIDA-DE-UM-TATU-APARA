@@ -74,6 +74,18 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
     public int FreeSlots => Mathf.Max(0, maxHandCards - shown.Count - spent.Count -
         pendingRewards.Count + testCards.Count);
     public bool ContainsCard(ActivityCardDrag card) => shown.Contains(card);
+    internal bool TutorialHasCards => shown.Exists(card => card != null && card.isActiveAndEnabled);
+
+    internal RectTransform TutorialShopCard
+    {
+        get
+        {
+            if (cards == null) return null;
+            ActivityCardDrag card = System.Array.Find(cards, candidate =>
+                candidate != null && candidate.Kind == ActivityKind.BuySeeds);
+            return card != null ? card.transform as RectTransform : null;
+        }
+    }
     public int CountOwnedCards(ActivityKind kind)
     {
         int count = 0;

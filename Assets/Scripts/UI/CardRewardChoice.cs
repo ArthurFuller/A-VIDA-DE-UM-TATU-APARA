@@ -15,6 +15,9 @@ public sealed class CardRewardChoice : MonoBehaviour
     [SerializeField] private Text[] choiceNames;
     [SerializeField] private Sprite placeholderArt;
     [SerializeField] private RectTransform[] choiceCards;
+    internal bool TutorialReady => completed != null && !transitioning;
+    internal bool TutorialCardPicked { get; private set; }
+    internal RectTransform TutorialPanel => panel;
     [SerializeField] private Button[] rerollButtons;
     [SerializeField, Min(0f)] private float floatDistance = 6f;
     [SerializeField, Min(0.1f)] private float floatDuration = 1.3f;
@@ -267,11 +270,17 @@ public sealed class CardRewardChoice : MonoBehaviour
         tip.position += root.TransformVector(new Vector3(dx, dy));
     }
 
-    public void Begin(int day, Action onCompleted)
+    public void Begin(int day, Action onCompleted) => Begin(day, onCompleted, null);
+
+    private Action rewardPicked;
+
+    internal void Begin(int day, Action onCompleted, Action onPicked)
     {
+        TutorialCardPicked = false;
         transition?.Kill();
         transitioning = false;
         completed = onCompleted;
+        rewardPicked = onPicked;
         currentDay = day;
         available.Clear();
         if (rewards != null)
@@ -287,7 +296,8 @@ public sealed class CardRewardChoice : MonoBehaviour
             onCompleted?.Invoke();
             return;
         }
-        if (day == 1)
+        if (day <= 1 && chosenKinds.Count == 0 &&
+            hand.TemplateFor(ActivityKind.PlantPumpkin) != null && hand.TemplateFor(ActivityKind.PlantJerimum) != null)
         {
             offered[0] = hand.TemplateFor(ActivityKind.PlantPumpkin);
             offered[1] = hand.TemplateFor(ActivityKind.PlantJerimum);
@@ -497,19 +507,25 @@ public sealed class CardRewardChoice : MonoBehaviour
     {
         if (transitioning || completed == null || index < 0 || index >= 2 || offered[index] == null) return;
         if (!hand.QueueRewardCard(offered[index].Kind)) return;
+        TutorialCardPicked = true;
         chosenKinds.Add(offered[index].Kind);
         AudioManager.Play(SoundCue.CardReward);
         Action callback = completed;
+        Action picked = rewardPicked;
         completed = null;
+        rewardPicked = null;
         transitioning = true;
+        picked?.Invoke();
         group.blocksRaycasts = true;
         foreach (Text description in descriptions)
             if (description != null) description.transform.parent.gameObject.SetActive(false);
         foreach (RectTransform card in choiceCards)
             if (card != null) card.DOKill();
         transition?.Kill();
+        float leaveDuration = picked != null
+            ? Mathf.Max(transitionDuration, InitialTutorial.CampaignFadeSeconds) : transitionDuration;
         transition = DOTween.Sequence().SetTarget(this)
-            .AppendInterval(transitionDuration)
+            .AppendInterval(leaveDuration)
             .OnComplete(() =>
             {
                 AudioManager.Play(SoundCue.UiPaper);
@@ -524,7 +540,7 @@ public sealed class CardRewardChoice : MonoBehaviour
             transition.Insert(0f, panel.DOAnchorPosX(panelHome.x - left,
                 transitionDuration).SetEase(Ease.InOutSine));
         }
-        if (backdrop != null)
+        if (backdrop != null && picked == null)
             backdrop.DOFade(0f, transitionDuration).SetEase(Ease.InOutCubic);
     }
 
