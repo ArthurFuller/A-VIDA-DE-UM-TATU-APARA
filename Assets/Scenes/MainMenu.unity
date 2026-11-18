@@ -682,11 +682,26 @@ MonoBehaviour:
   enteringScale: 0.975
   mainLogo: {fileID: 0}
   mainBackground: {fileID: 0}
+  optionsBackground: {fileID: 0}
   optionsFrameSprite: {fileID: 0}
+  introDarkHoldSeconds: 0.18
+  introRevealSeconds: 0.65
   logoDropSeconds: 0.5
   buttonDropSeconds: 0.27
   floatingHeight: 3.5
   floatingAngle: 1.1
+  borderRipple:
+    enabled: 1
+    rippleShader: {fileID: 0}
+    topLineInset: 0.06
+    bottomLineInset: 0.068
+    leftLineInset: 0.037
+    rightLineInset: 0.046
+    lineHalfWidth: 0.018
+    wavesPerLine: 5.5
+    impactAmplitude: 2.1
+    idleAmplitude: 1.35
+    idleSpeed: 1.45
 --- !u!225 &169113627
 CanvasGroup:
   m_ObjectHideFlags: 0
