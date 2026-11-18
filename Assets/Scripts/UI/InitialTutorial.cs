@@ -685,11 +685,13 @@ public sealed class InitialTutorial : MonoBehaviour
         campaignModalBlock = CreateImage("Entrada no Dia 1", viewport, Color.clear);
         campaignModalBlock.canvasRenderer.cullTransparentMesh = false;
         Stretch(campaignModalBlock.rectTransform, viewport, Vector2.zero, Vector2.zero);
+        FullscreenBackdrop.Cover(campaignModalBlock);
         campaignModalBlock.gameObject.SetActive(false);
 
         campaignCurtain = CreateImage("Transição do Dia 1", viewport, Color.clear);
         campaignCurtain.canvasRenderer.cullTransparentMesh = false;
         Stretch(campaignCurtain.rectTransform, viewport, Vector2.zero, Vector2.zero);
+        FullscreenBackdrop.Cover(campaignCurtain);
         campaignCurtain.gameObject.SetActive(false);
 
         Image oldFrame = description.rectTransform.parent != null
@@ -779,7 +781,8 @@ public sealed class InitialTutorial : MonoBehaviour
             rect.anchorMin = rect.anchorMax = rect.pivot = anchor;
         if (rect.anchoredPosition != look.offset) rect.anchoredPosition = look.offset;
         if (rect.sizeDelta != size) rect.sizeDelta = size;
-        if (!button.colors.Equals(look.colors)) button.colors = look.colors;
+        ColorBlock colors = SertaoButtonHoverPalette.WithFeedbackColors(look.colors);
+        if (!button.colors.Equals(colors)) button.colors = colors;
         if (label.enabled != showLabel) label.enabled = showLabel;
         if (label.text != look.caption) label.text = look.caption;
         ApplyTypography(label, look.typography);

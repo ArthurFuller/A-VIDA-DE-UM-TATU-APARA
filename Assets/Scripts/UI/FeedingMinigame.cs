@@ -87,6 +87,7 @@ public sealed class FeedingMinigame : MonoBehaviour
         {
             backdrop = group.GetComponent<Image>();
             if (backdrop != null) backdropColor = backdrop.color;
+            FullscreenBackdrop.Cover(backdrop);
         }
         if (panel != null) panelSceneScale = panel.localScale;
         if (panel != null) panelHome = panel.anchoredPosition;

@@ -21,8 +21,8 @@ public sealed class GameBalance : ScriptableObject
     public CropSettings jerimum = new CropSettings { type = CropType.Jerimum, displayName = "Jerimum", coinCost = 4, seedsPerPurchase = 1, growthDays = 3, foodYield = 4 };
 
     [Header("Venda por unidade")]
-    [Min(0)] public int woodPrice = 1, fishPrice = 2, cornPrice = 3, pumpkinPrice = 2;
-    [Min(0)] public int jerimumPrice = 3, foodPrice = 2, milkPrice = 2, eggPrice = 2;
+    [Min(0)] public int woodPrice = 2, fishPrice = 2, cornPrice = 3, pumpkinPrice = 2;
+    [Min(0)] public int jerimumPrice = 3, foodPrice = 3, milkPrice = 3, eggPrice = 3;
     [Min(0)] public int cornSeedPrice = 1, pumpkinSeedPrice = 2, jerimumSeedPrice = 2;
 
     [Header("Produção e coleta")]
@@ -65,7 +65,9 @@ public sealed class GameBalance : ScriptableObject
     [Min(0)] public int pestGrowthRegression = 2, droughtGrowthDelay = 1, rainGrowthBonus = 1;
     [Min(1)] public int forestExploitationThreshold = 6, comadreAbsenceDays = 1;
     [Min(0)] public int rainForestRecovery = 2;
-    [Min(1)] public int headOfCuiaFishTheft = 2;
+    [Min(1)] public int headOfCuiaMinimumFish = 8;
+    [Range(0, 100)] public int headOfCuiaChancePercent = 25;
+    [Range(1, 100)] public int headOfCuiaTheftPercent = 20;
     [Min(1)] public int daysWithoutWoodForReforestation = 3;
     [Min(0)] public int reforestationWood = 4;
 

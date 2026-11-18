@@ -264,6 +264,7 @@ public sealed class HouseSite : MonoBehaviour, IPointerClickHandler, IPointerEnt
         worker.ConfigureNewWorker("Trabalhador " + houseNumber);
         worker.SetHouseRoute(homeMarker, outsideMarker, doorwayMarker);
         worker.SetOriginHouseNumber(houseNumber);
+        worker.RestoreHomeFacing();
         return worker;
     }
 }

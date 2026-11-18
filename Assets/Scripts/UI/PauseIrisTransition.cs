@@ -39,6 +39,7 @@ public sealed class PauseIrisTransition : MonoBehaviour
         var transition = root.GetComponent<PauseIrisTransition>();
         transition.irisMaterial = new Material(shader) { hideFlags = HideFlags.DontSave };
         image.material = transition.irisMaterial;
+        FullscreenBackdrop.Cover(image);
         transition.SetRadius(1.1f);
         transition.AnimateRadius(-0.05f, 0.44f, () => SceneManager.LoadScene("MainMenu"));
         SceneManager.sceneLoaded += transition.SceneOpened;

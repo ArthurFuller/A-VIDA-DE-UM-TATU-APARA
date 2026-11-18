@@ -12,6 +12,7 @@ public sealed class SertaoButtonAudio : MonoBehaviour, IPointerEnterHandler
     internal static void Bind(Button target, bool useCardFeedback = false)
     {
         if (!Application.isPlaying || target == null) return;
+        SertaoButtonHoverPalette.Apply(target);
         if (!target.TryGetComponent(out SertaoButtonAudio feedback))
             feedback = target.gameObject.AddComponent<SertaoButtonAudio>();
         if (useCardFeedback) feedback.cardFeedback = true;

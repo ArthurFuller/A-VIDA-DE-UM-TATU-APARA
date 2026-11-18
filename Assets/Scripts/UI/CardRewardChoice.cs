@@ -104,6 +104,7 @@ public sealed class CardRewardChoice : MonoBehaviour
         {
             backdrop = group.GetComponent<Image>();
             if (backdrop != null) backdropColor = backdrop.color;
+            FullscreenBackdrop.Cover(backdrop);
             rootCanvas = group.GetComponentInParent<Canvas>()?.rootCanvas;
         }
         if (choiceCards.Length > 0 && choiceCards[0] != null)

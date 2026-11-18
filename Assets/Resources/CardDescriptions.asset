@@ -38,7 +38,7 @@ MonoBehaviour:
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
-    font: {fileID: 0}
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 0
     fontSize: 14
     alignment: 3
@@ -52,7 +52,7 @@ MonoBehaviour:
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
-    font: {fileID: 0}
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 0
     fontSize: 14
     alignment: 3
@@ -66,7 +66,7 @@ MonoBehaviour:
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
-    font: {fileID: 0}
+    font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 0
     fontSize: 14
     alignment: 3
@@ -427,7 +427,7 @@ MonoBehaviour:
     title: "Cabe\xE7a de Cuia"
     art: {fileID: 0}
     text: "Com tantos peixes guardados, voc\xEA atraiu a aten\xE7\xE3o do Cabe\xE7a
-      de Cuia. Ele te fez uma visita durante \xE0 noite\n\nVoc\xEA Perde 2 peixes"
+      de Cuia. Ele te fez uma visita durante a noite.\n\nVoc\xEA perdeu {peixesRoubados}."
     boxSize: {x: 390, y: 220}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 0, y: 0}

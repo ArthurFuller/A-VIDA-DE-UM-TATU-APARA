@@ -293,12 +293,12 @@ public sealed class ActionResolver : MonoBehaviour
                 AssignmentVersion++;
                 replayAnimations++;
                 ActivityKind revealed = repeated.Value;
-                bool deliverDuringReplay = !RequiresTargetSelection(revealed) &&
-                    revealed != ActivityKind.PrepareFood && revealed != ActivityKind.FoodPlus;
+                bool deliverDuringReplay = !RequiresTargetSelection(revealed);
                 card.PlayReplay(worker, revealed, deliverDuringReplay, () =>
                 {
                     replayAnimations--;
                     TryAssignInternal(worker, ActivityKind.Replay, activityName, card, true);
+                    if (pendingFoodCard != card) card.RestoreUnspentReplay();
                 });
                 if (disposable) hand.ConsumeReplayDisposable(revealed);
                 return;
@@ -402,7 +402,7 @@ public sealed class ActionResolver : MonoBehaviour
                     if (resourceHud != null) resourceHud.FlyFromWorld(ResourceKind.Coins,
                         stake, worker.transform.position + Vector3.up);
                 }
-                else resources.TrySpendCoins(stake);
+                else resources.TrySpendCoins(stake, allowDebt: true);
                 worker.SetStatus(won ? "aposta vencida" : "aposta perdida");
                 SendWorkerHome(worker);
             });
@@ -914,6 +914,7 @@ public sealed class ActionResolver : MonoBehaviour
     public void CancelFoodPreparation()
     {
         if (pendingFoodWorker != null && !pendingFoodWorker.UsedToday) pendingFoodWorker.SetStatus("livre");
+        pendingFoodCard?.RestoreUnspentReplay();
         pendingFoodWorker = null;
         pendingFoodCard = null;
         pendingFoodPlus = false;
@@ -950,6 +951,7 @@ public sealed class ActionResolver : MonoBehaviour
         plotsBeingPlowed.Clear();
         if (forestTrees != null) forestTrees.ResetTrees();
         ClearPendingPlot();
+        pendingFoodCard?.RestoreUnspentReplay();
         pendingFoodWorker = null;
         pendingFoodCard = null;
         WoodGainedToday = 0;
@@ -1230,7 +1232,7 @@ public sealed class ActionResolver : MonoBehaviour
     private void BeginGatheringGame(GatheringTask task)
     {
         WorkerAssignment worker = task.Worker;
-        ActivityKind activity = task.Activity;
+        ActivityKind activity = task.SelectedActivity;
         bool wood = activity == ActivityKind.CollectWood || activity == ActivityKind.WoodPlus;
         ResourceHud.DropBatch fishDrops = !wood && resourceHud != null ?
             resourceHud.CreateDropBatch(ResourceKind.Fish) : null;

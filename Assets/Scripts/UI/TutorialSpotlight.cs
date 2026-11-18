@@ -17,6 +17,18 @@ public sealed class TutorialSpotlight : Graphic
     private Material shadeMaterial;
     private Rect lastArea;
 
+    private Rect ShadeArea
+    {
+        get
+        {
+            Rect area = rectTransform.rect;
+            if (canvas == null) return area;
+            float padding = FullscreenBackdrop.EdgePixels / Mathf.Max(canvas.rootCanvas.scaleFactor, 0.01f);
+            return Rect.MinMaxRect(area.xMin - padding, area.yMin - padding,
+                area.xMax + padding, area.yMax + padding);
+        }
+    }
+
     protected override void Awake()
     {
         base.Awake();
@@ -44,7 +56,7 @@ public sealed class TutorialSpotlight : Graphic
             return;
         }
 
-        Rect area = rectTransform.rect;
+        Rect area = ShadeArea;
         if (area.width <= 0f || area.height <= 0f) return;
         bool changed = area != lastArea || cutouts.Count != count;
         for (int i = 0; i < count && !changed; i++)
@@ -73,7 +85,7 @@ public sealed class TutorialSpotlight : Graphic
     protected override void OnPopulateMesh(VertexHelper mesh)
     {
         mesh.Clear();
-        Rect area = rectTransform.rect;
+        Rect area = ShadeArea;
         if (shadeMaterial != null)
         {
             Quad(mesh, area, Color.white);

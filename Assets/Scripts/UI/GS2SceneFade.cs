@@ -35,6 +35,7 @@ public sealed class GS2SceneFade : MonoBehaviour
     {
         if (blackOverlay == null) blackOverlay = GetComponent<CanvasGroup>();
         if (blackOverlay == null) return;
+        FullscreenBackdrop.Cover(blackOverlay.GetComponentInChildren<Image>(true));
         // Na volta radial do pause, a transicao persistente ja cobre a tela.
         if (PauseIrisTransition.ReturningToMenu)
         {
@@ -70,10 +71,10 @@ public sealed class GS2SceneFade : MonoBehaviour
 
         fade?.Kill();
         blackOverlay.blocksRaycasts = true;
+        float darkenTime = Mathf.Max(0.08f, nicknameDarkenSeconds * (1f - blackOverlay.alpha));
         fade = DOTween.Sequence().SetUpdate(true)
-            .Append(blackOverlay.DOFade(1f, nicknameDarkenSeconds).SetEase(Ease.InOutSine))
+            .Append(blackOverlay.DOFade(1f, darkenTime).SetEase(Ease.OutSine))
             .AppendCallback(() => showMenu())
-            .AppendInterval(1f)
             .Append(blackOverlay.DOFade(0f, nicknameRevealSeconds).SetEase(Ease.InOutSine))
             .OnComplete(() =>
             {

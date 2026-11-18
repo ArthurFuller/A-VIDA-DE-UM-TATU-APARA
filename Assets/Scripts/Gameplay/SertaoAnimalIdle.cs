@@ -53,7 +53,7 @@ public sealed class SertaoAnimalIdle : MonoBehaviour
         child.transform.localScale = Vector3.one * (fullHeight * first.pixelsPerUnit / first.rect.height);
         child.transform.localPosition = new Vector3(
             (first.pivot.x / first.rect.width - (cow ? 0.55f : 0.52f)) * fullWidth * (cow ? -1f : 1f),
-            0.03f + (first.pivot.y / first.rect.height - (cow ? 140f : 119f) / 512f) * fullHeight,
+            (first.pivot.y / first.rect.height - (cow ? 141.5f : 119f) / 512f) * fullHeight,
             0f);
         LateUpdate();
     }

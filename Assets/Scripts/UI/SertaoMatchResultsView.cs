@@ -86,6 +86,9 @@ public sealed class SertaoMatchResultsView : MonoBehaviour
     private void Awake()
     {
         if (!IsConfigured) return;
+        FullscreenBackdrop.Cover(curtain);
+        FullscreenBackdrop.Cover(resultsPage);
+        FullscreenBackdrop.Cover(outcomePage);
         resultsPage.gameObject.SetActive(false);
         outcomePage.gameObject.SetActive(false);
         curtain.alpha = 0f;

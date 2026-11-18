@@ -55,7 +55,8 @@ public sealed class GameBalanceEditor : EditorWindow
             "rainDurationDays", "droughtFishingReduction", "pestHarvestReduction",
             "pestGrowthRegression", "droughtGrowthDelay", "rainGrowthBonus",
             "forestExploitationThreshold", "comadreChance", "comadreAbsenceDays",
-            "rainForestRecovery", "headOfCuiaFishTheft", "daysWithoutWoodForReforestation",
+            "rainForestRecovery", "headOfCuiaMinimumFish", "headOfCuiaChancePercent",
+            "headOfCuiaTheftPercent", "daysWithoutWoodForReforestation",
             "reforestationWood");
         EditorGUILayout.HelpBox("Os textos das cartas de evento continuam em Tools > Cartas > Editar descrições.", MessageType.None);
         EditorGUILayout.EndScrollView();
@@ -117,7 +118,7 @@ public sealed class GameBalanceEditor : EditorWindow
         "houseRewardLimit" or "minimumOffers" or "maximumOffers" or "campaignDays" or
         "droughtDurationDays" or "pestDurationDays" or "rainDurationDays" or
         "forestExploitationThreshold" or "comadreAbsenceDays" or
-        "headOfCuiaFishTheft" or "daysWithoutWoodForReforestation" => 1,
+        "headOfCuiaMinimumFish" or "headOfCuiaTheftPercent" or "daysWithoutWoodForReforestation" => 1,
         _ => 0
     };
 
@@ -126,6 +127,7 @@ public sealed class GameBalanceEditor : EditorWindow
         "maxPreparedFoodPerAction" => 2,
         "houseRewardLimit" or "returningOffersPerMarket" => 3,
         "minimumOffers" or "maximumOffers" => 5,
+        "headOfCuiaChancePercent" or "headOfCuiaTheftPercent" => 100,
         _ => int.MaxValue
     };
 
@@ -182,7 +184,9 @@ public sealed class GameBalanceEditor : EditorWindow
         "comadreChance" => "Probabilidade de a Comadre aparecer quando a exploração da floresta atingir o limite e houver trabalhador elegível.",
         "comadreAbsenceDays" => "Dias de ausência do trabalhador escolhido pela Comadre.",
         "rainForestRecovery" => "Pontos de exploração da floresta removidos a cada dia de chuva.",
-        "headOfCuiaFishTheft" => "Máximo de peixes roubados quando o Cabeça de Cuia aparece; não rouba mais do que há no estoque.",
+        "headOfCuiaMinimumFish" => "Estoque mínimo de peixes no início do dia para o Cabeça de Cuia entrar no sorteio.",
+        "headOfCuiaChancePercent" => "Chance fixa dentro do sorteio de eventos gerais, em porcentagem.",
+        "headOfCuiaTheftPercent" => "Porcentagem do estoque roubada. Metade exata arredonda para baixo.",
         "daysWithoutWoodForReforestation" => "Dias desde a última coleta de madeira ou reflorestamento necessários para o evento aparecer.",
         "reforestationWood" => "Madeiras recebidas ao fechar a carta do evento de reflorestamento.",
         _ => "Valor usado pelo jogo para este parâmetro."
@@ -235,7 +239,9 @@ public sealed class GameBalanceEditor : EditorWindow
         "forestExploitationThreshold" => "Exploração para Comadre",
         "comadreChance" => "Chance de Comadre", "comadreAbsenceDays" => "Dias de ausência",
         "rainForestRecovery" => "Recuperação da floresta na chuva",
-        "headOfCuiaFishTheft" => "Peixes roubados pelo Cabeça de Cuia",
+        "headOfCuiaMinimumFish" => "Estoque mínimo de peixes para Cabeça de Cuia",
+        "headOfCuiaChancePercent" => "Chance de Cabeça de Cuia no sorteio geral (%)",
+        "headOfCuiaTheftPercent" => "Estoque roubado pelo Cabeça de Cuia (%)",
         "daysWithoutWoodForReforestation" => "Dias sem madeira para reflorestamento",
         "reforestationWood" => "Madeira do reflorestamento",
         _ => ObjectNames.NicifyVariableName(name)

@@ -53,6 +53,7 @@ public sealed class EventCardView : MonoBehaviour
         {
             backdropImage = backdrop.GetComponent<Image>();
             if (backdropImage != null) backdropColor = backdropImage.color;
+            if (card != null) FullscreenBackdrop.Cover(backdropImage);
         }
         if (card != null)
         {

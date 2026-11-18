@@ -33,6 +33,7 @@ public class SertaoCoinToss : MonoBehaviour
     private int stake;
     private bool picked, temporaryInstance;
     private GameObject previousSelection;
+    private HoverPunchButton headsFeedback, tailsFeedback;
 
     private bool IsConfigured => screen != null && choices != null && stage != null &&
         coin != null && turn != null && face != null && heads != null && tails != null &&
@@ -41,6 +42,7 @@ public class SertaoCoinToss : MonoBehaviour
     protected void Awake()
     {
         if (!IsConfigured) return;
+        FullscreenBackdrop.Cover(screen.GetComponentInChildren<Image>(true));
         stageHome = stage.anchoredPosition;
         coinHome = coin.anchoredPosition;
         coinHomeScale = coin.localScale;
@@ -52,6 +54,9 @@ public class SertaoCoinToss : MonoBehaviour
         tails.onClick.AddListener(PickTails);
         SertaoButtonAudio.Bind(heads);
         SertaoButtonAudio.Bind(tails);
+        headsFeedback = HoverPunchButton.Bind(heads);
+        tailsFeedback = HoverPunchButton.Bind(tails);
+        headsFeedback.AnimatePointerClick = tailsFeedback.AnimatePointerClick = false;
     }
 
     public static SertaoCoinToss Open(Scene scene, int stake, float airtime, Action began, Action<bool> completed)
@@ -139,6 +144,7 @@ public class SertaoCoinToss : MonoBehaviour
     {
         if (picked) return;
         picked = true;
+        (selectedHeads ? headsFeedback : tailsFeedback)?.PlayAcceptedClick();
         idle.Kill();
         choices.interactable = choices.blocksRaycasts = false;
         EventSystem.current?.SetSelectedGameObject(null);

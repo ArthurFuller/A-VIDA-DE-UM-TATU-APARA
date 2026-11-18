@@ -77,6 +77,7 @@ public sealed class FoodPreparationPanel : MonoBehaviour
 
     private void Awake()
     {
+        FullscreenBackdrop.Cover(backdrop);
         if (panel != null) panelHome = panel.anchoredPosition;
         if (closeButton != null) closeScale = closeButton.localScale;
         if (rows != null)

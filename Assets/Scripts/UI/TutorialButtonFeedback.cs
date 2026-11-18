@@ -9,12 +9,10 @@ public sealed class TutorialButtonFeedback : Button
     private const float HoverScale = 1.027f;
     private const float PressedScale = 0.974f;
     private const float ClickScale = 1.033f;
-    private const float OutlineSize = 0.8f;
 
     private RectTransform buttonRect;
     private RectTransform box;
     private RectTransform visual;
-    private Outline outline;
     private Tween motion;
     private float scale = 1f;
     private bool hovered;
@@ -27,9 +25,6 @@ public sealed class TutorialButtonFeedback : Button
         box = container;
         visual = image.rectTransform;
         targetGraphic = image;
-        outline = image.gameObject.AddComponent<Outline>();
-        outline.effectColor = new Color(1f, 0.79f, 0.37f, 0.85f);
-        outline.enabled = false;
     }
 
     public override void OnPointerEnter(PointerEventData eventData)
@@ -113,25 +108,17 @@ public sealed class TutorialButtonFeedback : Button
 
     private void ApplyVisualScale()
     {
-        if (visual == null || buttonRect == null || box == null || outline == null) return;
+        if (visual == null || buttonRect == null || box == null) return;
         Rect button = buttonRect.rect;
         Rect area = box.rect;
         Vector2 center = buttonRect.localPosition + (Vector3)button.center;
         Vector2 available = Vector2.Min(center - area.min, area.max - center);
-        bool showOutline = (hovered || clicking) && IsInteractable();
         Vector2 half = Vector2.Max(Vector2.one, button.size) * 0.5f;
-        float extra = showOutline ? OutlineSize : 0f;
-        float budget = Mathf.Min(available.x / (half.x + extra), available.y / (half.y + extra));
+        float budget = Mathf.Min(available.x / half.x, available.y / half.y);
         float boundedScale = Mathf.Min(scale, Mathf.Max(1f, budget));
 
         Vector3 targetScale = Vector3.one * boundedScale;
         if (visual.localScale != targetScale) visual.localScale = targetScale;
-
-        // The contour itself must also fit when an authored button sits close to an edge.
-        Vector2 remaining = available / boundedScale - half;
-        float thickness = Mathf.Clamp(Mathf.Min(remaining.x, remaining.y), 0f, OutlineSize);
-        outline.enabled = showOutline && thickness > 0.01f;
-        if (outline.enabled) outline.effectDistance = new Vector2(thickness, -thickness);
     }
 
     protected override void OnDisable()
@@ -140,7 +127,6 @@ public sealed class TutorialButtonFeedback : Button
         motion = null;
         scale = 1f;
         if (visual != null) visual.localScale = Vector3.one;
-        if (outline != null) outline.enabled = false;
         hovered = pressed = clicking = false;
         base.OnDisable();
     }

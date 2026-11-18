@@ -168,6 +168,14 @@ public sealed class DayCycle : MonoBehaviour
         if (finishDayButton != null &&
             finishDayButton.TryGetComponent(out finishDayFeedback))
             finishDayFeedback.AnimatePointerClick = false;
+
+        if (finishDayButton != null && finishDayButton.image is Image finishDayImage)
+        {
+            Sprite sprite = finishDayImage.overrideSprite ?? finishDayImage.sprite;
+            if (sprite != null && !sprite.packed && sprite.texture.isReadable)
+                finishDayImage.alphaHitTestMinimumThreshold = 0.15f;
+        }
+
         if (hand != null) hand.SuspendEntranceForEvent();
     }
 

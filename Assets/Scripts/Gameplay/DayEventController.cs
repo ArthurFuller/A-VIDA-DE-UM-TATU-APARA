@@ -6,6 +6,8 @@ public enum SertaoEventKind { None, Drought, Pests, Rain, Comadre, Calm, HeadOfC
 
 public sealed class DayEventController : MonoBehaviour
 {
+    public const string HeadOfCuiaLossToken = "{peixesRoubados}";
+
     public readonly struct TimelineEvent
     {
         public readonly string Title;
@@ -66,7 +68,9 @@ public sealed class DayEventController : MonoBehaviour
     [SerializeField, HideInInspector, Range(0f, 1f)] private float comadreChance = 0.5f;
     [SerializeField, HideInInspector, Min(1)] private int comadreAbsenceDays = 1;
     [SerializeField, HideInInspector, Min(0)] private int rainForestRecovery = 2;
-    [SerializeField, HideInInspector, Min(1)] private int headOfCuiaFishTheft = 2;
+    private int headOfCuiaMinimumFish = 8;
+    private int headOfCuiaChancePercent = 25;
+    private int headOfCuiaTheftPercent = 20;
     [Header("Reflorestamento")]
     [SerializeField, HideInInspector, Min(1)]
     private int daysWithoutWoodForReforestation = 3;
@@ -78,6 +82,7 @@ public sealed class DayEventController : MonoBehaviour
     private SertaoEventKind preparedEvent;
     private int forestExploitation;
     private int stolenFishToday;
+    private string StolenFishLabel => stolenFishToday + (stolenFishToday == 1 ? " peixe" : " peixes");
     private int currentDay = 1;
     private int lastWoodCollectionDay = 1;
     private int lastReforestationDay = -100;
@@ -97,7 +102,9 @@ public sealed class DayEventController : MonoBehaviour
         comadreChance = balance.comadreChance;
         comadreAbsenceDays = balance.comadreAbsenceDays;
         rainForestRecovery = balance.rainForestRecovery;
-        headOfCuiaFishTheft = balance.headOfCuiaFishTheft;
+        headOfCuiaMinimumFish = Mathf.Max(1, balance.headOfCuiaMinimumFish);
+        headOfCuiaChancePercent = Mathf.Clamp(balance.headOfCuiaChancePercent, 0, 100);
+        headOfCuiaTheftPercent = Mathf.Clamp(balance.headOfCuiaTheftPercent, 1, 100);
         daysWithoutWoodForReforestation = balance.daysWithoutWoodForReforestation;
         reforestationWood = balance.reforestationWood;
     }
@@ -225,22 +232,12 @@ public sealed class DayEventController : MonoBehaviour
         }
         if (day > 0 && announced == SertaoEventKind.None && Random.value < generalEventChance)
         {
-            var options = new List<SertaoEventKind>();
-            foreach (SertaoEventKind kind in new[] { SertaoEventKind.Drought, SertaoEventKind.Pests,
-                         SertaoEventKind.Rain, SertaoEventKind.HeadOfCuia })
-            {
-                if (kind == lastAnnounced || IsActive(kind) ||
-                    (kind == SertaoEventKind.Drought && IsActive(SertaoEventKind.Rain)) ||
-                    (kind == SertaoEventKind.Rain && IsActive(SertaoEventKind.Drought)) ||
-                    (kind == SertaoEventKind.HeadOfCuia && (resources == null || resources.Fish <= 0)))
-                    continue;
-                options.Add(kind);
-            }
-            if (options.Count > 0) announced = options[Random.Range(0, options.Count)];
+            announced = RollGeneralEvent();
             if (announced == SertaoEventKind.HeadOfCuia)
             {
-                stolenFishToday = Mathf.Min(resources.Fish, headOfCuiaFishTheft);
-                resources.TryDeliverFish(stolenFishToday);
+                // Usa inteiros para que metade exata arredonde para baixo.
+                int loss = (int)(((long)resources.Fish * headOfCuiaTheftPercent + 49) / 100);
+                if (resources.TryDeliverFish(loss)) stolenFishToday = loss;
             }
             else if (announced != SertaoEventKind.None)
             {
@@ -297,6 +294,26 @@ public sealed class DayEventController : MonoBehaviour
         }
         card.Show(Title(announced), Description(announced), Art(announced), previousBackdrop);
         PlayEventSound(announced);
+    }
+
+    private SertaoEventKind RollGeneralEvent()
+    {
+        if (lastAnnounced != SertaoEventKind.HeadOfCuia && resources != null &&
+            resources.Fish >= headOfCuiaMinimumFish &&
+            Random.Range(0, 100) < headOfCuiaChancePercent)
+            return SertaoEventKind.HeadOfCuia;
+
+        var options = new List<SertaoEventKind>();
+        foreach (SertaoEventKind kind in new[] { SertaoEventKind.Drought, SertaoEventKind.Pests,
+                     SertaoEventKind.Rain })
+        {
+            if (kind == lastAnnounced || IsActive(kind) ||
+                (kind == SertaoEventKind.Drought && IsActive(SertaoEventKind.Rain)) ||
+                (kind == SertaoEventKind.Rain && IsActive(SertaoEventKind.Drought)))
+                continue;
+            options.Add(kind);
+        }
+        return options.Count > 0 ? options[Random.Range(0, options.Count)] : SertaoEventKind.None;
     }
 
     internal void RevealPreparedBackdrop()
@@ -381,6 +398,13 @@ public sealed class DayEventController : MonoBehaviour
     {
         CardDescriptionCatalog.Entry entry = CardDescriptionCatalog.Instance != null ?
             CardDescriptionCatalog.Instance.Find(CardDescriptionCatalog.EventKey(kind)) : null;
+        if (kind == SertaoEventKind.HeadOfCuia)
+        {
+            string text = entry?.text;
+            return text != null && text.Contains(HeadOfCuiaLossToken)
+                ? text.Replace(HeadOfCuiaLossToken, StolenFishLabel)
+                : DefaultDescription(kind);
+        }
         return entry != null ? entry.text : DefaultDescription(kind);
     }
 
@@ -394,8 +418,7 @@ public sealed class DayEventController : MonoBehaviour
             ". Duração: " + DurationFor(kind) + " dia(s).",
         SertaoEventKind.Rain => "A chuva acelera o crescimento e reduz o impacto da coleta de madeira. Duração: " + DurationFor(kind) + " dia(s).",
         SertaoEventKind.Calm => "Nenhum novo evento especial começou hoje.",
-        SertaoEventKind.HeadOfCuia => "O Cabeça de Cuia roubou " + stolenFishToday +
-            (stolenFishToday == 1 ? " peixe." : " peixes."),
+        SertaoEventKind.HeadOfCuia => "O Cabeça de Cuia roubou " + StolenFishLabel + ".",
         SertaoEventKind.Reforestation => "A exploração sustentável permitiu reflorestar parte da mata. Você recebe " +
             reforestationWood + (reforestationWood == 1 ? " madeira." : " madeiras."),
         _ => "A exploração da floresta desorientou um trabalhador por " + comadreAbsenceDays + " dia(s)."

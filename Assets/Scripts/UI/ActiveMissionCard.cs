@@ -216,7 +216,9 @@ public sealed class ActiveMissionCard : MonoBehaviour
         if (model.deliverButton != null && deliverButton != null)
         {
             CopyImage(model.deliverButton.targetGraphic as Image, deliverButton.targetGraphic as Image);
-            deliverButton.colors = model.deliverButton.colors;
+            deliverButton.colors = deliverButton.transition == Selectable.Transition.ColorTint
+                ? SertaoButtonHoverPalette.WithFeedbackColors(model.deliverButton.colors)
+                : model.deliverButton.colors;
         }
         CopyText(model.deliverLabel, deliverLabel);
         CopyImage(model.GetComponent<Image>(), GetComponent<Image>(), copyRect: false);

@@ -60,12 +60,13 @@ public sealed class CardHoverOutline : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (cardImage != null && cardImage.sprite != currentSprite) SyncArt();
+        if (cardImage != null && (cardImage.overrideSprite ?? cardImage.sprite) != currentSprite)
+            SyncArt();
     }
 
     private void SyncArt()
     {
-        currentSprite = cardImage.sprite;
+        currentSprite = cardImage.overrideSprite ?? cardImage.sprite;
         materialInstance.SetTexture("_ArtTex", currentSprite != null ?
             currentSprite.texture : Texture2D.whiteTexture);
         cardImage.SetMaterialDirty();

@@ -20,6 +20,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
     [SerializeField] private CanvasGroup leaderboardGroup;
     [SerializeField] private Button playButton;
     [SerializeField] private Button optionsButton;
+    [SerializeField] private Button mainLeaderboardButton;
     [SerializeField] private Button exitButton;
     [SerializeField] private Button optionsBackButton;
     [SerializeField] private Button leaderboardButton;
@@ -85,6 +86,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
         ConfigureMainArt();
         if (playButton != null) playButton.onClick.AddListener(Play);
         if (optionsButton != null) optionsButton.onClick.AddListener(OpenOptions);
+        if (mainLeaderboardButton != null) mainLeaderboardButton.onClick.AddListener(OpenLeaderboard);
         if (exitButton != null) exitButton.onClick.AddListener(Exit);
         if (optionsBackButton != null) optionsBackButton.onClick.AddListener(Back);
         if (leaderboardButton != null) leaderboardButton.onClick.AddListener(OpenLeaderboard);
@@ -161,10 +163,11 @@ public sealed class GS2FrontEnd : MonoBehaviour
         borderRipple ??= new BorderRipple();
         borderRipple.Bind(mainPageBackground);
         separateLogo = mainLogo != null && mainPage != null && !mainLogo.IsChildOf(mainPage);
-        var foreground = new List<RectTransform>(4);
+        var foreground = new List<RectTransform>(5);
         if (mainLogo != null) foreground.Add(mainLogo);
         if (playButton != null) foreground.Add((RectTransform)playButton.transform);
         if (optionsButton != null) foreground.Add((RectTransform)optionsButton.transform);
+        if (mainLeaderboardButton != null) foreground.Add((RectTransform)mainLeaderboardButton.transform);
         if (exitButton != null) foreground.Add((RectTransform)exitButton.transform);
         mainItems = CaptureItems(foreground.ToArray());
     }
@@ -338,8 +341,10 @@ public sealed class GS2FrontEnd : MonoBehaviour
             if (mainItems.rects[i] != null) mainItems.rects[i].localScale = mainItems.scales[i];
 
         Vector2 playDropOrigin = DropOrigin(playButton, mainLogo);
-        Vector2 optionsDropOrigin = DropOrigin(optionsButton, playButton != null ?
-            (RectTransform)playButton.transform : mainLogo);
+        RectTransform playSource = playButton != null ? (RectTransform)playButton.transform : mainLogo;
+        Vector2 optionsDropOrigin = DropOrigin(optionsButton, playSource);
+        Vector2 rankingDropOrigin = DropOrigin(mainLeaderboardButton, optionsButton != null ?
+            (RectTransform)optionsButton.transform : playSource);
         for (int i = 0; i < mainItems.rects.Length; i++)
         {
             RectTransform rect = mainItems.rects[i];
@@ -361,6 +366,8 @@ public sealed class GS2FrontEnd : MonoBehaviour
                 rect.anchoredPosition = playDropOrigin;
             if (optionsButton != null && rect == optionsButton.transform)
                 rect.anchoredPosition = optionsDropOrigin;
+            if (mainLeaderboardButton != null && rect == mainLeaderboardButton.transform)
+                rect.anchoredPosition = rankingDropOrigin;
         }
     }
 
@@ -383,6 +390,8 @@ public sealed class GS2FrontEnd : MonoBehaviour
         }
         if (playButton != null) impactAt = AddButtonDrop(sequence, playButton, impactAt + 0.025f, 0.62f);
         if (optionsButton != null) impactAt = AddButtonDrop(sequence, optionsButton, impactAt + 0.025f, 0.46f);
+        if (mainLeaderboardButton != null)
+            impactAt = AddButtonDrop(sequence, mainLeaderboardButton, impactAt + 0.025f, 0.46f);
         if (exitButton != null)
         {
             var rect = (RectTransform)exitButton.transform;
@@ -664,6 +673,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
         rect.offsetMin = rect.offsetMax = Vector2.zero;
         fill.color = Color.black;
         fill.raycastTarget = false;
+        FullscreenBackdrop.Cover(fill);
     }
 
     private void RemoveIntroCurtain()
@@ -682,6 +692,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
         RestoreNavigation();
         if (playButton != null) playButton.onClick.RemoveListener(Play);
         if (optionsButton != null) optionsButton.onClick.RemoveListener(OpenOptions);
+        if (mainLeaderboardButton != null) mainLeaderboardButton.onClick.RemoveListener(OpenLeaderboard);
         if (exitButton != null) exitButton.onClick.RemoveListener(Exit);
         if (optionsBackButton != null) optionsBackButton.onClick.RemoveListener(Back);
         if (leaderboardButton != null) leaderboardButton.onClick.RemoveListener(OpenLeaderboard);

@@ -18,6 +18,11 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
     [SerializeField, Min(0f)] private float dissolvePause = 0.2f;
     [SerializeField, Min(0.05f)] private float dissolveDuration = 1.4f;
     [SerializeField, Min(1f)] private float dissolveCenterScale = 1.7f;
+    [Header("Transformação do Replay")]
+    [SerializeField, Min(1f)] private float replayCenterScale = 1.62f;
+    [SerializeField, Min(0.05f)] private float replayCenterDuration = 0.64f;
+    [SerializeField, Min(0.05f)] private float replayDeliveryDuration = 0.54f;
+    [SerializeField, Min(0.05f)] private float replaySelectionDuration = 0.58f;
 
     private WorkerAssignment hoveredWorker;
     private bool dragging;
@@ -46,6 +51,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
     private Color[] fadeColors;
     private bool replayAnimating;
     private bool replayAlreadyDelivered;
+    private RectTransform replaySelectionStart;
     private WorkerAssignment deliveryWorker;
     private Tween pendingFloat;
     private Vector2 homePivot;
@@ -151,6 +157,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         Image shadeImage = shadeObject.GetComponent<Image>();
         shadeImage.color = new Color(0f, 0f, 0f, 0f);
         shadeImage.raycastTarget = false;
+        FullscreenBackdrop.Cover(shadeImage);
         var ghostObject = new GameObject("Carta Replay", typeof(RectTransform),
             typeof(CanvasRenderer), typeof(Image), typeof(CanvasGroup));
         RectTransform ghost = (RectTransform)ghostObject.transform;
@@ -160,11 +167,10 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         ghost.anchoredPosition = start;
         ghost.localScale = rect.localScale;
         Image image = ghostObject.GetComponent<Image>();
-        image.sprite = source != null ? source.sprite : null;
+        image.sprite = source != null ? source.overrideSprite ?? source.sprite : null;
         image.color = source != null ? source.color : Color.white;
         image.preserveAspect = true;
         image.raycastTarget = false;
-        CanvasGroup ghostGroup = ghostObject.GetComponent<CanvasGroup>();
         CanvasGroup originalGroup = GetComponent<CanvasGroup>();
         if (originalGroup == null) originalGroup = gameObject.AddComponent<CanvasGroup>();
         originalGroup.alpha = 0f;
@@ -173,18 +179,17 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         rect.localRotation = homeRotation;
         Sequence sequence = DOTween.Sequence();
         sequence.Append(shadeImage.DOFade(0.27f, 0.52f));
-        sequence.Append(ghost.DOAnchorPos(Vector2.zero, 0.58f).SetEase(Ease.OutCubic));
-        sequence.Join(ghost.DOScale(1.12f, 0.58f).SetEase(Ease.OutBack));
+        sequence.Append(ghost.DOAnchorPos(Vector2.zero, replayCenterDuration).SetEase(Ease.OutCubic));
+        sequence.Join(ghost.DOScale(replayCenterScale, replayCenterDuration).SetEase(Ease.OutBack));
         sequence.Append(ghost.DOPunchRotation(new Vector3(0f, 0f, 10f), 0.88f, 12));
         sequence.AppendCallback(() =>
         {
-            bool hasFinishedArt = template != null && template.sprite != null &&
-                !template.sprite.name.Contains("9-SlicedBox");
-            if (hasFinishedArt) image.sprite = template.sprite;
+            Sprite copiedArt = template != null ? template.overrideSprite ?? template.sprite : null;
+            bool hasFinishedArt = copiedArt != null && !copiedArt.name.Contains("9-SlicedBox");
+            if (hasFinishedArt) image.sprite = copiedArt;
             else
             {
-                image.sprite = template != null && template.sprite != null ?
-                    template.sprite : source != null ? source.sprite : null;
+                if (copiedArt != null) image.sprite = copiedArt;
                 var label = new GameObject("Nome da ação", typeof(RectTransform),
                     typeof(CanvasRenderer), typeof(Text));
                 RectTransform labelRect = (RectTransform)label.transform;
@@ -206,37 +211,40 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             }
         });
         sequence.Append(ghost.DOPunchScale(Vector3.one * 0.19f, 0.25f, 5));
-        sequence.Append(shadeImage.DOFade(0f, 0.28f));
-        if (deliverDuringReplay)
-        {
-            Camera camera = worldCamera != null ? worldCamera : Camera.main;
-            Vector2 workerScreen = camera != null ?
-                (Vector2)camera.WorldToScreenPoint(worker.transform.position + Vector3.up) :
-                new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(root, workerScreen,
-                canvas.worldCamera, out Vector2 destination);
-            sequence.Join(ghost.DOAnchorPos(destination, 0.48f).SetEase(Ease.InOutCubic));
-            sequence.Join(ghost.DOScale(0.4f, 0.48f).SetEase(Ease.InCubic));
-            sequence.Join(ghost.DOLocalRotate(new Vector3(0f, 0f, -9f), 0.48f));
-        }
-        sequence.Append(ghostGroup.DOFade(0f, 0.17f));
         sequence.OnComplete(() =>
         {
-            if (originalGroup != null) originalGroup.alpha = 1f;
-            Destroy(ghostObject);
-            Destroy(shadeObject);
+            shadeImage.DOFade(0f, 0.28f).OnComplete(() => Destroy(shadeObject));
+            if (deliverDuringReplay)
+                AnimateDelivery(ghost, worker, FinishReplay, fromReplay: true);
+            else
+                FinishReplay();
+        });
+
+        void FinishReplay()
+        {
             replayAnimating = false;
-            returning = false;
+            returning = deliverDuringReplay;
             replayAlreadyDelivered = deliverDuringReplay;
+            if (!deliverDuringReplay) replaySelectionStart = ghost;
             try
             {
                 onFinished?.Invoke();
             }
             finally
             {
-                replayAlreadyDelivered = false;
+                replaySelectionStart = null;
+                if (!deliverDuringReplay && originalGroup != null) originalGroup.alpha = 1f;
+                Destroy(ghostObject);
             }
-        });
+        }
+    }
+
+    internal void RestoreUnspentReplay()
+    {
+        if (!replayAlreadyDelivered) return;
+        replayAlreadyDelivered = false;
+        returning = false;
+        RestoreAppearance();
     }
 
     public void FadeOut(System.Action onFinished)
@@ -246,6 +254,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         pendingFloat?.Kill();
         if (replayAlreadyDelivered)
         {
+            replayAlreadyDelivered = false;
             deliveryWorker = null;
             waitingForTarget = false;
             returning = false;
@@ -364,14 +373,22 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         waitingForTarget = true;
         returning = true;
         if (activity == ActivityKind.Replay) ShowReplaySelectionArt(selectedActivity);
-        rect.localRotation = homeRotation;
         RectTransform parent = (RectTransform)rect.parent;
+        float duration = replaySelectionStart != null ? replaySelectionDuration : 0.42f;
+        if (replaySelectionStart != null)
+        {
+            rect.localScale = replaySelectionStart.lossyScale / parent.lossyScale.x;
+            rect.rotation = replaySelectionStart.rotation;
+            rect.position += replaySelectionStart.TransformPoint(replaySelectionStart.rect.center) -
+                rect.TransformPoint(rect.rect.center);
+        }
+        else rect.localRotation = homeRotation;
         Vector2 screen = new Vector2(Screen.width * 0.17f, Screen.height * 0.82f);
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, screen,
                 canvas.worldCamera, out Vector2 destination)) return;
-        rect.DOAnchorPos(destination, 0.42f).SetEase(Ease.OutCubic);
-        rect.DOScale(originalScale * 0.72f, 0.42f).SetEase(Ease.OutBack);
-        rect.DOLocalRotate(new Vector3(0f, 0f, -8f), 0.42f)
+        rect.DOAnchorPos(destination, duration).SetEase(Ease.OutCubic);
+        rect.DOScale(originalScale * 0.72f, duration).SetEase(Ease.OutBack);
+        rect.DOLocalRotate(new Vector3(0f, 0f, -8f), duration)
             .OnComplete(() =>
             {
                 if (!waitingForTarget) return;
@@ -410,9 +427,9 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
     }
 
     private void AnimateDelivery(RectTransform rect, WorkerAssignment worker,
-        System.Action onFinished)
+        System.Action onFinished, bool fromReplay = false)
     {
-        Canvas canvas = GetComponentInParent<Canvas>();
+        Canvas canvas = rect.GetComponentInParent<Canvas>();
         RectTransform originalParent = rect.parent as RectTransform;
         Camera destinationCamera = worldCamera != null ? worldCamera : Camera.main;
         if (canvas == null || originalParent == null || destinationCamera == null || worker == null)
@@ -420,7 +437,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             onFinished?.Invoke();
             return;
         }
-        bool fromSelection = waitingForTarget;
+        bool fromSelection = !fromReplay && waitingForTarget;
         Vector3 visualCenter = rect.TransformPoint(rect.rect.center);
         Vector2 originalAnchorMin = rect.anchorMin;
         Vector2 originalAnchorMax = rect.anchorMax;
@@ -435,6 +452,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.position += visualCenter - rect.TransformPoint(rect.rect.center);
         float liftScale = Mathf.Max(rect.localScale.x, 0.1f) * 1.16f;
+        float flightDuration = fromReplay ? replayDeliveryDuration : 0.47f;
         Vector2 flightStart = rect.anchoredPosition;
         float flightProgress = 0f;
         Sequence delivery = DOTween.Sequence().SetTarget(rect);
@@ -452,12 +470,12 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(flightParent,
                     screen, canvas.worldCamera, out Vector2 destination))
                 rect.anchoredPosition = Vector2.LerpUnclamped(flightStart, destination, progress);
-        }, 1f, 0.47f).SetEase(Ease.InCubic));
+        }, 1f, flightDuration).SetEase(Ease.InCubic));
         delivery.Join(rect.DOLocalRotate(new Vector3(0f, 0f,
-            rect.localEulerAngles.z + 360f), 0.47f, RotateMode.FastBeyond360));
-        delivery.Join(rect.DOScale(originalScale * 0.04f, 0.47f).SetEase(Ease.InCubic));
-        CanvasGroup fadeGroup = GetComponent<CanvasGroup>();
-        if (fadeGroup == null) fadeGroup = gameObject.AddComponent<CanvasGroup>();
+            rect.localEulerAngles.z + 360f), flightDuration, RotateMode.FastBeyond360));
+        delivery.Join(rect.DOScale(originalScale * 0.04f, flightDuration).SetEase(Ease.InCubic));
+        CanvasGroup fadeGroup = rect.GetComponent<CanvasGroup>();
+        if (fadeGroup == null) fadeGroup = rect.gameObject.AddComponent<CanvasGroup>();
         delivery.Append(rect.DOScale(originalScale * 0.14f, 0.08f)
             .SetEase(Ease.OutBack));
         delivery.Join(fadeGroup.DOFade(0f, 0.08f));
@@ -469,7 +487,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
                 rect.anchorMin = originalAnchorMin;
                 rect.anchorMax = originalAnchorMax;
             }
-            rect.pivot = homePivot;
+            if (!fromReplay) rect.pivot = homePivot;
             returning = false;
             onFinished?.Invoke();
         });

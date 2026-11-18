@@ -10,6 +10,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
 {
     // Na grade de PrototypeLayout, a areia desce até cerca de 0,084 m abaixo da origem dos slots.
     private const float FenceFootOffset = -0.09f;
+    private const float FenceOutlinePadding = 0.13f;
     private static readonly System.Random chickenFacingRandom = new System.Random();
 
     [SerializeField] private ActionResolver actionResolver;
@@ -294,9 +295,18 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     {
         if (selectionOutline == null) return;
         selectionOutline.DOKill();
-        selectionOutline.localScale = Vector3.one;
+        Vector3 scale = Vector3.one;
+        if (IsFenced && selectionMesh != null)
+        {
+            Vector3 size = Vector3.Scale(selectionMesh.bounds.size, selectionOutline.parent.lossyScale);
+            scale.x = Mathf.Max(1f, 2f * (FenceHalfX * Mathf.Abs(transform.lossyScale.x) +
+                FenceOutlinePadding) / Mathf.Max(0.001f, Mathf.Abs(size.x)));
+            scale.z = Mathf.Max(1f, 2f * (FenceHalfZ * Mathf.Abs(transform.lossyScale.z) +
+                FenceOutlinePadding) / Mathf.Max(0.001f, Mathf.Abs(size.z)));
+        }
+        selectionOutline.localScale = scale;
         if (selectionOutline.gameObject.activeSelf && pointerOver)
-            selectionOutline.DOScale(1.07f, 0.35f).SetLoops(-1, LoopType.Yoyo)
+            selectionOutline.DOScale(scale * 1.07f, 0.35f).SetLoops(-1, LoopType.Yoyo)
                 .SetEase(Ease.InOutSine);
     }
 
@@ -770,7 +780,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             AddAnimalPart(root.transform, "Bico", new Vector3(0.31f, 0.51f, 0f),
                 new Vector3(0.12f, 0.07f, 0.12f), new Color(0.95f, 0.39f, 0.12f));
         }
-        PositionAnimals(root.transform, kind, frames);
+        PositionAnimals(root.transform, kind);
         root.transform.localScale = Vector3.zero;
         root.transform.DOScale(1f, 0.32f).SetEase(Ease.OutBack)
             .OnComplete(() => root.transform.DOPunchScale(Vector3.one * 0.08f, 0.2f));
@@ -779,37 +789,30 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         return true;
     }
 
-    private void PositionAnimals(Transform group, AnimalKind kind, Sprite[] frames)
+    private void PositionAnimals(Transform group, AnimalKind kind)
     {
-        var animals = new List<SpriteRenderer>();
-        float lowestPoint = float.PositiveInfinity;
-        foreach (Renderer renderer in group.GetComponentsInChildren<Renderer>())
+        SpriteRenderer[] animals = group.GetComponentsInChildren<SpriteRenderer>();
+        if (kind == AnimalKind.Chicken && animals.Length == 3)
         {
-            if (renderer is SpriteRenderer sprite)
-            {
-                if (sprite.sprite != null &&
-                    (frames == null || Array.IndexOf(frames, sprite.sprite) < 0)) continue;
-                animals.Add(sprite);
-                if (sprite.sprite == null) continue;
-            }
-            lowestPoint = Mathf.Min(lowestPoint, renderer.bounds.min.y);
-        }
-
-        if (kind == AnimalKind.Chicken && animals.Count == 3)
-        {
-            int facingLeft = chickenFacingRandom.Next(animals.Count);
-            for (int i = 0; i < animals.Count; i++)
+            int facingLeft = chickenFacingRandom.Next(animals.Length);
+            for (int i = 0; i < animals.Length; i++)
             {
                 bool facesRight = i != facingLeft;
                 animals[i].flipX = facesRight != chickenSpriteFacesRight;
             }
         }
 
-        // Usa a areia dentro da cerca como referência para o pé dos animais.
-        float groundY = transform.position.y + FenceFootOffset + 0.04f;
-        float drop = float.IsPositiveInfinity(lowestPoint) ? -FenceFootOffset :
-            Mathf.Clamp(lowestPoint - groundY, 0f, 0.32f);
-        group.position -= Vector3.up * drop;
+        // As animações usam o pé desenhado como origem, sem contar a margem transparente.
+        float groundY = transform.position.y + FenceFootOffset + 0.03f;
+        float feet = group.position.y;
+        if (animals.Length == 0)
+        {
+            Renderer[] parts = group.GetComponentsInChildren<Renderer>();
+            if (parts.Length > 0) feet = parts[0].bounds.min.y;
+            foreach (Renderer part in parts)
+                feet = Mathf.Min(feet, part.bounds.min.y);
+        }
+        group.position += Vector3.up * (groundY - feet);
     }
 
     public void PulseAnimal()
@@ -1033,7 +1036,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             }
             root.GetComponent<PlotJoinedSurface>().Configure(connected, SetHovered);
 
-            outlineMesh = BuildOutline(border, center, surfaceTop + 0.015f);
+            outlineMesh = BuildOutline(border, center, surfaceTop + 0.015f,
+                IsAnimalGroup ? FenceOutlinePadding : 0f);
             Shader shader = Resources.Load<Shader>("PlotOutline");
             outlineMaterial = shader != null ? new Material(shader) : null;
             var outlineObject = new GameObject("Contorno da área", typeof(MeshFilter),
@@ -1283,16 +1287,16 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             return mesh;
         }
 
-        private static Mesh BuildOutline(List<BorderEdge> border, Vector2 center, float y)
+        private static Mesh BuildOutline(List<BorderEdge> border, Vector2 center, float y, float padding)
         {
             const float halfWidth = 0.035f;
             var vertices = new List<Vector3>();
             var triangles = new List<int>();
             foreach (BorderEdge edge in border)
             {
-                float a = edge.Start - (edge.Horizontal ? center.x : center.y);
-                float b = edge.End - (edge.Horizontal ? center.x : center.y);
-                float line = edge.Line - (edge.Horizontal ? center.y : center.x);
+                float a = edge.Start - (edge.Horizontal ? center.x : center.y) - padding;
+                float b = edge.End - (edge.Horizontal ? center.x : center.y) + padding;
+                float line = edge.Line - (edge.Horizontal ? center.y : center.x) + edge.Normal * padding;
                 if (edge.Horizontal)
                     AddQuad(vertices, triangles, new Vector3(a, y, line - halfWidth),
                         new Vector3(a, y, line + halfWidth),

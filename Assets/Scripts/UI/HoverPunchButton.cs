@@ -13,7 +13,6 @@ public sealed class HoverPunchButton : MonoBehaviour, IPointerEnterHandler,
 
     private Button button;
     private Image image;
-    private Outline outline;
     private RectTransform rect;
     private Vector3 originalScale;
     private Vector2 originalPosition;
@@ -25,20 +24,34 @@ public sealed class HoverPunchButton : MonoBehaviour, IPointerEnterHandler,
     public bool IsAnimating => animating;
     public bool AnimatePointerClick { get; set; } = true;
 
+    internal static HoverPunchButton Bind(Button target)
+    {
+        if (target.transition == Selectable.Transition.ColorTint)
+        {
+            ColorBlock colors = SertaoButtonHoverPalette.WithFeedbackColors(target.colors);
+            Color normal = colors.normalColor;
+            if (Mathf.Min(normal.r, normal.g, normal.b) > 0.95f)
+                colors.normalColor = new Color(0.92f, 0.92f, 0.92f, normal.a);
+            if (!target.colors.Equals(colors)) target.colors = colors;
+        }
+        return target.TryGetComponent(out HoverPunchButton effect)
+            ? effect : target.gameObject.AddComponent<HoverPunchButton>();
+    }
+
     private void Awake()
     {
         button = GetComponent<Button>();
-        image = GetComponent<Image>();
+        SertaoButtonHoverPalette.Apply(button);
+        image = button.image != null ? button.image : GetComponent<Image>();
         rect = (RectTransform)transform;
         originalScale = rect.localScale;
         originalPosition = rect.anchoredPosition;
         originalRotation = rect.localRotation;
-        if (image != null) originalColor = image.color;
-        outline = GetComponent<Outline>();
-        if (outline == null) outline = gameObject.AddComponent<Outline>();
-        outline.effectColor = new Color(1f, 0.78f, 0.32f, 0.7f);
-        outline.effectDistance = new Vector2(2f, -2f);
-        outline.enabled = false;
+        if (image != null)
+        {
+            originalColor = image.color;
+            if (image.TryGetComponent(out Outline oldOutline)) oldOutline.enabled = false;
+        }
     }
 
     private void OnDisable()
@@ -58,35 +71,38 @@ public sealed class HoverPunchButton : MonoBehaviour, IPointerEnterHandler,
         hovered = false;
         pressedEligible = false;
         animating = false;
-        if (outline != null) outline.enabled = false;
     }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
-        if (button == null || !button.isActiveAndEnabled || !button.interactable) return;
+        if (button == null || !button.isActiveAndEnabled || !button.IsInteractable()) return;
         hovered = true;
-        if (outline != null) outline.enabled = true;
         if (animating) return;
         rect.DOKill();
         rect.DOScale(originalScale * hoverScale, duration).SetEase(Ease.OutBack).SetUpdate(true);
-        if (image != null)
-            image.DOColor(new Color(1f, 0.96f, 0.76f, originalColor.a), duration).SetUpdate(true);
+        TweenTint(SertaoButtonHoverPalette.Lighten(originalColor));
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
         hovered = false;
-        if (outline != null) outline.enabled = false;
         if (animating) return;
         rect.DOKill();
         rect.DOScale(originalScale, duration).SetEase(Ease.OutCubic).SetUpdate(true);
-        if (image != null) image.DOColor(originalColor, duration).SetUpdate(true);
+        TweenTint(originalColor);
+    }
+
+    private void TweenTint(Color target)
+    {
+        if (image == null) return;
+        image.DOKill();
+        image.DOColor(target, duration).SetUpdate(true);
     }
 
     public void OnPointerClick(PointerEventData eventData)
     {
         if (!AnimatePointerClick || !pressedEligible || animating || button == null || !button.isActiveAndEnabled ||
-            !button.interactable) return;
+            !button.IsInteractable()) return;
         PlayAcceptedClick();
     }
 
@@ -96,6 +112,12 @@ public sealed class HoverPunchButton : MonoBehaviour, IPointerEnterHandler,
         pressedEligible = false;
         rect.DOKill();
         animating = true;
+        // Botões com transição própria, como Finalizar Dia, não usam o ColorBlock.
+        if (image != null && button.transition != Selectable.Transition.ColorTint)
+        {
+            image.DOKill();
+            image.color = SertaoButtonHoverPalette.Pressed(originalColor.a);
+        }
         DOTween.Sequence().SetTarget(rect).SetUpdate(true)
             .Append(rect.DOScale(originalScale * pressedScale, 0.08f))
             .Append(rect.DOScale(originalScale * (hovered ? hoverScale : 1f), duration)
@@ -103,8 +125,8 @@ public sealed class HoverPunchButton : MonoBehaviour, IPointerEnterHandler,
             .OnComplete(() =>
             {
                 rect.localScale = originalScale * (hovered ? hoverScale : 1f);
-                if (image != null) image.color = hovered ?
-                    new Color(1f, 0.96f, 0.76f, originalColor.a) : originalColor;
+                TweenTint(hovered && button.IsInteractable()
+                    ? SertaoButtonHoverPalette.Lighten(originalColor) : originalColor);
                 animating = false;
             })
             .OnKill(() => animating = false);
@@ -112,8 +134,9 @@ public sealed class HoverPunchButton : MonoBehaviour, IPointerEnterHandler,
 
     public void OnPointerDown(PointerEventData eventData)
     {
-        pressedEligible = AnimatePointerClick && !animating && button != null &&
-            button.isActiveAndEnabled && button.interactable;
+        pressedEligible = eventData.button == PointerEventData.InputButton.Left &&
+            AnimatePointerClick && !animating && button != null &&
+            button.isActiveAndEnabled && button.IsInteractable();
     }
 
     public void ShakeRejected()
@@ -131,8 +154,8 @@ public sealed class HoverPunchButton : MonoBehaviour, IPointerEnterHandler,
             {
                 rect.localRotation = originalRotation;
                 rect.localScale = originalScale * (hovered ? hoverScale : 1f);
-                if (image != null) image.color = hovered ?
-                    new Color(1f, 0.96f, 0.76f, originalColor.a) : originalColor;
+                TweenTint(hovered && button.IsInteractable()
+                    ? SertaoButtonHoverPalette.Lighten(originalColor) : originalColor);
                 animating = false;
             })
             .OnKill(() =>

@@ -51,14 +51,14 @@ MonoBehaviour:
     foodYield: 4
     bonusYieldPerExtraDay: 1
     witherDaysAfterMaturity: 2
-  woodPrice: 1
+  woodPrice: 2
   fishPrice: 2
   cornPrice: 3
   pumpkinPrice: 2
   jerimumPrice: 3
-  foodPrice: 2
-  milkPrice: 2
-  eggPrice: 2
+  foodPrice: 3
+  milkPrice: 3
+  eggPrice: 3
   cornSeedPrice: 1
   pumpkinSeedPrice: 2
   jerimumSeedPrice: 2
@@ -100,6 +100,8 @@ MonoBehaviour:
   forestExploitationThreshold: 6
   comadreAbsenceDays: 1
   rainForestRecovery: 2
-  headOfCuiaFishTheft: 2
+  headOfCuiaMinimumFish: 8
+  headOfCuiaChancePercent: 25
+  headOfCuiaTheftPercent: 20
   daysWithoutWoodForReforestation: 3
   reforestationWood: 4

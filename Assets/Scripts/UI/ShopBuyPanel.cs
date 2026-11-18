@@ -59,14 +59,15 @@ public sealed class ShopBuyPanel : MonoBehaviour
             merchant.GetUnitPrice(SaleItem.Food),
             merchant.FenceCoinCost
         };
-        long budget = Math.Min(int.MaxValue, (long)resources.Coins - int.MinValue);
+        bool canBuy = merchant.CanTrade && resources.Coins > 0;
+        long budget = canBuy ? resources.Coins : 0;
         long spendingLimit = budget;
         int woodBudget = resources.Wood;
         for (int i = 0; i < rows.Length; i++)
         {
             rows[i].SetPrice(prices[i]);
             rows[i].SetWoodPrice(i == 1 ? merchant.FenceWoodCost : 0);
-            int limit = prices[i] > 0 ? (int)Math.Min(int.MaxValue, budget / prices[i]) : 0;
+            int limit = !canBuy ? 0 : prices[i] == 0 ? int.MaxValue : (int)(budget / prices[i]);
             if (i == 0) limit = Math.Min(limit, int.MaxValue - resources.Food);
             if (i == 1)
                 limit = Mathf.Min(limit, merchant.FenceWoodCost > 0 ?
@@ -78,8 +79,8 @@ public sealed class ShopBuyPanel : MonoBehaviour
         long total = spendingLimit - budget;
         for (int i = 0; i < rows.Length; i++)
         {
-            int limit = prices[i] > 0 ?
-                (int)Math.Min(int.MaxValue, rows[i].Quantity + budget / prices[i]) : 0;
+            int limit = !canBuy ? 0 : prices[i] == 0 ? int.MaxValue :
+                (int)Math.Min(int.MaxValue, rows[i].Quantity + budget / prices[i]);
             if (i == 0) limit = Math.Min(limit, int.MaxValue - resources.Food);
             if (i == 1)
                 limit = Math.Min(limit, Math.Min(merchant.FenceSlotsAvailable,
@@ -87,9 +88,9 @@ public sealed class ShopBuyPanel : MonoBehaviour
                         (merchant.FenceWoodCost > 0 ? woodBudget / merchant.FenceWoodCost : int.MaxValue))));
             rows[i].SetLimit(limit);
         }
-        if (totalText != null) totalText.text = "TOTAL: " + total + " moedas" +
-            (fenceRow.Quantity > 0 ? " + " +
-                fenceRow.Quantity * merchant.FenceWoodCost + " madeiras" : "");
-        if (buyButton != null) buyButton.interactable = total > 0 && merchant.CanTrade;
+        int woodTotal = resources.Wood - woodBudget;
+        if (totalText != null) totalText.text = "TOTAL: " + ShopQuantityRow.FormatCost(total, woodTotal);
+        if (buyButton != null)
+            buyButton.interactable = canBuy && (foodRow.Quantity > 0 || fenceRow.Quantity > 0);
     }
 }

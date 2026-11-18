@@ -924,6 +924,7 @@ public sealed class DayTimeline : MonoBehaviour
 
         inspectionShade = Box("Fundo da inspeção", root, Color.clear, false);
         Fill(inspectionShade, 0f, 0f);
+        FullscreenBackdrop.Cover(inspectionShade);
         EventTrigger backdrop = inspectionShade.gameObject.AddComponent<EventTrigger>();
         var closeOnClick = new EventTrigger.Entry { eventID = EventTriggerType.PointerClick };
         closeOnClick.callback.AddListener(_ => CloseInspection(false));
@@ -945,7 +946,8 @@ public sealed class DayTimeline : MonoBehaviour
             hand != null ? hand.InspectionDescriptionGap : 18f);
         CardDescriptionCatalog.Entry saved = CardDescriptionCatalog.Instance != null ?
             CardDescriptionCatalog.Instance.Find(key) : null;
-        if (saved != null) description = saved.text;
+        if (saved != null && key != CardDescriptionCatalog.EventKey(SertaoEventKind.HeadOfCuia))
+            description = saved.text;
         CardDescriptionCatalog.Entry entry = key.StartsWith("E:") ? null : saved;
         float panelWidth = entry != null ? entry.boxSize.x :
             Mathf.Clamp(root.rect.width * 0.24f, 240f, 390f);

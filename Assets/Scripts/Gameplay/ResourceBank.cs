@@ -254,9 +254,10 @@ public sealed class ResourceBank : MonoBehaviour
         Changed?.Invoke();
     }
 
-    public bool TrySpendCoins(int amount)
+    public bool TrySpendCoins(int amount, bool allowDebt = false)
     {
-        if (amount < 0 || (long)Coins - amount < int.MinValue) return false;
+        if (amount < 0 || (allowDebt ? (long)Coins - amount < int.MinValue : amount > Coins))
+            return false;
         Coins -= amount;
         Changed?.Invoke();
         return true;

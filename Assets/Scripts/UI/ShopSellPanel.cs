@@ -80,7 +80,7 @@ public sealed class ShopSellPanel : MonoBehaviour
             row.SetLimit(trading.GetStock(item));
             total += (long)row.Quantity * price;
         }
-        if (totalText != null) totalText.text = "RECEBER: " + total + " moedas";
+        if (totalText != null) totalText.text = "RECEBER: " + ShopQuantityRow.FormatCost(total);
         if (sellButton != null) sellButton.interactable = total > 0;
     }
 }

@@ -96,7 +96,7 @@ public sealed class CardDescriptionEditor : EditorWindow
         SertaoEventKind.Rain => "A chuva acelera o crescimento e reduz o impacto da coleta de madeira.",
         SertaoEventKind.Comadre => "A exploração da floresta desorientou um trabalhador por um dia.",
         SertaoEventKind.Calm => "Nenhum novo evento especial começou hoje.",
-        SertaoEventKind.HeadOfCuia => "O Cabeça de Cuia roubou peixes.",
+        SertaoEventKind.HeadOfCuia => "O Cabeça de Cuia roubou " + DayEventController.HeadOfCuiaLossToken + ".",
         _ => "A exploração sustentável permitiu reflorestar parte da mata. Você recebe madeiras."
     };
 
@@ -222,6 +222,9 @@ public sealed class CardDescriptionEditor : EditorWindow
         }
         if (isEvent)
         {
+            if (entry.key == CardDescriptionCatalog.EventKey(SertaoEventKind.HeadOfCuia))
+                EditorGUILayout.HelpBox("Use " + DayEventController.HeadOfCuiaLossToken +
+                    " para mostrar a quantidade roubada, com peixe no singular ou plural.", MessageType.Info);
             EditorGUILayout.HelpBox("Eventos usam o tamanho e a fonte da caixa da cena. O deslocamento acima vale para todas as cartas de evento.", MessageType.Info);
             if (GUILayout.Button("Selecionar caixa do evento na Hierarchy"))
             {

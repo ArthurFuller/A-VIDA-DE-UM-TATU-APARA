@@ -103,6 +103,13 @@ public sealed class WorkerAssignment : MonoBehaviour
             comadreDizzy = Instantiate(comadreDizzyPrefab, transform, false);
             comadreDizzy.name = "Tontura - Comadre Fulozinha";
             comadreDizzy.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var particles = comadreDizzy.main;
+            particles.simulationSpace = ParticleSystemSimulationSpace.Local;
+            if (spriteRenderer != null && comadreDizzy.TryGetComponent(out ParticleSystemRenderer stars))
+            {
+                stars.sortingLayerID = spriteRenderer.sortingLayerID;
+                stars.sortingOrder = spriteRenderer.sortingOrder + 1;
+            }
         }
         actionDotsRoot = new GameObject("Ações - " + workerName).transform;
         actionDotsRoot.SetParent(transform.parent, false);
@@ -118,6 +125,7 @@ public sealed class WorkerAssignment : MonoBehaviour
                 spriteVisual.rotation = Quaternion.Euler(0f, spriteCamera.transform.eulerAngles.y, 0f);
             UpdateSpriteAnimation();
             if (routeFlipX is bool flip && spriteRenderer != null) spriteRenderer.flipX = flip;
+            if (IsUnavailableToday) PositionDizzyEffect();
         }
         if (actionDotsRoot != null)
         {
@@ -125,6 +133,21 @@ public sealed class WorkerAssignment : MonoBehaviour
             if (spriteCamera == null) spriteCamera = Camera.main;
             if (spriteCamera != null) actionDotsRoot.rotation = spriteCamera.transform.rotation;
         }
+    }
+
+    private void PositionDizzyEffect()
+    {
+        if (comadreDizzy == null || spriteRenderer == null || spriteRenderer.sprite == null) return;
+        Sprite frame = spriteRenderer.sprite;
+        // As orelhas ficam à esquerda do centro no quadro de repouso.
+        Vector2 ears = Vector2.Scale(frame.rect.size, new Vector2(0.28f, 0.94f));
+        Vector2 offset = (ears - frame.pivot) / frame.pixelsPerUnit;
+        if (spriteRenderer.flipX) offset.x = -offset.x;
+        Vector3 head = spriteRenderer.transform.TransformPoint(offset) + Vector3.up * 0.08f;
+        if (spriteCamera != null)
+            head += Vector3.ProjectOnPlane(spriteCamera.transform.position - head,
+                Vector3.up).normalized * 0.12f;
+        comadreDizzy.transform.position = head;
     }
 
     public void RefreshSpriteAppearance()
@@ -341,7 +364,11 @@ public sealed class WorkerAssignment : MonoBehaviour
         if (IsUnavailableToday) absenceDaysRemaining--;
         if (comadreDizzy != null)
         {
-            if (IsUnavailableToday) comadreDizzy.Play(true);
+            if (IsUnavailableToday)
+            {
+                PositionDizzyEffect();
+                comadreDizzy.Play(true);
+            }
             else comadreDizzy.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
         actionsRemaining = IsUnavailableToday ? 0 : 1 + nextDayExtraActions;

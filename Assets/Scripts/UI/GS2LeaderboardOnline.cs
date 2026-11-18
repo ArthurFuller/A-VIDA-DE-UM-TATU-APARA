@@ -24,7 +24,7 @@ public sealed class GS2LeaderboardOnline : MonoBehaviour
         public string user_id;
     }
 
-    internal const string NicknameTaken = "Esse nickname já está em uso.";
+    internal const string NicknameTaken = "Esse nome já está sendo utilizado.";
 
     private const string RefreshKey = "GS2.FirebaseRefreshToken";
     private static GS2LeaderboardOnline instance;
@@ -48,6 +48,9 @@ public sealed class GS2LeaderboardOnline : MonoBehaviour
 
     public bool Configured => settings != null && !string.IsNullOrWhiteSpace(settings.webApiKey);
 
+    private bool HasSession => !string.IsNullOrEmpty(idToken) &&
+        !string.IsNullOrEmpty(uid) && DateTime.UtcNow < tokenExpires;
+
     private void Awake()
     {
         if (instance != null && instance != this) { Destroy(gameObject); return; }
@@ -58,6 +61,13 @@ public sealed class GS2LeaderboardOnline : MonoBehaviour
     public void SaveNickname(string nickname, Action<bool, string> done) =>
         StartCoroutine(SaveName(nickname, done));
 
+    internal void PrepareSession()
+    {
+        if (Configured && !authenticating && !HasSession &&
+            Application.internetReachability != NetworkReachability.NotReachable)
+            StartCoroutine(Authenticate(_ => { }));
+    }
+
     public void SubmitFinishedGame(int coins)
     {
         if (GS2Profile.HasNickname) StartCoroutine(Submit(coins));
@@ -67,9 +77,14 @@ public sealed class GS2LeaderboardOnline : MonoBehaviour
 
     private IEnumerator Authenticate(Action<bool> done)
     {
-        while (authenticating) yield return null;
         if (!Configured) { done(false); yield break; }
-        if (!string.IsNullOrEmpty(idToken) && DateTime.UtcNow < tokenExpires)
+        if (authenticating)
+        {
+            while (authenticating) yield return null;
+            done(HasSession);
+            yield break;
+        }
+        if (HasSession)
         { done(true); yield break; }
 
         authenticating = true;
@@ -113,10 +128,11 @@ public sealed class GS2LeaderboardOnline : MonoBehaviour
             else Debug.LogWarning("Ranking: falha na identificação Firebase: " + request.error);
         }
         authenticating = false;
-        done(!string.IsNullOrEmpty(idToken) && !string.IsNullOrEmpty(uid));
+        done(HasSession);
     }
 
-    private IEnumerator ClaimNickname(string nickname, Action<bool, string> done)
+    private IEnumerator ClaimNickname(string nickname, Action<bool, string> done,
+        bool requireUnreserved = false)
     {
         if (!GS2Profile.IsValidNickname(nickname))
         { done(false, GS2Profile.NicknameHelp); yield break; }
@@ -126,37 +142,54 @@ public sealed class GS2LeaderboardOnline : MonoBehaviour
         { done(false, Configured ? "Não foi possível conectar ao Firebase." : "Ranking Firebase ainda não configurado."); yield break; }
 
         string path = "nicknames/" + NameKey(nickname);
-        using (var get = UnityWebRequest.Get(DatabaseUrl(path)))
-        {
-            get.timeout = 6;
-            yield return get.SendWebRequest();
-            if (get.result != UnityWebRequest.Result.Success)
-            { done(false, "Não foi possível verificar o nickname."); yield break; }
-            string owner = get.downloadHandler.text.Trim(' ', '\n', '\r', '"');
-            if (owner == uid) { done(true, null); yield break; }
-            if (owner != "null")
-            { done(false, NicknameTaken); yield break; }
-        }
-
-        using (var put = UnityWebRequest.Put(DatabaseUrl(path), "\"" + uid + "\""))
+        string ownerJson = "\"" + uid + "\"";
+        // A reserva condicional é atômica e já confirma a disponibilidade na mesma requisição.
+        using (var put = UnityWebRequest.Put(DatabaseUrl(path), ownerJson))
         {
             put.timeout = 6;
             put.SetRequestHeader("Content-Type", "application/json");
             put.SetRequestHeader("If-Match", "null_etag");
             yield return put.SendWebRequest();
+            if (put.result == UnityWebRequest.Result.Success)
+            { done(true, null); yield break; }
+            if (put.responseCode != 412 && put.responseCode != 401 && put.responseCode != 403)
+            { done(false, "Não foi possível salvar o nome."); yield break; }
+
             if (put.responseCode == 412)
-            { done(false, NicknameTaken); yield break; }
-            if (put.result != UnityWebRequest.Result.Success)
-            { done(false, "Não foi possível salvar o nickname."); yield break; }
+            {
+                if (requireUnreserved)
+                { done(false, NicknameTaken); yield break; }
+
+                // Quando disponível, o corpo do 412 traz o valor atual da reserva.
+                string current = put.downloadHandler.text.Trim();
+                if (current.Length > 2 && current[0] == '"' && current[current.Length - 1] == '"')
+                {
+                    bool useExisting = current == ownerJson;
+                    done(useExisting, useExisting ? null : NicknameTaken);
+                    yield break;
+                }
+            }
         }
-        done(true, null);
+
+        // As regras do Firebase também podem rejeitar a escrita antes de devolver o valor.
+        using (var get = UnityWebRequest.Get(DatabaseUrl(path)))
+        {
+            get.timeout = 6;
+            yield return get.SendWebRequest();
+            if (get.result != UnityWebRequest.Result.Success)
+            { done(false, "Não foi possível verificar o nome."); yield break; }
+            string current = get.downloadHandler.text.Trim();
+            if (!requireUnreserved && current == ownerJson) { done(true, null); yield break; }
+            done(false, current == "null" ? "Não foi possível salvar o nome." : NicknameTaken);
+        }
     }
 
     private IEnumerator SaveName(string nickname, Action<bool, string> done)
     {
         bool claimed = false;
         string error = null;
-        yield return ClaimNickname(nickname, (ok, message) => { claimed = ok; error = message; });
+        yield return ClaimNickname(nickname, (ok, message) => { claimed = ok; error = message; },
+            requireUnreserved: true);
         if (!claimed) { done(false, error); yield break; }
         string previous = GS2Profile.Nickname;
         if (!string.IsNullOrEmpty(previous) && NameKey(previous) != NameKey(nickname))

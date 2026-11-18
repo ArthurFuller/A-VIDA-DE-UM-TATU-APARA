@@ -22,6 +22,12 @@ public sealed class ShopQuantityRow : MonoBehaviour
     public event Action Changed;
     public int Quantity => quantity;
 
+    internal static string FormatCost(long coins, long wood = 0)
+    {
+        string price = coins + (coins == 1 ? " moeda" : " moedas");
+        return wood > 0 ? price + " + " + wood + (wood == 1 ? " madeira" : " madeiras") : price;
+    }
+
     public void SetItemName(string name)
     {
         itemName = name;
@@ -75,8 +81,7 @@ public sealed class ShopQuantityRow : MonoBehaviour
         if (quantityText != null) quantityText.text = quantity.ToString();
         if (amountText != null) amountText.text = ((long)quantity * unitPrice).ToString();
         if (unitPriceText != null)
-            unitPriceText.text = unitPrice + (unitPrice == 1 ? " moeda" : " moedas") +
-                (woodPrice > 0 ? " + " + woodPrice + " madeiras" : "") + "/un.";
+            unitPriceText.text = FormatCost(unitPrice, woodPrice) + "/un.";
         if (decreaseButton != null) decreaseButton.interactable = quantity > 0;
         if (increaseButton != null) increaseButton.interactable = quantity < limit;
         if (rowGroup != null) rowGroup.alpha = limit == 0 ? 0.42f : 1f;

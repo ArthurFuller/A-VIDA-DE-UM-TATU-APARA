@@ -83,6 +83,7 @@ public sealed class PauseToggle : MonoBehaviour
 
         backdrop = pauseOverlay.GetComponent<Image>();
         if (backdrop != null) backdropColor = backdrop.color;
+        FullscreenBackdrop.Cover(backdrop);
         panelHome = panel.anchoredPosition;
         buttonMask = buttonViewport.GetComponent<RectMask2D>();
         menuActions = new[] { resumeButton, settingsButton, exitButton };

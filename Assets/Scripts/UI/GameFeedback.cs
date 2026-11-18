@@ -30,6 +30,7 @@ public sealed class GameFeedback : MonoBehaviour
         {
             summaryBackdrop = summaryGroup.GetComponent<Image>();
             if (summaryBackdrop != null) summaryBackdropColor = summaryBackdrop.color;
+            FullscreenBackdrop.Cover(summaryBackdrop);
             summaryGroup.alpha = 0;
             summaryGroup.blocksRaycasts = false;
             summaryGroup.interactable = false;

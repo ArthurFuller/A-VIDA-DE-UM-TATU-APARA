@@ -46,20 +46,15 @@ public sealed class SeedMerchant : MonoBehaviour
          (backdropGroup != null && backdropGroup.isActiveAndEnabled && backdropGroup.blocksRaycasts));
     internal RectTransform TutorialPanel => panelRect;
     internal bool TutorialPanelSettled => panelTransition == null || !panelTransition.IsActive();
-    public int FenceWoodCost => fenceWoodCost;
-    public int FenceCoinCost => fenceCoinCost;
+    public int FenceWoodCost => GameBalance.Current != null ? GameBalance.Current.fenceWoodCost : fenceWoodCost;
+    public int FenceCoinCost => GameBalance.Current != null ? GameBalance.Current.fenceCoinCost : fenceCoinCost;
     public int FenceSlotsAvailable => hand != null ? hand.FreeSlots : 0;
 
     private void Awake()
     {
         GameBalance balance = GameBalance.Current;
         if (balance != null)
-        {
-            fenceWoodCost = balance.fenceWoodCost;
-            fenceCoinCost = balance.fenceCoinCost;
-            foodCoinCost = balance.foodCoinCost;
             marketDays = balance.marketDays;
-        }
         if (shopGroup == null) return;
         panelRect = shopGroup.transform as RectTransform;
         if (panelRect != null) panelHome = panelRect.anchoredPosition;
@@ -69,6 +64,7 @@ public sealed class SeedMerchant : MonoBehaviour
         shopGroup.interactable = false;
         if (backdropGroup != null)
         {
+            FullscreenBackdrop.Cover(backdropGroup);
             backdropGroup.alpha = 0f;
             backdropGroup.interactable = false;
             backdropGroup.blocksRaycasts = false;
@@ -98,29 +94,29 @@ public sealed class SeedMerchant : MonoBehaviour
 
     public int GetUnitPrice(SaleItem item)
     {
-        if (catalog == null) return 0;
         return item switch
         {
-            SaleItem.CornSeeds => catalog.Get(CropType.Corn).coinCost,
-            SaleItem.PumpkinSeeds => catalog.Get(CropType.Pumpkin).coinCost,
-            SaleItem.JerimumSeeds => catalog.Get(CropType.Jerimum).coinCost,
-            SaleItem.Food => foodCoinCost,
+            SaleItem.CornSeeds => catalog != null ? catalog.Get(CropType.Corn).coinCost : 0,
+            SaleItem.PumpkinSeeds => catalog != null ? catalog.Get(CropType.Pumpkin).coinCost : 0,
+            SaleItem.JerimumSeeds => catalog != null ? catalog.Get(CropType.Jerimum).coinCost : 0,
+            SaleItem.Food => GameBalance.Current != null ? GameBalance.Current.foodCoinCost : foodCoinCost,
             _ => 0
         };
     }
 
     public bool TryBuyCart(int cornSeeds, int pumpkinSeeds, int jerimumSeeds, int food, int fences)
     {
+        int woodPerFence = FenceWoodCost;
         if (!CanTrade || !IsOpen || dayCycle == null || !dayCycle.CanAcceptActions || resources == null ||
-            catalog == null ||
+            (food == 0 && fences == 0) ||
             cornSeeds != 0 || pumpkinSeeds != 0 || jerimumSeeds != 0 || food < 0 || fences < 0 ||
             fences > FenceSlotsAvailable ||
-            resources.Wood < (long)fences * fenceWoodCost ||
+            resources.Wood < (long)fences * woodPerFence ||
             (long)resources.Food + food > int.MaxValue) return false;
-        long total = (long)food * GetUnitPrice(SaleItem.Food) + (long)fences * fenceCoinCost;
-        if (total <= 0 || total > int.MaxValue || !resources.TrySpendCoins((int)total))
+        long total = (long)food * GetUnitPrice(SaleItem.Food) + (long)fences * FenceCoinCost;
+        if (resources.Coins <= 0 || total > resources.Coins || !resources.TrySpendCoins((int)total))
         {
-            if (feedback != null) feedback.ShowMessage("Compra acima do limite de moedas.");
+            if (feedback != null) feedback.ShowMessage("Moedas insuficientes para essa compra.");
             return false;
         }
         if (food > 0)
@@ -132,10 +128,12 @@ public sealed class SeedMerchant : MonoBehaviour
         }
         if (fences > 0)
         {
-            resources.TrySpendWood(fences * fenceWoodCost);
+            resources.TrySpendWood(fences * woodPerFence);
             for (int i = 0; i < fences; i++) hand.AddCard(ActivityKind.BuildFence);
         }
-        if (feedback != null) feedback.ShowMessage("Compra concluída: -" + total + " moedas.");
+        if (feedback != null)
+            feedback.ShowMessage("Compra concluída. Gasto: " +
+                ShopQuantityRow.FormatCost(total, (long)fences * woodPerFence) + ".");
         return true;
     }
 
