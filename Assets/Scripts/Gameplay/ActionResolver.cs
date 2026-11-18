@@ -632,7 +632,8 @@ public sealed class ActionResolver : MonoBehaviour
         MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
             if (dayCycle.TryFeedAnimal(plot, out int milk, out int eggs))
-                feedback.ShowMessage(milk > 0 ? "Ração: +1 leite." : "Ração: +1 ovo.");
+                feedback.ShowMessage(milk > 0 ? $"Ração: +{milk} leite{(milk == 1 ? "" : "s")}." :
+                    $"Ração: +{eggs} ovo{(eggs == 1 ? "" : "s")}.");
             AudioManager.Play(feedingCue);
             SendWorkerHome(worker);
         });

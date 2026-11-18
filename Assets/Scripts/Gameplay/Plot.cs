@@ -648,34 +648,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         int side = index / 3;
         if (neighbors[side] != null) return false;
 
-        int section = index % 3;
-        int direction = side == 0 ? (section == 0 ? -1 : section == 2 ? 1 : 0) :
-            side == 2 ? (section == 0 ? 1 : section == 2 ? -1 : 0) :
-            side == 1 ? (section == 0 ? 1 : section == 2 ? -1 : 0) :
-            (section == 0 ? -1 : section == 2 ? 1 : 0);
-        if (direction == 0) return true;
-
-        bool horizontal = side == 0 || side == 2;
-        Plot adjacent = neighbors[horizontal ? (direction > 0 ? 1 : 3) :
-            (direction > 0 ? 0 : 2)];
-        if (adjacent == null) return true;
-        float ownAxisScale = Mathf.Max(0.01f, Mathf.Abs(horizontal ? transform.lossyScale.x : transform.lossyScale.z));
-        float neighborAxisScale = Mathf.Abs(horizontal ? adjacent.transform.lossyScale.x : adjacent.transform.lossyScale.z);
-        float distance = Mathf.Abs(horizontal ? adjacent.transform.position.x - transform.position.x :
-            adjacent.transform.position.z - transform.position.z);
-        float ownHalf = (horizontal ? FenceHalfX : FenceHalfZ) * ownAxisScale;
-        float neighborHalf = (horizontal ? adjacent.FenceHalfX : adjacent.FenceHalfZ) * neighborAxisScale;
-        float extension = Mathf.Max(0f, (distance - ownHalf - neighborHalf) * 0.5f) / ownAxisScale;
-        if (horizontal)
-        {
-            position.x += direction * extension * 0.5f;
-            scale.x += extension;
-        }
-        else
-        {
-            position.z += direction * extension * 0.5f;
-            scale.z += extension;
-        }
+        // Os 12 segmentos existentes já formam o cercado. Ao juntar terrenos,
+        // retiramos somente os lados internos: nenhuma peça é esticada ou substituída.
         return true;
     }
 
@@ -1053,6 +1027,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
 
             if (IsAnimalGroup)
             {
+                // Preserva a animação original: as cercas antigas afundam
+                // e o novo perímetro é reconstruído, peça por peça, de baixo para cima.
                 foreach (Plot plot in members) plot.HideOriginalFenceParts();
                 BuildFence(border, center);
             }
@@ -1287,27 +1263,82 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             return mesh;
         }
 
+        // Recria o contorno como anéis fechados; em cada quina o mesmo vértice
+        // é compartilhado pelas duas faixas. Evita lacunas em L, U e outras formas.
         private static Mesh BuildOutline(List<BorderEdge> border, Vector2 center, float y, float padding)
         {
             const float halfWidth = 0.035f;
-            var vertices = new List<Vector3>();
-            var triangles = new List<int>();
+            var starts = new List<Vector2>(border.Count);
+            var ends = new List<Vector2>(border.Count);
             foreach (BorderEdge edge in border)
             {
-                float a = edge.Start - (edge.Horizontal ? center.x : center.y) - padding;
-                float b = edge.End - (edge.Horizontal ? center.x : center.y) + padding;
-                float line = edge.Line - (edge.Horizontal ? center.y : center.x) + edge.Normal * padding;
-                if (edge.Horizontal)
-                    AddQuad(vertices, triangles, new Vector3(a, y, line - halfWidth),
-                        new Vector3(a, y, line + halfWidth),
-                        new Vector3(b, y, line + halfWidth),
-                        new Vector3(b, y, line - halfWidth));
-                else
+                // Sentido: a área ocupada fica sempre à esquerda do segmento.
+                Vector2 a = edge.Horizontal ? new Vector2(edge.Start, edge.Line) :
+                    new Vector2(edge.Line, edge.Start);
+                Vector2 b = edge.Horizontal ? new Vector2(edge.End, edge.Line) :
+                    new Vector2(edge.Line, edge.End);
+                bool reverse = edge.Horizontal ? edge.Normal > 0 : edge.Normal < 0;
+                starts.Add(reverse ? b : a);
+                ends.Add(reverse ? a : b);
+            }
+            var used = new bool[border.Count];
+            var vertices = new List<Vector3>();
+            var triangles = new List<int>();
+            for (int first = 0; first < border.Count; first++)
+            {
+                if (used[first]) continue;
+                var ring = new List<Vector2>();
+                int current = first;
+                bool closed = false;
+                for (int step = 0; step <= border.Count; step++)
+                {
+                    if (used[current]) break;
+                    used[current] = true;
+                    ring.Add(starts[current]);
+                    Vector2 tip = ends[current];
+                    if ((tip - starts[first]).sqrMagnitude < 0.000001f)
+                    {
+                        closed = true;
+                        break;
+                    }
+                    int next = -1;
+                    for (int k = 0; k < starts.Count; k++)
+                        if (!used[k] && (starts[k] - tip).sqrMagnitude < 0.000001f)
+                        {
+                            next = k;
+                            break;
+                        }
+                    if (next < 0) break;
+                    current = next;
+                }
+                if (!closed || ring.Count < 4) continue;
+                int count = ring.Count;
+                // Para cada canto calculamos a interseção das duas retas
+                // paralelas ao perímetro. Assim o padding também fecha nas reentrâncias.
+                var inner = new Vector2[count];
+                var outer = new Vector2[count];
+                for (int i = 0; i < count; i++)
+                {
+                    Vector2 here = ring[i];
+                    Vector2 incoming = (here - ring[(i + count - 1) % count]).normalized;
+                    Vector2 outgoing = (ring[(i + 1) % count] - here).normalized;
+                    Vector2 normalBefore = new Vector2(incoming.y, -incoming.x);
+                    Vector2 normalAfter = new Vector2(outgoing.y, -outgoing.x);
+                    float denominator = 1f + Vector2.Dot(normalBefore, normalAfter);
+                    Vector2 miter = denominator > 0.01f ?
+                        (normalBefore + normalAfter) / denominator : normalAfter;
+                    inner[i] = here + miter * (padding - halfWidth) - center;
+                    outer[i] = here + miter * (padding + halfWidth) - center;
+                }
+                for (int i = 0; i < count; i++)
+                {
+                    int next = (i + 1) % count;
                     AddQuad(vertices, triangles,
-                        new Vector3(line - halfWidth, y, a),
-                        new Vector3(line - halfWidth, y, b),
-                        new Vector3(line + halfWidth, y, b),
-                        new Vector3(line + halfWidth, y, a));
+                        new Vector3(outer[i].x, y, outer[i].y),
+                        new Vector3(inner[i].x, y, inner[i].y),
+                        new Vector3(inner[next].x, y, inner[next].y),
+                        new Vector3(outer[next].x, y, outer[next].y));
+                }
             }
             var mesh = new Mesh { name = "Contorno unificado" };
             mesh.SetVertices(vertices);
@@ -1316,18 +1347,18 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             return mesh;
         }
 
+        // A geometria do perímetro continua vindo dos mesmos terrenos. Apenas
+        // a distribuição das peças muda: reutiliza a cerquinha original, em tamanho
+        // constante, e completa os intervalos entre os slots sem deformar o FBX.
         private void BuildFence(List<BorderEdge> border, Vector2 center)
         {
             Plot source = members[0];
-            if (source.fenceParts == null || source.fenceParts.Length == 0 ||
-                source.fenceParts[0] == null) return;
-            Renderer original = source.fenceParts[0].GetComponent<Renderer>();
-            if (original == null || source.fenceBaseScales == null) return;
-            Transform fenceParent = source.fenceParts[0].transform.parent;
-            Vector3 parentScale = fenceParent.lossyScale;
-            float height = source.fenceBaseScales[0].y * Mathf.Abs(parentScale.y);
-            float thickness = source.fenceBaseScales[0].z * Mathf.Abs(parentScale.z);
-            float y = fenceParent.TransformPoint(source.fenceBasePositions[0]).y;
+            if (source.fenceParts == null || source.fenceParts.Length < 12 ||
+                source.fenceBasePositions == null || source.fenceBaseScales == null)
+                return;
+
+            // Junta arestas colineares: cada lateral passa a ser uma sequência
+            // contínua de módulos, inclusive através do espaço entre slots.
             border.Sort((a, b) =>
             {
                 int orientation = a.Horizontal.CompareTo(b.Horizontal);
@@ -1352,50 +1383,77 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
                 }
                 else merged.Add(edge);
             }
-            int pieceIndex = 0;
+
             float startDelay = source.fencePieceDuration +
                 (source.fenceParts.Length - 1) * source.fencePieceDelay * 0.5f + 0.05f;
+            int pieceIndex = 0;
             foreach (BorderEdge edge in merged)
             {
-                int count = Mathf.Max(1, Mathf.CeilToInt((edge.End - edge.Start) / 0.45f));
-                float length = (edge.End - edge.Start) / count;
+                // Escolhe o mesmo módulo que já existe na lateral correspondente.
+                // Lados opostos usam suas próprias versões, preservando a arte.
+                int templateIndex = edge.Horizontal ?
+                    (edge.Normal > 0 ? 1 : 7) : (edge.Normal > 0 ? 4 : 10);
+                GameObject template = source.fenceParts[templateIndex];
+                if (template == null) continue;
+                Transform originalPiece = template.transform;
+                Transform originalParent = originalPiece.parent;
+                if (originalParent == null) continue;
+                Vector3 originalScale = originalPiece.lossyScale;
+                float moduleLength = edge.Horizontal ?
+                    Mathf.Abs(originalScale.x) : Mathf.Abs(originalScale.z);
+                if (moduleLength < 0.01f) continue;
+
+                float span = edge.End - edge.Start;
+                if (span <= 0f) continue;
+                int count = Mathf.Max(1, Mathf.RoundToInt(span / moduleLength));
+                // Nunca deixa aberturas grandes entre módulos. Se não couberem
+                // exatamente, coloca mais um e sobrepõe ligeiramente, sem esticar.
+                while (count > 1 && (span - moduleLength) / (count - 1) > moduleLength + 0.015f)
+                    count++;
+                float spacing = count > 1 ? (span - moduleLength) / (count - 1) : 0f;
+
+                Vector3 originalCenter = originalParent.TransformPoint(
+                    source.fenceBasePositions[templateIndex]);
+                float surfaceLine = edge.Horizontal ?
+                    (edge.Normal > 0 ? source.surfaceBounds.max.z : source.surfaceBounds.min.z) :
+                    (edge.Normal > 0 ? source.surfaceBounds.max.x : source.surfaceBounds.min.x);
+                float offset = (edge.Horizontal ? originalCenter.z : originalCenter.x) - surfaceLine;
+                float boundary = edge.Line + offset;
+                Vector3 rootScale = root.transform.lossyScale;
+
                 for (int i = 0; i < count; i++)
                 {
-                    GameObject part = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    part.name = "Cerca modular " + ++pieceIndex;
-                    part.transform.SetParent(root.transform, false);
-                    float middle = edge.Start + (i + 0.5f) * length;
-                    Vector3 position = edge.Horizontal ?
-                        new Vector3(middle - center.x, y,
-                            edge.Line - center.y - edge.Normal * thickness * 0.5f) :
-                        new Vector3(edge.Line - center.x - edge.Normal * thickness * 0.5f,
-                            y, middle - center.y);
-                    part.transform.localPosition = position - Vector3.up * 0.45f;
-                    part.transform.localScale = edge.Horizontal ?
-                        new Vector3(length + 0.015f, height, thickness) :
-                        new Vector3(thickness, height, length + 0.015f);
-                    UnityEngine.Object.Destroy(part.GetComponent<Collider>());
-                    Renderer fenceRenderer = part.GetComponent<Renderer>();
-                    fenceRenderer.sharedMaterial = original.sharedMaterial;
-                    if (source.joinedFenceModel != null)
-                    {
-                        // Mantém a peça lógica e a animação existentes; troca só a malha visível.
-                        GameObject visual = new GameObject("Visual - Cerca FBX");
-                        visual.transform.SetParent(part.transform, false);
-                        GameObject model = UnityEngine.Object.Instantiate(
-                            source.joinedFenceModel, visual.transform);
-                        if (GS2VisualFit.Fit(visual.transform, model.transform,
-                            new Bounds(Vector3.zero, Vector3.one),
-                            GS2VisualFit.Axis.LongX, false))
-                            fenceRenderer.enabled = false;
-                        else UnityEngine.Object.Destroy(visual);
-                    }
-                    fencePieces.Add(part.transform);
-                    part.transform.DOLocalMove(position, source.fencePieceDuration + 0.1f)
+                    float middle = count == 1 ? (edge.Start + edge.End) * 0.5f :
+                        edge.Start + moduleLength * 0.5f + i * spacing;
+                    Vector3 worldPosition = edge.Horizontal ?
+                        new Vector3(middle, originalCenter.y, boundary) :
+                        new Vector3(boundary, originalCenter.y, middle);
+
+                    // Clona o objeto real da cerca, com seus filhos, mesh, material e
+                    // proporções originais. Nunca usa cubos substitutos ou GS2VisualFit.
+                    GameObject part = UnityEngine.Object.Instantiate(template, root.transform, false);
+                    part.name = "Cerquinha unificada " + ++pieceIndex;
+                    Transform piece = part.transform;
+                    piece.rotation = originalPiece.rotation;
+                    piece.localScale = new Vector3(
+                        originalScale.x / Mathf.Max(0.001f, Mathf.Abs(rootScale.x)),
+                        originalScale.y / Mathf.Max(0.001f, Mathf.Abs(rootScale.y)),
+                        originalScale.z / Mathf.Max(0.001f, Mathf.Abs(rootScale.z)));
+                    Vector3 position = root.transform.InverseTransformPoint(worldPosition);
+                    piece.localPosition = position + Vector3.down * 0.45f;
+                    // A superfície unificada já recebe o clique; cópias visuais
+                    // não devem interceptar o apontamento do jogador.
+                    foreach (Collider collider in part.GetComponentsInChildren<Collider>(true))
+                        UnityEngine.Object.Destroy(collider);
+                    part.SetActive(true);
+                    fencePieces.Add(piece);
+                    piece.DOLocalMove(position, source.fencePieceDuration + 0.1f)
                         .SetDelay(startDelay + pieceIndex * source.fencePieceDelay * 0.45f)
                         .SetEase(Ease.OutBack);
                 }
             }
         }
+
+
     }
 }

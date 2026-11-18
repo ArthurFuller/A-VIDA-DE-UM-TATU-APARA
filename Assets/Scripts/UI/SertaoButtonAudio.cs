@@ -8,14 +8,16 @@ public sealed class SertaoButtonAudio : MonoBehaviour, IPointerEnterHandler
 {
     private Button button;
     private bool cardFeedback;
+    private bool muteClickOnly;
 
-    internal static void Bind(Button target, bool useCardFeedback = false)
+    internal static void Bind(Button target, bool useCardFeedback = false, bool muteClickOnly = false)
     {
         if (!Application.isPlaying || target == null) return;
         SertaoButtonHoverPalette.Apply(target);
         if (!target.TryGetComponent(out SertaoButtonAudio feedback))
             feedback = target.gameObject.AddComponent<SertaoButtonAudio>();
         if (useCardFeedback) feedback.cardFeedback = true;
+        if (muteClickOnly) feedback.muteClickOnly = true;
         feedback.button = target;
         target.onClick.RemoveListener(feedback.PlayClick);
         target.onClick.AddListener(feedback.PlayClick);
@@ -28,7 +30,7 @@ public sealed class SertaoButtonAudio : MonoBehaviour, IPointerEnterHandler
 
     private void PlayClick()
     {
-        if (!cardFeedback) AudioManager.Play(SoundCue.UiClick);
+        if (!cardFeedback && !muteClickOnly) AudioManager.Play(SoundCue.UiClick);
     }
 
     public void OnPointerEnter(PointerEventData eventData)

@@ -30712,6 +30712,7 @@ MonoBehaviour:
   quantityText: {fileID: 1668772773}
   amountText: {fileID: 968685155}
   unitPriceText: {fileID: 1992380461}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 779338799}
   increaseButton: {fileID: 1034323338}
   rowGroup: {fileID: 210648871}
@@ -56663,85 +56664,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8548824103141286736, guid: 759dbde0da4b0bb49bcf15cf5228fc50, type: 3}
   m_PrefabInstance: {fileID: 461529938}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &461751476
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 461751477}
-  - component: {fileID: 461751479}
-  - component: {fileID: 461751478}
-  m_Layer: 0
-  m_Name: "R\xF3tulo"
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &461751477
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 461751476}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1108183994}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 4, y: -2}
-  m_SizeDelta: {x: 37, y: 32}
-  m_Pivot: {x: 0, y: 1}
---- !u!114 &461751478
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 461751476}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
-  m_Material: {fileID: 0}
-  m_Color: {r: 0.16, g: 0.13, b: 0.1, a: 1}
-  m_RaycastTarget: 0
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_FontData:
-    m_Font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
-    m_FontSize: 12
-    m_FontStyle: 0
-    m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 40
-    m_Alignment: 4
-    m_AlignByGeometry: 0
-    m_RichText: 1
-    m_HorizontalOverflow: 0
-    m_VerticalOverflow: 0
-    m_LineSpacing: 1
-  m_Text: X
---- !u!222 &461751479
-CanvasRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 461751476}
-  m_CullTransparentMesh: 1
 --- !u!1 &462023342
 GameObject:
   m_ObjectHideFlags: 0
@@ -64912,6 +64834,7 @@ MonoBehaviour:
   quantityText: {fileID: 1899595521}
   amountText: {fileID: 1071652163}
   unitPriceText: {fileID: 209417909}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 835190797}
   increaseButton: {fileID: 1317830780}
   rowGroup: {fileID: 512543208}
@@ -95262,6 +95185,7 @@ MonoBehaviour:
   quantityText: {fileID: 1143302356}
   amountText: {fileID: 260702891}
   unitPriceText: {fileID: 2054025845}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 358710263}
   increaseButton: {fileID: 468041295}
   rowGroup: {fileID: 752318437}
@@ -101073,6 +100997,7 @@ MonoBehaviour:
   quantityText: {fileID: 746442935}
   amountText: {fileID: 1561651340}
   unitPriceText: {fileID: 552444500}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 1649880791}
   increaseButton: {fileID: 1448550991}
   rowGroup: {fileID: 767725308}
@@ -110853,6 +110778,7 @@ MonoBehaviour:
   quantityText: {fileID: 1465086195}
   amountText: {fileID: 1382159170}
   unitPriceText: {fileID: 1552312181}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 278813035}
   increaseButton: {fileID: 359237905}
   rowGroup: {fileID: 851885153}
@@ -132133,8 +132059,7 @@ RectTransform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 461751477}
+  m_Children: []
   m_Father: {fileID: 559229436}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
@@ -141813,7 +141738,6 @@ MonoBehaviour:
   comadreChance: 0.5
   comadreAbsenceDays: 1
   rainForestRecovery: 2
-  headOfCuiaFishTheft: 2
   daysWithoutWoodForReforestation: 3
   reforestationWood: 4
 --- !u!4 &1188192334
@@ -175009,6 +174933,7 @@ MonoBehaviour:
   quantityText: {fileID: 173227084}
   amountText: {fileID: 1617970723}
   unitPriceText: {fileID: 1639687207}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 1914267458}
   increaseButton: {fileID: 1760575037}
   rowGroup: {fileID: 1493904904}
@@ -177892,6 +177817,7 @@ MonoBehaviour:
   quantityText: {fileID: 473483111}
   amountText: {fileID: 229010173}
   unitPriceText: {fileID: 970698038}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 1669488080}
   increaseButton: {fileID: 578256996}
   rowGroup: {fileID: 1530312993}
@@ -253353,6 +253279,7 @@ MonoBehaviour:
   quantityText: {fileID: 2010491971}
   amountText: {fileID: 1226177131}
   unitPriceText: {fileID: 1091987275}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 461076421}
   increaseButton: {fileID: 292936374}
   rowGroup: {fileID: 2111049336}
@@ -258308,6 +258235,7 @@ MonoBehaviour:
   quantityText: {fileID: 3000100034}
   amountText: {fileID: 3000100051}
   unitPriceText: {fileID: 3000100017}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 3000100022}
   increaseButton: {fileID: 3000100039}
   rowGroup: {fileID: 3000100004}
@@ -259371,6 +259299,7 @@ MonoBehaviour:
   quantityText: {fileID: 3000100086}
   amountText: {fileID: 3000100103}
   unitPriceText: {fileID: 3000100069}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 3000100074}
   increaseButton: {fileID: 3000100091}
   rowGroup: {fileID: 3000100056}
@@ -268398,6 +268327,7 @@ MonoBehaviour:
   quantityText: {fileID: 3000400034}
   amountText: {fileID: 3000400051}
   unitPriceText: {fileID: 3000400017}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 3000400022}
   increaseButton: {fileID: 3000400039}
   rowGroup: {fileID: 3000400004}
@@ -284441,6 +284371,7 @@ MonoBehaviour:
   quantityText: {fileID: 7000000034}
   amountText: {fileID: 7000000051}
   unitPriceText: {fileID: 7000000017}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 7000000022}
   increaseButton: {fileID: 7000000039}
   rowGroup: {fileID: 7000000004}
@@ -285265,6 +285196,7 @@ MonoBehaviour:
   quantityText: {fileID: 7000000134}
   amountText: {fileID: 7000000151}
   unitPriceText: {fileID: 7000000117}
+  bonusPriceColor: {r: 0.5686275, g: 0.32941177, b: 0.0627451, a: 1}
   decreaseButton: {fileID: 7000000122}
   increaseButton: {fileID: 7000000139}
   rowGroup: {fileID: 7000000104}

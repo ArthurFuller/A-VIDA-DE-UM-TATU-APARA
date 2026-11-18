@@ -200,6 +200,8 @@ public sealed class GS2Profile : MonoBehaviour
 
         void Complete()
         {
+            // Som de confirmação apenas após o nome ter sido validado e salvo.
+            AudioManager.Play(SoundCue.CardReward);
             ClearNotice();
             shake?.Kill();
             proceed.interactable = false;
@@ -227,7 +229,8 @@ public sealed class GS2Profile : MonoBehaviour
 
         input.onValueChanged.AddListener(Refresh);
         proceed.onClick.AddListener(Submit);
-        SertaoButtonAudio.Bind(proceed);
+        // Mantém o hover; evita o clique genérico sobreposto ao som de sucesso.
+        SertaoButtonAudio.Bind(proceed, muteClickOnly: true);
         return true;
     }
 

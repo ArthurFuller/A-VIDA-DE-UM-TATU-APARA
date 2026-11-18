@@ -80,13 +80,44 @@ public sealed class DayCycle : MonoBehaviour
 
     public bool TryFeedAnimal(Plot plot, out int milk, out int eggs)
     {
-        milk = plot != null && plot.Animal == AnimalKind.Cow ? 1 : 0;
-        eggs = plot != null && plot.Animal == AnimalKind.Chicken ? 1 : 0;
-        if (milk + eggs == 0 || resources == null) return false;
+        milk = 0;
+        eggs = 0;
+        if (plot == null || resources == null || !plot.CanUse(ActivityKind.FeedAnimals, currentDay, seedCatalog))
+            return false;
+
+        // Usa o mesmo grupo de cercados unidos das outras ações em slots conectados.
+        // Cercados isolados têm apenas o próprio plot; grupos nunca atravessam áreas desconectadas.
+        List<Plot> targets = plot.ConnectedPlotsFor(ActivityKind.FeedAnimals, currentDay, seedCatalog);
+        foreach (Plot target in targets)
+        {
+            if (target.Animal == AnimalKind.Cow) milk++;
+            else if (target.Animal == AnimalKind.Chicken) eggs++;
+        }
+        if (milk + eggs == 0) return false;
+
         resources.AddAnimalProducts(milk, eggs);
         resources.RecordProduction(SaleItem.Milk, milk);
         resources.RecordProduction(SaleItem.Eggs, eggs);
-        plot.PulseAnimal();
+
+        // Cada animal alimentado gera seu próprio ícone a partir do cercado de origem,
+        // como acontece com a produção diária. O crédito ao estoque ocorre só uma vez, acima.
+        const float itemInterval = 0.20f;
+        float appearanceDelay = 0f;
+        foreach (Plot target in targets)
+        {
+            if (target == null || target.Animal == AnimalKind.None) continue;
+            Plot sourcePlot = target;
+            if (resourceHud != null)
+            {
+                ResourceKind kind = target.Animal == AnimalKind.Cow ? ResourceKind.Milk : ResourceKind.Eggs;
+                resourceHud.FlyFromWorld(kind, 1, target.transform.position + Vector3.up,
+                    0.8f, appearanceDelay: appearanceDelay,
+                    onEachAppearance: () => { if (sourcePlot != null) sourcePlot.PulseAnimal(); });
+            }
+            else
+                target.PulseAnimal();
+            appearanceDelay += itemInterval;
+        }
         return true;
     }
 

@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Sprites;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
 // Navegação da cena de entrada; a transição preta permanece até a cena do jogo abrir.
 public sealed class GS2FrontEnd : MonoBehaviour
@@ -38,6 +39,31 @@ public sealed class GS2FrontEnd : MonoBehaviour
     [SerializeField, Min(0.15f)] private float introRevealSeconds = 0.65f;
     [SerializeField, Min(0.1f)] private float logoDropSeconds = 0.50f;
     [SerializeField, Min(0.1f)] private float buttonDropSeconds = 0.27f;
+    [Header("Vinheta de abertura da desenvolvedora")]
+    [SerializeField, Tooltip("Arraste aqui o MP4 quando estiver pronto. Sem vídeo, a abertura atual não muda.")]
+    private VideoClip studioOpeningVideo;
+    [SerializeField, Min(0f), Tooltip("Tempo em preto antes de aparecer a vinheta. Padrão: 2,5 segundos.")]
+    private float studioBlackHoldSeconds = 2.5f;
+    [SerializeField, Range(0.2f, 3f), Tooltip("Clareamento lento antes de começar a animação do MP4.")]
+    private float studioRevealSeconds = 1.05f;
+    [SerializeField, Range(0.2f, 2f), Tooltip("Escurecimento sobre a saída da logo, antes do vídeo acabar.")]
+    private float studioDarkenSeconds = 0.68f;
+    [SerializeField, Range(1f, 2.5f), Tooltip("Tempo completamente preto após o vídeo terminar, antes de mostrar nickname/menu.")]
+    private float studioPostVideoBlackSeconds = 1.35f;
+    [SerializeField, Range(1.7f, 3f), Tooltip("Clareamento suave e único para revelar nickname ou menu.")]
+    private float studioMenuRevealSeconds = 1.75f;
+    [SerializeField, Tooltip("Cor do fundo do MP4 (Old Welder: branco rosado #FFF6F9).")]
+    private Color studioVideoBackground = new Color32(255, 246, 249, 255);
+    private GS2StudioIntro studioIntro;
+    private bool nicknameAfterStudioIntro;
+
+    [Header("Sons da entrada inicial")]
+    [SerializeField] private SoundCue introImpactCue = SoundCue.CardPlaced;
+    [SerializeField, Range(0f, 1f), Tooltip("Volume do impacto ao pousar o logo. Zero desliga.")]
+    private float introLogoImpactVolume = 0.34f;
+    [SerializeField, Range(0f, 1f), Tooltip("Volume do impacto de cada botão. Zero desliga.")]
+    private float introButtonImpactVolume = 0.20f;
+    private AudioSource introImpactSource;
     [SerializeField, Min(0f)] private float floatingHeight = 3.5f;
     [SerializeField, Min(0f)] private float floatingAngle = 1.1f;
     [SerializeField, InspectorName("Ondulação da moldura")] private BorderRipple borderRipple = new();
@@ -78,6 +104,13 @@ public sealed class GS2FrontEnd : MonoBehaviour
         Time.timeScale = 0f;
         ApplyAnimationSettings(Resources.Load<MainMenuAnimationSettings>(MainMenuAnimationSettings.ResourceName));
         bool returningFromMatch = SertaoMatchResultsView.BindReturningMenu(this, out returnToRanking);
+        if (!returningFromMatch && GS2StudioIntro.ShouldPlay(studioOpeningVideo))
+        {
+            studioIntro = gameObject.AddComponent<GS2StudioIntro>();
+            studioIntro.Initialize(studioOpeningVideo, studioBlackHoldSeconds,
+                studioRevealSeconds, studioDarkenSeconds, studioPostVideoBlackSeconds,
+                studioMenuRevealSeconds, studioVideoBackground);
+        }
         if (nicknamePage?.Root != null) nicknamePage.Root.SetActive(false);
         if (root != null) { root.alpha = 0f; root.interactable = true; root.blocksRaycasts = true; }
         SetInitialPage(mainPage, mainGroup, true);
@@ -104,7 +137,8 @@ public sealed class GS2FrontEnd : MonoBehaviour
             SetInitialPage(mainPage, mainGroup, false);
             SetSeparateLogoVisible(false);
             SetLocked(true);
-            if (!returningFromMatch)
+            nicknameAfterStudioIntro = studioIntro != null;
+            if (!returningFromMatch && studioIntro == null)
                 motion = DOTween.Sequence().SetUpdate(true)
                     .Append(root.DOFade(1f, fadeSeconds))
                     .OnComplete(() => SetLocked(false));
@@ -120,7 +154,25 @@ public sealed class GS2FrontEnd : MonoBehaviour
         LayoutPageBackgrounds();
         if (locked) BlockNavigation();
         // Os botões precisam guardar a posição e a escala no Awake do próprio hover.
-        if (startMenuEntrance) AnimateMenuEntrance();
+        if (studioIntro != null)
+            studioIntro.Begin(() =>
+            {
+                studioIntro = null;
+                // A unica cortina da vinheta permanece preta durante esta troca.
+                // A transicao inicial da cena nao deve competir com ela.
+                sceneFade?.ReleaseInitialMenuOverlay();
+                if (nicknameAfterStudioIntro)
+                {
+                    nicknameAfterStudioIntro = false;
+                    if (root != null) root.alpha = 1f;
+                    SetLocked(false);
+                }
+                else if (startMenuEntrance)
+                    // A cortina ORIGINAL do menu faz a propria revelacao antes
+                    // dos elementos cairem; nao animar atras do fade longo do video.
+                    AnimateMenuEntrance();
+            }, !nicknameAfterStudioIntro);
+        else if (startMenuEntrance) AnimateMenuEntrance();
     }
 
     public void ApplyAnimationSettings(MainMenuAnimationSettings settings)
@@ -420,11 +472,36 @@ public sealed class GS2FrontEnd : MonoBehaviour
 
     private void AddBorderImpact(Sequence sequence, float impact, RectTransform source, float strength)
     {
-        if (borderRipple == null) return;
         sequence.InsertCallback(impact, () =>
         {
             if (borderRipple != null) borderRipple.Impact(source, strength);
+            PlayIntroImpact(source == mainLogo ? introLogoImpactVolume : introButtonImpactVolume);
         });
+    }
+
+    private void PlayIntroImpact(float volume)
+    {
+        AudioManager manager = AudioManager.Instance;
+        if (volume <= 0f || manager == null || manager.EffectsMuted || manager.EffectsVolume <= 0f)
+            return;
+        SertaoAudioLibrary library = Resources.Load<SertaoAudioLibrary>("SertaoAudioLibrary");
+        if (library == null || library.effects == null) return;
+        foreach (AudioManager.CueEntry entry in library.effects)
+        {
+            if (entry == null || entry.cue != introImpactCue || entry.clips == null || entry.clips.Length == 0)
+                continue;
+            AudioClip clip = entry.clips[UnityEngine.Random.Range(0, entry.clips.Length)];
+            if (clip == null) return;
+            if (introImpactSource == null)
+            {
+                introImpactSource = gameObject.AddComponent<AudioSource>();
+                introImpactSource.playOnAwake = false;
+                introImpactSource.ignoreListenerPause = true;
+                introImpactSource.spatialBlend = 0f;
+            }
+            introImpactSource.PlayOneShot(clip, Mathf.Clamp01(entry.volume * volume * manager.EffectsVolume));
+            return;
+        }
     }
 
     private void Update() => borderRipple?.Tick();

@@ -65,7 +65,10 @@ public sealed class ShopSellPanel : MonoBehaviour
         if (trading.TrySellBatch(quantities))
         {
             if (resourceHud != null && sellButton != null && coins > 0 && coins <= int.MaxValue)
-                resourceHud.FlyFromRect(ResourceKind.Coins, (int)coins, sellButton.transform as RectTransform);
+                // Lotes grandes usam poucos ícones: cada um leva uma parcela das moedas.
+                // O total creditado continua sendo o valor integral da venda.
+                resourceHud.FlyFromRect(ResourceKind.Coins, (int)coins,
+                    sellButton.transform as RectTransform, maxIcons: 8);
             ResetSelection();
         }
     }

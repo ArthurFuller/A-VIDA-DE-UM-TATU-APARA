@@ -18,7 +18,7 @@ MonoBehaviour:
   wind: {fileID: 0}
   rain: {fileID: 8300000, guid: dfdbfa45ff1f54f1bc9069f57a35a0a5, type: 3}
   windVolume: 0
-  rainVolume: 0.62
+  rainVolume: 0.375
   windInRain: 0.28
   weatherFade: 0.85
   reelInputHold: 0.42

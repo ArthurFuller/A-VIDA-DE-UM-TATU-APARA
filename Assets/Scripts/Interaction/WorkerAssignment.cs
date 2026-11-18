@@ -265,8 +265,11 @@ public sealed class WorkerAssignment : MonoBehaviour
 
     public void SetHovered(bool value)
     {
-        if (selectionMarker != null && selectionMarker.activeSelf != value)
-            selectionMarker.SetActive(value);
+        // O quadrado amarelo de destino foi removido da interação com cartas.
+        // Mantemos o componente e a referência serializada por compatibilidade
+        // com a cena; a detecção de trabalhador continua no ActivityCardDrag.
+        if (selectionMarker != null && selectionMarker.activeSelf)
+            selectionMarker.SetActive(false);
     }
 
     public void TryAssign(ActivityKind activity, string activityName, ActivityCardDrag card = null)

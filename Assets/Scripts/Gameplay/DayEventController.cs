@@ -401,9 +401,17 @@ public sealed class DayEventController : MonoBehaviour
         if (kind == SertaoEventKind.HeadOfCuia)
         {
             string text = entry?.text;
-            return text != null && text.Contains(HeadOfCuiaLossToken)
-                ? text.Replace(HeadOfCuiaLossToken, StolenFishLabel)
-                : DefaultDescription(kind);
+            if (string.IsNullOrEmpty(text)) return DefaultDescription(kind);
+            if (text.Contains(HeadOfCuiaLossToken))
+                return text.Replace(HeadOfCuiaLossToken, StolenFishLabel);
+
+            // Suporta descrições editadas com número fixo (ex.: "Você perde 2 peixes")
+            // sem alterar o catálogo, a diagramação ou o restante da escrita do jogador.
+            string dynamicText = System.Text.RegularExpressions.Regex.Replace(
+                text, @"\b(perdeu|perde)\s+\d+\s+peixes?\b",
+                match => match.Groups[1].Value + " " + StolenFishLabel,
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return dynamicText != text ? dynamicText : DefaultDescription(kind);
         }
         return entry != null ? entry.text : DefaultDescription(kind);
     }
