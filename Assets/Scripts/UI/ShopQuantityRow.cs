@@ -8,6 +8,7 @@ public sealed class ShopQuantityRow : MonoBehaviour
     [SerializeField] private Text quantityText;
     [SerializeField] private Text amountText;
     [SerializeField] private Text unitPriceText;
+    [SerializeField] private Color bonusPriceColor = new Color32(145, 84, 16, 255);
     [SerializeField] private Button decreaseButton;
     [SerializeField] private Button increaseButton;
     [SerializeField] private CanvasGroup rowGroup;
@@ -16,6 +17,8 @@ public sealed class ShopQuantityRow : MonoBehaviour
     private int quantity;
     private int limit;
     private int unitPrice;
+    private bool hasSaleBonus;
+    private Color? normalUnitPriceColor;
     private int woodPrice;
     private int stock = -1;
 
@@ -41,7 +44,14 @@ public sealed class ShopQuantityRow : MonoBehaviour
         Refresh();
     }
 
-    public void SetPrice(int price) { unitPrice = Mathf.Max(0, price); Refresh(); }
+    public void SetPrice(int price) => SetPrice(price, false);
+
+    internal void SetPrice(int price, bool boosted)
+    {
+        unitPrice = Mathf.Max(0, price);
+        hasSaleBonus = boosted;
+        Refresh();
+    }
     public void SetWoodPrice(int price) { woodPrice = Mathf.Max(0, price); Refresh(); }
     public void SetStock(int available) { stock = available; Refresh(); }
     public void SetLimit(int maximum)
@@ -81,7 +91,11 @@ public sealed class ShopQuantityRow : MonoBehaviour
         if (quantityText != null) quantityText.text = quantity.ToString();
         if (amountText != null) amountText.text = ((long)quantity * unitPrice).ToString();
         if (unitPriceText != null)
+        {
+            normalUnitPriceColor ??= unitPriceText.color;
             unitPriceText.text = FormatCost(unitPrice, woodPrice) + "/un.";
+            unitPriceText.color = hasSaleBonus ? bonusPriceColor : normalUnitPriceColor.Value;
+        }
         if (decreaseButton != null) decreaseButton.interactable = quantity > 0;
         if (increaseButton != null) increaseButton.interactable = quantity < limit;
         if (rowGroup != null) rowGroup.alpha = limit == 0 ? 0.42f : 1f;

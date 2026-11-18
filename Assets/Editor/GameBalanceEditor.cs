@@ -175,7 +175,7 @@ public sealed class GameBalanceEditor : EditorWindow
         "droughtDurationDays" => "Dias em que a seca permanece ativa, contando o dia em que aparece.",
         "pestDurationDays" => "Dias em que as pragas permanecem ativas, contando o dia em que aparecem.",
         "rainDurationDays" => "Dias em que a chuva permanece ativa, contando o dia em que aparece.",
-        "droughtFishingReduction" => "Peixes subtraídos do resultado da pesca enquanto a seca estiver ativa.",
+        "droughtFishingReduction" => "Redução da recompensa da pesca durante a seca. 1 divide o total por 2, com mínimo de 1 peixe.",
         "pestHarvestReduction" => "Unidades subtraídas da colheita afetada enquanto as pragas estiverem ativas.",
         "pestGrowthRegression" => "Etapas de crescimento que as pragas fazem a plantação afetada perder, inclusive se já estiver pronta.",
         "droughtGrowthDelay" => "Etapas de crescimento perdidas a cada dia de seca pelas plantações sem proteção do poço.",

@@ -38,6 +38,7 @@ public sealed class MandalaSynergy : MonoBehaviour
     private int evaluatedDay = 1;
     public static MandalaSynergy Instance { get; private set; }
     public event Action Changed;
+    internal event Action PlotStateChanged;
 
     private void Awake()
     {
@@ -56,7 +57,7 @@ public sealed class MandalaSynergy : MonoBehaviour
     {
         if (plots == null) return;
         foreach (Plot plot in plots)
-            if (plot != null) plot.StateChanged += Refresh;
+            if (plot != null) plot.StateChanged += OnPlotStateChanged;
         Refresh();
     }
 
@@ -64,12 +65,18 @@ public sealed class MandalaSynergy : MonoBehaviour
     {
         if (plots != null)
             foreach (Plot plot in plots)
-                if (plot != null) plot.StateChanged -= Refresh;
+                if (plot != null) plot.StateChanged -= OnPlotStateChanged;
         active.Clear();
         if (slotEffects == null) return;
         foreach (SlotEffect link in slotEffects)
             if (link.lightParticles != null)
                 link.lightParticles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+    }
+
+    private void OnPlotStateChanged()
+    {
+        Refresh();
+        PlotStateChanged?.Invoke();
     }
 
     public MandalaCombo For(Plot plot) => plot != null && active.TryGetValue(plot, out var combos)

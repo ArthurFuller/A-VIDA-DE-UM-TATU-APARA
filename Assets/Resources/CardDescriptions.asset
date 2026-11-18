@@ -26,8 +26,8 @@ MonoBehaviour:
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
-    alignment: 4
+    fontSize: 18
+    alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:Fish
@@ -39,8 +39,8 @@ MonoBehaviour:
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
-    bold: 0
-    fontSize: 14
+    bold: 1
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
@@ -53,8 +53,8 @@ MonoBehaviour:
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
-    bold: 0
-    fontSize: 14
+    bold: 1
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
@@ -75,28 +75,32 @@ MonoBehaviour:
   - key: A:PlantCorn
     title: Plantar Milho
     art: {fileID: 21300000, guid: 4a11058d49e5a9549b2d18ea93036c72, type: 3}
-    text: "Plante em terreno arado.\n\nCresce em 1 dia e rende 2 milhos por terreno.\n\nMilho maduro acelera a macaxeira e o jerimum vizinhos em 1 etapa por dia e dá +1 à colheita deles. Animais vizinhos produzem +1."
-    boxSize: {x: 240, y: 296.54}
+    text: "Plante em terreno arado.\n\nCresce em 1 dia e rende 2 milhos por terreno.\n\nMilho
+      maduro acelera a macaxeira e o jerimum vizinhos em 1 etapa por dia e d\xE1
+      +1 \xE0 colheita deles. Animais vizinhos produzem +1.\n\nO po\xE7o anula o
+      efeito da seca.\n"
+    boxSize: {x: 240, y: 272.6}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 215.64}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 0
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:PlantPumpkin
     title: Plantar Macaxeira
     art: {fileID: 21300000, guid: 38b7d34e0211c1d49a846fc7cca19f3b, type: 3}
-    text: "Plante em terreno arado.\n\nCresce em 2 dias e rende 3 macaxeiras por terreno.\n\nMilho maduro ao lado acelera o crescimento e dá +1 à colheita. Galinha protege contra pragas, e poço protege contra seca."
-    boxSize: {x: 186.4, y: 204.1}
+    text: "Plante em terreno arado.\n\nCresce em 2 dias e rende 3 macaxeiras por
+      terreno.\n\nO po\xE7o anula o efeito da seca.\n"
+    boxSize: {x: 240, y: 186.4}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 204.1}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 12
+    fontSize: 18
     alignment: 0
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.121568635, g: 0.1137255, b: 0.09019608, a: 0.92}
@@ -110,21 +114,22 @@ MonoBehaviour:
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:PrepareFood
     title: PrepareFood
     art: {fileID: 21300000, guid: aee19f07feebf9d4eb91a871e1e2cb09, type: 3}
-    text: "Use 2 ou 3 ingredientes para cozinhar. Três ingredientes de dois tipos rendem 2 porções. As outras combinações rendem 1."
+    text: "Use 2 ou 3 ingredientes para cozinhar. Tr\xEAs ingredientes de dois tipos
+      rendem 2 por\xE7\xF5es. As outras combina\xE7\xF5es rendem 1."
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
@@ -139,22 +144,22 @@ MonoBehaviour:
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:Rest
     title: Descansar
     art: {fileID: 21300000, guid: 6f27f67ec9e2fcb498ee6552dd222269, type: 3}
-    text: "Consome uma a\xE7\xE3o\n\nO trabalhar passa o dia descansando e recebe
-      uma a\xE7\xE3o extra no dia seguinte"
+    text: "O trabalhador perda sua a\xE7\xE3o.\n\nPassa o dia descansando e recebe
+      uma a\xE7\xE3o extra no dia seguinte."
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
@@ -162,14 +167,14 @@ MonoBehaviour:
     title: "Caf\xE9zinho"
     art: {fileID: 21300000, guid: c7d6793ff7a9f07489ad432087820efe, type: 3}
     text: "Concede ao trabalhador uma a\xE7\xE3o extra (n\xE3o permite repetir a
-      a\xE7\xE3o anterior)"
+      a\xE7\xE3o anterior)."
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
@@ -177,181 +182,182 @@ MonoBehaviour:
     title: Replay
     art: {fileID: 21300000, guid: 5521e6861c7f94e4db1cdcd6eba1bcf7, type: 3}
     text: "Repete a \xFAltima a\xE7\xE3o realizada (cartas de constru\xE7\xE3o n\xE3o
-      podem ser repetidas)"
+      podem ser reutilizadas)"
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:FishPlus
     title: Pescaria+
     art: {fileID: 21300000, guid: 20dfe1570210a9b4a80a17232c1c09ad, type: 3}
-    text: "Teste sua for\xE7a contra peixes maiores (rendimento maior)"
+    text: "Teste sua for\xE7a contra peixes maiores para obter um rendimento melhor."
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:WoodPlus
     title: Madeira+
     art: {fileID: 21300000, guid: ff98509903b1cb64582e500d9ebc20c7, type: 3}
-    text: "Corte \xE1rvores mais resistentes para obter um maior rendimento"
+    text: "Corte \xE1rvores mais resistentes para obter um maior rendimento."
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:FoodPlus
     title: Comida+
     art: {fileID: 21300000, guid: 4b66664cd7add734186fdff7ce38e2d0, type: 3}
-    text: "Prepare uma porção a mais com os mesmos ingredientes."
-    boxSize: {x: 240, y: 140}
+    text: Prepare mais comida com a mesma quantidade de ingredientes.
+    boxSize: {x: 244.2, y: 137.3}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:WateringCan
     title: Regador
     art: {fileID: 21300000, guid: 0e15f64c19208c4428b484072b3cf5ef, type: 3}
-    text: "Adianta em um dia o crescimento da planta\xE7\xE3o escolhida"
+    text: "Adianta em um dia o crescimento da planta\xE7\xE3o escolhida."
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:Fertilizer
     title: Adubo
     art: {fileID: 21300000, guid: 57582edae713d1d439866339ce37cb9e, type: 3}
-    text: "Aumenta em 1 unidade a próxima colheita do terreno adubado."
+    text: "Aumenta a produ\xE7\xE3o da colheita do terreno adubado em +1."
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:BuildHouse
     title: Construir Casa
     art: {fileID: 21300000, guid: 6fd42d970364d5c44b9aae27cae5b459, type: 3}
-    text: Escolha um lote livre para construir uma casa e expandir a comunidade
+    text: Escolha um lote livre para construir uma casa e expandir a comunidade.
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:BuildFence
     title: Construir Cerca
     art: {fileID: 21300000, guid: 06b2e014012eb5d49b157a77f0ed8bb3, type: 3}
-    text: Escolha um terreno para criar um cercado de animais
+    text: Escolha um terreno para criar um cercado de animais.
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:PlantJerimum
     title: Plantar Jerimum
     art: {fileID: 21300000, guid: 42e3ac39a1266e944be8cd384e8cecf3, type: 3}
-    text: "Plante em terreno arado.\n\nCresce em 3 dias e rende 4 jerimuns por terreno. Deixe mais um dia para colher 1 a mais.\n\nMilho maduro ao lado acelera o crescimento e dá +1 à colheita. Galinha protege contra pragas, e poço protege contra seca."
-    boxSize: {x: 240, y: 245.1}
+    text: "Plante em terreno arado.\n\nCresce em 3 dias e rende 4 jerimuns por terreno.
+      \n\nO po\xE7o anula o efeito da seca.\n\n"
+    boxSize: {x: 240, y: 173.12}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 204.1}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 0
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:PlaceCow
     title: Colocar Vaca
     art: {fileID: 21300000, guid: 27b7a0d62caa657418ab4b8905e7805f, type: 3}
-    text: "Colocar em cercado vazio.\n\nProdu\xE7\xE3o: 1 leite por dia\n\nB\xF4nus:\n\nAo
-      lado do po\xE7o de \xE1gua, as vacas ficam mais \xE0 vontade e adubam as planta\xE7\xF5es.
-      Cada tipo de planta adijacente tem seu valor de venda aumentado em +2 (esse
-      efeito vale para a fazenda inteira)\n"
-    boxSize: {x: 240, y: 211.9}
+    text: "Colocar em cercado vazio.\n\nProduz 1 leite por dia.\n\nAo lado do po\xE7o
+      de \xE1gua, as vacas ficam mais \xE0 vontade e adubam as planta\xE7\xF5es.
+      Cada tipo de planta adjacente tem seu valor de venda aumentado em +2 (esse
+      efeito vale para a fazenda inteira).\n"
+    boxSize: {x: 240, y: 270.9}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 220}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 0
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:PlaceChicken
     title: Colocar Galinha
     art: {fileID: 21300000, guid: e143afdec3040024ebbf7ee7ba860c0b, type: 3}
-    text: "Colocar em cercado vazio\n\nProdu\xE7\xE3o: 1 ovo por dia\n\nA galinha
-      pode se alimentar de insetos, anulando o efeito das pragas em qualquer planta\xE7\xE3o
-      adjacente"
-    boxSize: {x: 240, y: 148.6}
+    text: "Colocar em cercado vazio.\n\nProduz 1 ovo por dia.\n\nA galinha pode se
+      alimentar de insetos, anulando o efeito das pragas em qualquer planta\xE7\xE3o
+      adjacente."
+    boxSize: {x: 240, y: 205.6}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 121.3}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: A:FeedAnimals
     title: "Ra\xE7\xE3o"
     art: {fileID: 21300000, guid: d8cfdc7ff4ef112429df8fed28d52c78, type: 3}
-    text: "Alimenta os animais para duplicar a produ\xE7\xE3o de leite ou ovos do
-      dia"
+    text: "Alimenta os animais para aumentar a produ\xE7\xE3o de leite ou ovos em
+      +1."
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
     choiceFontSize: 12
     font: {fileID: 12800000, guid: 6b4b9b33ff35a9341912c1d19b4aca09, type: 3}
     bold: 1
-    fontSize: 14
+    fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
     backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
   - key: E:Drought
     title: Seca
     art: {fileID: 0}
-    text: "A seca reduziu a quantidade de peixes e dificultou o crescimento das plantas\n\nDura\xE7\xE3o:
+    text: "A seca reduziu a quantidade de peixes e dificultou o crescimento das plantas.\n\nDura\xE7\xE3o:
       2 dias"
     boxSize: {x: 390, y: 220}
     choiceOffset: {x: 0, y: 0}
@@ -366,7 +372,7 @@ MonoBehaviour:
   - key: E:Pests
     title: Pragas
     art: {fileID: 0}
-    text: "As pragas destru\xEDram parte das planta\xE7\xF5es\n\nA cultura afetada
+    text: "As pragas destru\xEDram parte das planta\xE7\xF5es.\n\nA cultura afetada
       regride no crescimento, inclusive as plantas prontas.\n\nDura\xE7\xE3o: 2 dias"
     boxSize: {x: 390, y: 220}
     choiceOffset: {x: 0, y: 0}
@@ -381,8 +387,8 @@ MonoBehaviour:
   - key: E:Rain
     title: Chuva
     art: {fileID: 0}
-    text: "Por conta da chuva, as planta\xE7\xF5es crescem mais r\xE1pido  e o impacto
-      da coleta de madeira \xE9 menor\n\nDura\xE7\xE3o: 1 dia"
+    text: "Por conta da chuva, as planta\xE7\xF5es crescem mais r\xE1pido e o impacto
+      da coleta de madeira \xE9 menor.\n\nDura\xE7\xE3o: 1 dia"
     boxSize: {x: 390, y: 220}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 0, y: 0}
@@ -397,8 +403,8 @@ MonoBehaviour:
     title: Comadre Fulozinha
     art: {fileID: 0}
     text: "Voc\xEA exagerou na explora\xE7\xE3o das florestas e a Comadre Fulozinha
-      deixou um dos trabalhadores desorientado\n\nO trabalhador fica sem a\xE7\xE3o
-      e n\xE3o pode ser alimentado por 1 dia"
+      deixou um dos trabalhadores desorientado.\n\nO trabalhador fica sem a\xE7\xE3o
+      e n\xE3o pode ser alimentado por 1 dia."
     boxSize: {x: 390, y: 239.9}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 0, y: 0}
@@ -412,7 +418,7 @@ MonoBehaviour:
   - key: E:Calm
     title: Dia tranquilo
     art: {fileID: 0}
-    text: Hoje parece ser um dia tranquilo, sem muitas novidades
+    text: Hoje parece ser um dia tranquilo, sem muitas novidades.
     boxSize: {x: 390, y: 220}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 0, y: 0}
@@ -427,7 +433,7 @@ MonoBehaviour:
     title: "Cabe\xE7a de Cuia"
     art: {fileID: 0}
     text: "Com tantos peixes guardados, voc\xEA atraiu a aten\xE7\xE3o do Cabe\xE7a
-      de Cuia. Ele te fez uma visita durante a noite.\n\nVoc\xEA perdeu {peixesRoubados}."
+      de Cuia. Ele te fez uma visita durante \xE0 noite.\n\nVoc\xEA perde 2 peixes."
     boxSize: {x: 390, y: 220}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 0, y: 0}
@@ -441,8 +447,8 @@ MonoBehaviour:
   - key: E:Reforestation
     title: Reflorestamento
     art: {fileID: 0}
-    text: "A explora\xE7\xE3o sustent\xE1vel permitiu reflorestar parte da floresta\n\nVoc\xEA
-      recebe 4 madeiras"
+    text: "A explora\xE7\xE3o sustent\xE1vel permitiu reflorestar parte da floresta.\n\nVoc\xEA
+      recebe 4 madeiras."
     boxSize: {x: 390, y: 220}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 0, y: 0}

@@ -34,7 +34,9 @@ public sealed class InventoryTrading : MonoBehaviour
         _ => 0
     };
 
-    public int GetPrice(SaleItem item)
+    public int GetPrice(SaleItem item) => GetPrice(item, out _);
+
+    internal int GetPrice(SaleItem item, out bool hasSaleBonus)
     {
         GameBalance balance = GameBalance.Current;
         int price = item switch
@@ -52,6 +54,7 @@ public sealed class InventoryTrading : MonoBehaviour
             SaleItem.Eggs => balance != null ? balance.eggPrice : eggPrice,
             _ => 0
         };
+        int basePrice = price;
         if (item == SaleItem.Corn || item == SaleItem.Pumpkin || item == SaleItem.Jerimum)
         {
             CropType crop = item == SaleItem.Corn ? CropType.Corn :
@@ -60,6 +63,7 @@ public sealed class InventoryTrading : MonoBehaviour
                 (MandalaSynergy.Instance != null ?
                     MandalaSynergy.Instance.CropSalePriceBonus(crop) : 0));
         }
+        hasSaleBonus = price > basePrice;
         return price;
     }
 

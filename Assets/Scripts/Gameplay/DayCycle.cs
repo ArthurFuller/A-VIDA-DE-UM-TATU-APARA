@@ -78,15 +78,15 @@ public sealed class DayCycle : MonoBehaviour
         Array.Find(workers, worker => worker != null && worker.isActiveAndEnabled && !worker.UsedToday);
     internal bool FirstDayPreparationFinished { get; private set; }
 
-    public bool TryRepeatAnimalProduction(out int milk, out int eggs)
+    public bool TryFeedAnimal(Plot plot, out int milk, out int eggs)
     {
-        milk = todayMilk;
-        eggs = todayEggs;
+        milk = plot != null && plot.Animal == AnimalKind.Cow ? 1 : 0;
+        eggs = plot != null && plot.Animal == AnimalKind.Chicken ? 1 : 0;
         if (milk + eggs == 0 || resources == null) return false;
         resources.AddAnimalProducts(milk, eggs);
         resources.RecordProduction(SaleItem.Milk, milk);
         resources.RecordProduction(SaleItem.Eggs, eggs);
-        AnimateAnimalGains();
+        plot.PulseAnimal();
         return true;
     }
 

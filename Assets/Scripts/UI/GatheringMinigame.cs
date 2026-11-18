@@ -78,6 +78,7 @@ public sealed class GatheringMinigame : MonoBehaviour
     private Image barImage;
     private Layout panelLayout, barLayout, markerLayout, titleLayout;
     private bool layoutCaptured, fishing, fishingPlus, resolving, entering;
+    private int fishingYieldReduction;
     private bool fishingTensionStarted;
     private int round, hits;
     private float difficultyMultiplier, initialTargetWidth, previousTargetCenter;
@@ -116,7 +117,7 @@ public sealed class GatheringMinigame : MonoBehaviour
     private void OnDisable() => ClearWoodMissFlash();
 
     // A madeira devolve a classificação da rodada. A pesca devolve o total de peixes.
-    public void Begin(ActivityKind activity, Action<int> onCompleted, int fishingDifficulty = 0,
+    public void Begin(ActivityKind activity, Action<int> onCompleted, int droughtFishingReduction = 0,
         Action onWoodHit = null, Action<bool> onFishingTension = null,
         Action onFishDropped = null)
     {
@@ -139,7 +140,8 @@ public sealed class GatheringMinigame : MonoBehaviour
         resolving = false;
         fishingTensionStarted = false;
         round = hits = 0;
-        difficultyMultiplier = fishing ? 1f + Mathf.Max(0, fishingDifficulty) * 0.4f : 1f;
+        difficultyMultiplier = 1f;
+        fishingYieldReduction = fishing ? Mathf.Max(0, droughtFishingReduction) : 0;
         previousTargetCenter = float.NaN;
         group.alpha = 1f;
         group.interactable = true;
@@ -304,6 +306,8 @@ public sealed class GatheringMinigame : MonoBehaviour
             return;
         }
         int fishCount = fishingPlus ? (rating > 0 ? 4 : 2) : (rating > 0 ? 2 : 1);
+        if (fishingYieldReduction > 0)
+            fishCount = Mathf.Max(1, fishCount / (1 + fishingYieldReduction));
         Sequence sequence = DOTween.Sequence().SetTarget(this);
         panel.DOKill();
         panel.localScale = panelLayout.Scale;

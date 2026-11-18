@@ -631,8 +631,8 @@ public sealed class ActionResolver : MonoBehaviour
         CommitAction(worker, ActivityKind.FeedAnimals, "distribuindo ração", card);
         MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
-            if (dayCycle.TryRepeatAnimalProduction(out int milk, out int eggs))
-                feedback.ShowMessage("Ração: +" + milk + " leite e +" + eggs + " ovos.");
+            if (dayCycle.TryFeedAnimal(plot, out int milk, out int eggs))
+                feedback.ShowMessage(milk > 0 ? "Ração: +1 leite." : "Ração: +1 ovo.");
             AudioManager.Play(feedingCue);
             SendWorkerHome(worker);
         });

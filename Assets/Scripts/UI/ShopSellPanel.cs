@@ -10,6 +10,7 @@ public sealed class ShopSellPanel : MonoBehaviour
     [SerializeField] private Text totalText;
     [SerializeField] private Button sellButton;
     [SerializeField] private Button resetButton;
+    private MandalaSynergy mandala;
     private static readonly SaleItem[] Items =
     {
         SaleItem.Wood, SaleItem.Fish, SaleItem.Corn,
@@ -26,6 +27,8 @@ public sealed class ShopSellPanel : MonoBehaviour
     private void OnEnable()
     {
         if (resources != null) resources.Changed += RefreshDisplay;
+        mandala = MandalaSynergy.Instance;
+        if (mandala != null) mandala.PlotStateChanged += RefreshDisplay;
         if (rows != null)
             foreach (ShopQuantityRow row in rows)
                 if (row != null) row.Changed += RefreshDisplay;
@@ -35,6 +38,8 @@ public sealed class ShopSellPanel : MonoBehaviour
     private void OnDisable()
     {
         if (resources != null) resources.Changed -= RefreshDisplay;
+        if (mandala != null) mandala.PlotStateChanged -= RefreshDisplay;
+        mandala = null;
         if (rows != null)
             foreach (ShopQuantityRow row in rows)
                 if (row != null) row.Changed -= RefreshDisplay;
@@ -74,8 +79,8 @@ public sealed class ShopSellPanel : MonoBehaviour
             ShopQuantityRow row = rows[i];
             if (row == null) continue;
             SaleItem item = Items[i];
-            int price = trading.GetPrice(item);
-            row.SetPrice(price);
+            int price = trading.GetPrice(item, out bool hasSaleBonus);
+            row.SetPrice(price, hasSaleBonus);
             row.SetStock(trading.GetStock(item));
             row.SetLimit(trading.GetStock(item));
             total += (long)row.Quantity * price;
