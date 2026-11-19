@@ -998,19 +998,41 @@ public sealed class GS2FrontEnd : MonoBehaviour
         if (items == null || items.rects.Length == 0) return null;
         RectMask2D mask = EnableFrameMask(page, frame, sequence);
         Rect inner = mask != null ? FitMaskToFrame(mask, frame) : default;
+        // No menu principal a moldura desliza separadamente dos controles.
+        RectTransform viewport = background != null && mask != null
+            ? frame.canvas.rootCanvas.transform as RectTransform : null;
+        var visibility = new CanvasGroup[items.rects.Length];
+        var restingAlpha = new float[items.rects.Length];
 
         // A página já começou a deslizar quando os primeiros controles aparecem.
         float waveStart = duration * 0.5f;
         for (int i = 0; i < items.rects.Length; i++)
         {
             RectTransform item = items.rects[i];
+            if (!item.TryGetComponent(out CanvasGroup group))
+                group = item.gameObject.AddComponent<CanvasGroup>();
+            visibility[i] = group;
+            float alpha = restingAlpha[i] = group.alpha;
+            group.alpha = 0f;
             float homeX = items.positions[i].x;
             float offset = mask != null ? OffsetOutsideFrame(item, frame.rectTransform, inner, Vector2.right).x :
                 distance;
+            if (viewport != null)
+                offset = Mathf.Max(offset, OffsetOutsideFrame(item, viewport, viewport.rect, Vector2.right).x);
             SetHorizontalPosition(item, homeX + offset);
-            sequence.Insert(waveStart + i * 0.035f,
+            float entryTime = waveStart + i * 0.035f;
+            sequence.InsertCallback(entryTime, () => { if (group != null) group.alpha = alpha; });
+            sequence.Insert(entryTime,
                 item.DOAnchorPosX(homeX, duration).SetEase(Ease.OutCubic));
         }
+        sequence.onKill += () =>
+        {
+            for (int i = 0; i < visibility.Length; i++)
+            {
+                if (visibility[i] != null) visibility[i].alpha = restingAlpha[i];
+                if (items.rects[i] != null) SetHorizontalPosition(items.rects[i], items.positions[i].x);
+            }
+        };
 
         return mask;
     }

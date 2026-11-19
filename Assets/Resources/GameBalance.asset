@@ -83,12 +83,16 @@ MonoBehaviour:
   thirdHouseDeliveries: 4
   houseRewardLimit: 3
   minimumOffers: 2
-  maximumOffers: 2
+  maximumOffers: 3
   campaignDays: 12
   returningOffersPerMarket: 1
   dailyMissionOffers: 1
+  missedMealPenalty: 2
+  undeliveredOrderPenalty: 3
+  undevelopedPlotPenalty: 5
+  unbuiltHousePenalty: 7
   generalEventChance: 0.35
-  comadreChance: 0.5
+  comadreChance: 0.35
   droughtDurationDays: 2
   pestDurationDays: 2
   rainDurationDays: 1
@@ -101,7 +105,7 @@ MonoBehaviour:
   comadreAbsenceDays: 1
   rainForestRecovery: 2
   headOfCuiaMinimumFish: 8
-  headOfCuiaChancePercent: 25
+  headOfCuiaChancePercent: 35
   headOfCuiaTheftPercent: 20
   daysWithoutWoodForReforestation: 3
   reforestationWood: 4

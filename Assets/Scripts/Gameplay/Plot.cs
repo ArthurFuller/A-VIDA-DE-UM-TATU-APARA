@@ -132,6 +132,12 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
 
     public event Action StateChanged;
 
+    private void NotifyStateChanged()
+    {
+        if (actionResolver != null) actionResolver.InvalidatePlotHighlights();
+        StateChanged?.Invoke();
+    }
+
     private void Awake()
     {
         if (growthBar != null) growthBarRotation = growthBar.transform.localRotation;
@@ -227,6 +233,8 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     public bool CanUse(ActivityKind activity, int currentDay, SeedCatalog catalog)
     {
         if (isWater) return false;
+        if (activity == ActivityKind.Plow && actionResolver != null && actionResolver.IsPlowing(this))
+            return false;
         return activity switch
         {
             ActivityKind.Plow or ActivityKind.BuildFence =>
@@ -246,16 +254,15 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
 
     public static void ShowAvailable(ActivityKind activity, int currentDay, SeedCatalog catalog)
     {
+        foreach (JoinedVisual joined in joinedVisuals.Values)
+            joined.ShowAvailable(activity, currentDay, catalog);
         foreach (Plot plot in allPlots)
         {
             if (plot == null) continue;
-            bool groupAvailable = plot.joinedVisual != null &&
-                plot.joinedVisual.AllCanUse(activity, currentDay, catalog);
+            bool groupAvailable = plot.joinedVisual != null && plot.joinedVisual.HasOutline;
             plot.SetHighlight(!groupAvailable &&
                 plot.CanUse(activity, currentDay, catalog));
         }
-        foreach (JoinedVisual joined in joinedVisuals.Values)
-            joined.SetHighlight(joined.AllCanUse(activity, currentDay, catalog));
     }
 
     public static bool HasAvailable(ActivityKind activity, int currentDay, SeedCatalog catalog)
@@ -382,7 +389,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             visual.localPosition = plowedVisualHome + Vector3.down * 0.18f;
             visual.DOLocalMove(plowedVisualHome, 0.42f).SetEase(Ease.OutCubic);
         }
-        StateChanged?.Invoke();
+        NotifyStateChanged();
     }
 
     public void Plant(CropType crop, int currentDay, SeedCatalog catalog)
@@ -404,7 +411,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         RefreshGrowth(currentDay, catalog);
         RefreshJoinedPlots();
         if (mandalaGround != null) mandalaGround.Invalidate();
-        StateChanged?.Invoke();
+        NotifyStateChanged();
         if (MandalaSynergy.Instance != null)
             MandalaSynergy.Instance.ApplyGrowthBonuses(currentDay, catalog);
     }
@@ -419,28 +426,24 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
 
     public int GrowthAge(int day) => day + growthAdjustment - PlantedDay;
 
-    public List<Plot> ReadyConnectedPlots(int currentDay, SeedCatalog catalog)
-    {
-        return ConnectedPlots(plot => plot.IsReady(currentDay, catalog));
-    }
+    public List<Plot> ReadyConnectedPlots(int currentDay, SeedCatalog catalog) =>
+        ConnectedPlotsFor(ActivityKind.Harvest, currentDay, catalog);
 
     public IReadOnlyList<Plot> JoinedPlots => joinedVisual?.Members;
 
+    private static bool AffectsJoinedPlots(ActivityKind activity) =>
+        activity is ActivityKind.Harvest or ActivityKind.WateringCan or
+            ActivityKind.Fertilizer or ActivityKind.FeedAnimals;
+
     public List<Plot> ConnectedPlotsFor(ActivityKind activity, int currentDay, SeedCatalog catalog)
     {
-        return ConnectedPlots(plot => plot.CanUse(activity, currentDay, catalog));
-    }
-
-    private List<Plot> ConnectedPlots(System.Predicate<Plot> eligible)
-    {
         var ready = new List<Plot>();
-        if (eligible(this)) ready.Add(this);
-        if (joinedVisual == null) return ready;
+        if (!CanUse(activity, currentDay, catalog)) return ready;
+        ready.Add(this);
+        if (!AffectsJoinedPlots(activity) || joinedVisual == null) return ready;
 
-        var remaining = new List<Plot>();
-        foreach (Plot member in joinedVisual.Members)
-            if (member != null && member != this && eligible(member))
-                remaining.Add(member);
+        List<Plot> remaining = joinedVisual.EligibleMembers(activity, currentDay, catalog);
+        remaining.Remove(this);
         Plot previous = this;
         while (remaining.Count > 0)
         {
@@ -563,14 +566,14 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         if (growthBar != null) growthBar.SetActive(false);
         RefreshJoinedPlots();
         if (mandalaGround != null) mandalaGround.Invalidate();
-        StateChanged?.Invoke();
+        NotifyStateChanged();
         return harvested;
     }
 
     public void AdvanceGrowth(int days)
     {
         if (Crop != CropType.None) growthAdjustment += days;
-        StateChanged?.Invoke();
+        NotifyStateChanged();
     }
 
     public void RegressGrowthFromPests(int stages, int currentDay, SeedCatalog catalog)
@@ -606,7 +609,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     {
         if (isWater || Crop == CropType.None || fertilized) return;
         fertilized = true;
-        StateChanged?.Invoke();
+        NotifyStateChanged();
     }
 
     public void BuildFence()
@@ -616,7 +619,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         if (fenceParts != null && fenceBasePositions != null) FormFencePerimeter(true);
         else AudioManager.Play(SoundCue.FenceBuilt);
         RefreshJoinedPlots();
-        StateChanged?.Invoke();
+        NotifyStateChanged();
     }
 
     private Plot[] FencedNeighbors()
@@ -759,7 +762,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         root.transform.DOScale(1f, 0.32f).SetEase(Ease.OutBack)
             .OnComplete(() => root.transform.DOPunchScale(Vector3.one * 0.08f, 0.2f));
         RefreshFencedPlots();
-        StateChanged?.Invoke();
+        NotifyStateChanged();
         return true;
     }
 
@@ -941,18 +944,45 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         private readonly Mesh surfaceMesh;
         private readonly Mesh bridgeMesh;
         private readonly Mesh outlineMesh;
+        private Mesh eligibleOutline;
         private readonly Material outlineMaterial;
         private readonly Transform outline;
+        private readonly Vector2 outlineCenter;
+        private readonly float outlineHeight;
         private readonly List<Transform> fencePieces = new List<Transform>();
         private bool hovered;
         public bool IsAnimalGroup { get; }
         public bool UsesDetailedPlowed { get; }
+        public bool HasOutline => outline != null && outline.gameObject.activeSelf;
 
-        public bool AllCanUse(ActivityKind activity, int currentDay, SeedCatalog catalog)
+        public List<Plot> EligibleMembers(ActivityKind activity, int currentDay, SeedCatalog catalog) =>
+            members.FindAll(plot => plot != null && plot.CanUse(activity, currentDay, catalog));
+
+        public void ShowAvailable(ActivityKind activity, int currentDay, SeedCatalog catalog)
         {
-            foreach (Plot plot in members)
-                if (plot == null || !plot.CanUse(activity, currentDay, catalog)) return false;
-            return true;
+            if (!AffectsJoinedPlots(activity) || outlineMaterial == null)
+            {
+                SetHighlight(false);
+                return;
+            }
+
+            ClearEligibleOutline();
+            List<Plot> eligible = EligibleMembers(activity, currentDay, catalog);
+            if (eligible.Count < 2 || eligible.Count == members.Count)
+            {
+                SetHighlight(eligible.Count >= 2 && outlineMesh.vertexCount > 0);
+                return;
+            }
+
+            List<Rect> regions = BuildRegions(eligible);
+            bool[,] filled = FillRegionGrid(regions, out List<float> xs, out List<float> zs);
+            var center = new Vector2((xs[0] + xs[xs.Count - 1]) * 0.5f,
+                (zs[0] + zs[zs.Count - 1]) * 0.5f);
+            eligibleOutline = BuildOutline(CollectBorder(xs, zs, filled), center, outlineHeight,
+                IsAnimalGroup ? FenceOutlinePadding : 0f);
+            outline.localPosition = new Vector3(center.x - outlineCenter.x, 0f, center.y - outlineCenter.y);
+            outline.GetComponent<MeshFilter>().sharedMesh = eligibleOutline;
+            SetHighlight(eligibleOutline.vertexCount > 0);
         }
 
         public JoinedVisual(List<Plot> connected)
@@ -1010,7 +1040,9 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             }
             root.GetComponent<PlotJoinedSurface>().Configure(connected, SetHovered);
 
-            outlineMesh = BuildOutline(border, center, surfaceTop + 0.015f,
+            outlineCenter = center;
+            outlineHeight = surfaceTop + 0.015f;
+            outlineMesh = BuildOutline(border, outlineCenter, outlineHeight,
                 IsAnimalGroup ? FenceOutlinePadding : 0f);
             Shader shader = Resources.Load<Shader>("PlotOutline");
             outlineMaterial = shader != null ? new Material(shader) : null;
@@ -1048,9 +1080,22 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
 
         public void SetHighlight(bool visible)
         {
+            if (!visible) ClearEligibleOutline();
             if (outline == null || outlineMaterial == null) return;
             outline.gameObject.SetActive(visible);
             PulseOutline();
+        }
+
+        private void ClearEligibleOutline()
+        {
+            if (eligibleOutline == null) return;
+            if (outline != null)
+            {
+                outline.localPosition = Vector3.zero;
+                outline.GetComponent<MeshFilter>().sharedMesh = outlineMesh;
+            }
+            UnityEngine.Object.Destroy(eligibleOutline);
+            eligibleOutline = null;
         }
 
         public void SetHovered(bool value)
@@ -1110,6 +1155,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
 
         private void DestroyAssets()
         {
+            ClearEligibleOutline();
             if (root != null) UnityEngine.Object.Destroy(root);
             if (surfaceMesh != null) UnityEngine.Object.Destroy(surfaceMesh);
             if (bridgeMesh != null) UnityEngine.Object.Destroy(bridgeMesh);
@@ -1200,11 +1246,10 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             triangles.Add(first); triangles.Add(first + 2); triangles.Add(first + 3);
         }
 
-        private static Mesh BuildSurface(List<Rect> regions, Vector2 center, float top,
-            float bottom, out List<BorderEdge> border)
+        private static bool[,] FillRegionGrid(List<Rect> regions, out List<float> xs, out List<float> zs)
         {
-            List<float> xs = Coordinates(regions, true);
-            List<float> zs = Coordinates(regions, false);
+            xs = Coordinates(regions, true);
+            zs = Coordinates(regions, false);
             var filled = new bool[xs.Count - 1, zs.Count - 1];
             for (int x = 0; x < xs.Count - 1; x++)
                 for (int z = 0; z < zs.Count - 1; z++)
@@ -1214,9 +1259,47 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
                     foreach (Rect region in regions)
                         if (region.Contains(point)) { filled[x, z] = true; break; }
                 }
+            return filled;
+        }
+
+        private static List<BorderEdge> CollectBorder(List<float> xs, List<float> zs, bool[,] filled)
+        {
+            var border = new List<BorderEdge>();
+            for (int x = 0; x < xs.Count - 1; x++)
+                for (int z = 0; z < zs.Count - 1; z++)
+                {
+                    if (!filled[x, z]) continue;
+                    if (z == 0 || !filled[x, z - 1])
+                        border.Add(new BorderEdge(true, zs[z], xs[x], xs[x + 1], -1));
+                    if (z == zs.Count - 2 || !filled[x, z + 1])
+                        border.Add(new BorderEdge(true, zs[z + 1], xs[x], xs[x + 1], 1));
+                    if (x == 0 || !filled[x - 1, z])
+                        border.Add(new BorderEdge(false, xs[x], zs[z], zs[z + 1], -1));
+                    if (x == xs.Count - 2 || !filled[x + 1, z])
+                        border.Add(new BorderEdge(false, xs[x + 1], zs[z], zs[z + 1], 1));
+                }
+            return border;
+        }
+
+        private static void BorderEndpoints(BorderEdge edge, out Vector2 start, out Vector2 end)
+        {
+            // Sentido: a área ocupada fica sempre à esquerda do segmento.
+            Vector2 a = edge.Horizontal ? new Vector2(edge.Start, edge.Line) :
+                new Vector2(edge.Line, edge.Start);
+            Vector2 b = edge.Horizontal ? new Vector2(edge.End, edge.Line) :
+                new Vector2(edge.Line, edge.End);
+            bool reverse = edge.Horizontal ? edge.Normal > 0 : edge.Normal < 0;
+            start = reverse ? b : a;
+            end = reverse ? a : b;
+        }
+
+        private static Mesh BuildSurface(List<Rect> regions, Vector2 center, float top,
+            float bottom, out List<BorderEdge> border)
+        {
+            bool[,] filled = FillRegionGrid(regions, out List<float> xs, out List<float> zs);
+            border = CollectBorder(xs, zs, filled);
             var vertices = new List<Vector3>();
             var triangles = new List<int>();
-            border = new List<BorderEdge>();
             for (int x = 0; x < xs.Count - 1; x++)
                 for (int z = 0; z < zs.Count - 1; z++)
                 {
@@ -1226,35 +1309,16 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
                     AddQuad(vertices, triangles, new Vector3(x0, top, z0),
                         new Vector3(x0, top, z1), new Vector3(x1, top, z1),
                         new Vector3(x1, top, z0));
-                    if (z == 0 || !filled[x, z - 1])
-                    {
-                        border.Add(new BorderEdge(true, zs[z], xs[x], xs[x + 1], -1));
-                        AddQuad(vertices, triangles, new Vector3(x0, bottom, z0),
-                            new Vector3(x0, top, z0), new Vector3(x1, top, z0),
-                            new Vector3(x1, bottom, z0));
-                    }
-                    if (z == zs.Count - 2 || !filled[x, z + 1])
-                    {
-                        border.Add(new BorderEdge(true, zs[z + 1], xs[x], xs[x + 1], 1));
-                        AddQuad(vertices, triangles, new Vector3(x1, bottom, z1),
-                            new Vector3(x1, top, z1), new Vector3(x0, top, z1),
-                            new Vector3(x0, bottom, z1));
-                    }
-                    if (x == 0 || !filled[x - 1, z])
-                    {
-                        border.Add(new BorderEdge(false, xs[x], zs[z], zs[z + 1], -1));
-                        AddQuad(vertices, triangles, new Vector3(x0, bottom, z1),
-                            new Vector3(x0, top, z1), new Vector3(x0, top, z0),
-                            new Vector3(x0, bottom, z0));
-                    }
-                    if (x == xs.Count - 2 || !filled[x + 1, z])
-                    {
-                        border.Add(new BorderEdge(false, xs[x + 1], zs[z], zs[z + 1], 1));
-                        AddQuad(vertices, triangles, new Vector3(x1, bottom, z0),
-                            new Vector3(x1, top, z0), new Vector3(x1, top, z1),
-                            new Vector3(x1, bottom, z1));
-                    }
                 }
+            foreach (BorderEdge edge in border)
+            {
+                BorderEndpoints(edge, out Vector2 start, out Vector2 end);
+                start -= center;
+                end -= center;
+                AddQuad(vertices, triangles, new Vector3(start.x, bottom, start.y),
+                    new Vector3(start.x, top, start.y), new Vector3(end.x, top, end.y),
+                    new Vector3(end.x, bottom, end.y));
+            }
             var mesh = new Mesh { name = "Solo unificado" };
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0);
@@ -1272,14 +1336,9 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             var ends = new List<Vector2>(border.Count);
             foreach (BorderEdge edge in border)
             {
-                // Sentido: a área ocupada fica sempre à esquerda do segmento.
-                Vector2 a = edge.Horizontal ? new Vector2(edge.Start, edge.Line) :
-                    new Vector2(edge.Line, edge.Start);
-                Vector2 b = edge.Horizontal ? new Vector2(edge.End, edge.Line) :
-                    new Vector2(edge.Line, edge.End);
-                bool reverse = edge.Horizontal ? edge.Normal > 0 : edge.Normal < 0;
-                starts.Add(reverse ? b : a);
-                ends.Add(reverse ? a : b);
+                BorderEndpoints(edge, out Vector2 start, out Vector2 end);
+                starts.Add(start);
+                ends.Add(end);
             }
             var used = new bool[border.Count];
             var vertices = new List<Vector3>();

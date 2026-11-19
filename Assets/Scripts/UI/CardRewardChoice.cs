@@ -33,7 +33,8 @@ public sealed class CardRewardChoice : MonoBehaviour
     private readonly ActivityCardDrag[] offered = new ActivityCardDrag[2];
     private readonly Vector2[] homes = new Vector2[2];
     private readonly Image[] glows = new Image[2];
-    private readonly Vector2[] glowHomes = new Vector2[2];
+    // Keep this padding in sync with the contour in CardRewardGlow.shader.
+    private const float GlowPaddingScale = 1.32f;
     private readonly Vector2[] rerollHomes = new Vector2[2];
     private readonly bool[] rerolled = new bool[2];
     private readonly List<ActivityCardDrag> available = new List<ActivityCardDrag>();
@@ -117,8 +118,9 @@ public sealed class CardRewardChoice : MonoBehaviour
             {
                 homes[i] = choiceCards[i].anchoredPosition;
                 Transform glow = choiceCards[i].parent.Find("Brilho " + (i + 1));
-                if (glow != null) glows[i] = glow.GetComponent<Image>();
-                if (glows[i] != null) glowHomes[i] = glows[i].rectTransform.anchoredPosition;
+                if (glow != null && glow.TryGetComponent(out Image glowImage) &&
+                    glowImage.material != Graphic.defaultGraphicMaterial)
+                    glows[i] = glowImage;
                 var tip = new GameObject("Descrição da carta", typeof(RectTransform),
                     typeof(CanvasRenderer), typeof(Image));
                 RectTransform tipRect = (RectTransform)tip.transform;
@@ -175,8 +177,6 @@ public sealed class CardRewardChoice : MonoBehaviour
         transition?.Kill();
         foreach (RectTransform card in choiceCards)
             if (card != null) card.DOKill();
-        foreach (Image glow in glows)
-            if (glow != null) glow.DOKill();
         foreach (Button button in rerollButtons)
             if (button != null) button.transform.DOKill();
     }
@@ -237,6 +237,28 @@ public sealed class CardRewardChoice : MonoBehaviour
         return new Rect(rect.center.x - size.x * 0.5f + size.x * 0.145f,
             rect.center.y - size.y * 0.5f + size.y * 0.047f,
             size.x * 0.708f, size.y * 0.926f);
+    }
+
+    private void LateUpdate()
+    {
+        if (group == null || group.alpha <= 0f) return;
+        for (int i = 0; i < glows.Length; i++)
+        {
+            Image glow = glows[i];
+            if (glow == null || !glow.isActiveAndEnabled) continue;
+            Image art = choiceArt[i];
+            if (art == null) continue;
+
+            Rect bounds = CardArtRect(art);
+            RectTransform artRect = art.rectTransform;
+            RectTransform glowRect = glow.rectTransform;
+            Vector2 size = bounds.size * GlowPaddingScale;
+            if (glowRect.sizeDelta != size) glowRect.sizeDelta = size;
+            glowRect.SetPositionAndRotation(artRect.TransformPoint(bounds.center), artRect.rotation);
+            Vector3 scale = choiceCards[i].localScale;
+            if (i == 1) scale.x = -scale.x;
+            glowRect.localScale = scale;
+        }
     }
 
     private void KeepDescriptionOnScreen(RectTransform tip, int index, RectTransform root)
@@ -355,11 +377,11 @@ public sealed class CardRewardChoice : MonoBehaviour
         {
             RectTransform card = choiceCards[i];
             if (card != null)
+            {
                 EnterFromBelow(card, homes[i], transitionDuration + i * cardWaveDelay,
                     cardEntranceDuration);
-            if (glows[i] != null)
-                EnterFromBelow(glows[i].rectTransform, glowHomes[i],
-                    transitionDuration + i * cardWaveDelay, cardEntranceDuration);
+                if (glows[i] != null) glows[i].gameObject.SetActive(true);
+            }
             if (i >= rerollButtons.Length || rerollButtons[i] == null ||
                 !rerollButtons[i].gameObject.activeSelf) continue;
             RectTransform button = (RectTransform)rerollButtons[i].transform;
@@ -380,9 +402,6 @@ public sealed class CardRewardChoice : MonoBehaviour
                     if (card != null)
                         card.DOAnchorPosY(homes[i].y + floatDistance, floatDuration)
                             .SetLoops(-1, LoopType.Yoyo).SetEase(Ease.InOutSine);
-                    if (glows[i] != null)
-                        glows[i].DOFade(0.7f, floatDuration).SetLoops(-1, LoopType.Yoyo)
-                            .SetEase(Ease.InOutSine);
                 }
             });
         if (panel != null)
@@ -404,7 +423,11 @@ public sealed class CardRewardChoice : MonoBehaviour
         innerMask = area.GetComponent<RectMask2D>();
         for (int i = 0; i < 2; i++)
         {
-            if (glows[i] != null) glows[i].transform.SetParent(innerViewport, false);
+            if (glows[i] != null)
+            {
+                glows[i].transform.SetParent(innerViewport, false);
+                glows[i].transform.SetAsFirstSibling();
+            }
             if (choiceCards[i] != null) choiceCards[i].SetParent(innerViewport, false);
             if (i < rerollButtons.Length && rerollButtons[i] != null)
                 rerollButtons[i].transform.SetParent(innerViewport, false);
@@ -579,17 +602,9 @@ public sealed class CardRewardChoice : MonoBehaviour
                 choiceCards[i].anchoredPosition = homes[i];
             }
         foreach (Image glow in glows)
-            if (glow != null)
-            {
-                glow.DOKill();
-                Color color = glow.color;
-                glow.color = new Color(color.r, color.g, color.b, 0.38f);
-            }
+            if (glow != null) glow.gameObject.SetActive(false);
         for (int i = 0; i < 2; i++)
-        {
-            if (glows[i] != null) glows[i].rectTransform.anchoredPosition = glowHomes[i];
             if (i < rerollButtons.Length && rerollButtons[i] != null)
                 ((RectTransform)rerollButtons[i].transform).anchoredPosition = rerollHomes[i];
-        }
     }
 }

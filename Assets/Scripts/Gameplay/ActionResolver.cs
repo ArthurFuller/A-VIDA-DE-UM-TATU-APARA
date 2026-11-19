@@ -82,6 +82,7 @@ public sealed class ActionResolver : MonoBehaviour
     private ActivityCardDrag pendingPlotCard;
     private ActivityCardDrag pendingReplayDisposable;
     private ActivityKind pendingPlotAction;
+    private bool plotHighlightsDirty;
     private readonly System.Collections.Generic.HashSet<Plot> plotsBeingPlowed = new();
     private int busyWorkers;
     private bool housePreviewBusy;
@@ -197,6 +198,22 @@ public sealed class ActionResolver : MonoBehaviour
     {
         foreach (GatheringTask task in forestTasks) UpdateGathering(task);
         foreach (GatheringTask task in fishingTasks) UpdateGathering(task);
+    }
+
+    internal void InvalidatePlotHighlights()
+    {
+        if (pendingPlotWorker != null && pendingPlotAction != ActivityKind.BuildHouse)
+            plotHighlightsDirty = true;
+    }
+
+    internal bool IsPlowing(Plot plot) => plotsBeingPlowed.Contains(plot);
+
+    private void LateUpdate()
+    {
+        if (!plotHighlightsDirty) return;
+        plotHighlightsDirty = false;
+        if (pendingPlotWorker != null && pendingPlotAction != ActivityKind.BuildHouse && dayCycle != null)
+            Plot.ShowAvailable(pendingPlotAction, dayCycle.CurrentDay, seedCatalog);
     }
 
     private static GatheringTask[] CreateGatheringPositions(ActivityKind activity, Transform destination,
@@ -473,6 +490,7 @@ public sealed class ActionResolver : MonoBehaviour
     private void ClearPendingPlot()
     {
         bool hadSelection = pendingPlotWorker != null;
+        plotHighlightsDirty = false;
         Plot.ClearHighlights();
         HouseSite.ClearHighlights();
         pendingPlotCard?.ReturnFromSelection();
@@ -613,7 +631,7 @@ public sealed class ActionResolver : MonoBehaviour
 
     public void TryUsePlot(Plot plot)
     {
-        if (dayCycle == null || !dayCycle.CanAcceptActions)
+        if (plot == null || dayCycle == null || !dayCycle.CanAcceptActions)
             return;
         if (pendingFoodWorker != null)
         {
@@ -644,7 +662,7 @@ public sealed class ActionResolver : MonoBehaviour
 
     private void FeedAnimals(Plot plot)
     {
-        if (plot.Animal == AnimalKind.None)
+        if (!plot.CanUse(ActivityKind.FeedAnimals, dayCycle.CurrentDay, seedCatalog))
         {
             RejectAction("Escolha um cercado com animal.");
             return;
@@ -665,7 +683,7 @@ public sealed class ActionResolver : MonoBehaviour
 
     private void PlaceAnimal(Plot plot, AnimalKind animal)
     {
-        if (!plot.IsFenced || !plot.IsEmpty || plot.Animal != AnimalKind.None)
+        if (!plot.CanUse(pendingPlotAction, dayCycle.CurrentDay, seedCatalog))
         {
             RejectAction("Escolha um cercado vazio para o animal.");
             return;
@@ -799,12 +817,12 @@ public sealed class ActionResolver : MonoBehaviour
 
     private void PlowPlot(Plot plot)
     {
-        if (plotsBeingPlowed.Contains(plot))
+        if (IsPlowing(plot))
         {
             RejectAction("Esse terreno já está sendo arado.");
             return;
         }
-        if (plot.IsPlowed || plot.IsFenced || plot.Animal != AnimalKind.None)
+        if (!plot.CanUse(ActivityKind.Plow, dayCycle.CurrentDay, seedCatalog))
         {
             RejectAction("Escolha um terreno livre para arar.");
             return;
@@ -822,8 +840,7 @@ public sealed class ActionResolver : MonoBehaviour
                 return;
             }
             plot.Plow();
-            if (pendingPlotWorker != null && IsPlanting(pendingPlotAction) && dayCycle != null)
-                Plot.ShowAvailable(pendingPlotAction, dayCycle.CurrentDay, seedCatalog);
+            InvalidatePlotHighlights();
             AudioManager.Play(SoundCue.Plow);
             PlotsPlowedToday++;
             worker.SetStatus("terreno arado");
@@ -834,7 +851,7 @@ public sealed class ActionResolver : MonoBehaviour
 
     private void PlantPlot(Plot plot, CropType crop)
     {
-        if (!plot.IsPlowed || plot.IsFenced || !plot.IsEmpty || plot.Animal != AnimalKind.None)
+        if (!plot.CanUse(pendingPlotAction, dayCycle.CurrentDay, seedCatalog))
         {
             RejectAction("Plante em um terreno arado e vazio.");
             return;
@@ -859,7 +876,8 @@ public sealed class ActionResolver : MonoBehaviour
 
     private void HarvestPlot(Plot plot)
     {
-        if (seedCatalog == null || resources == null || !plot.IsReady(dayCycle.CurrentDay, seedCatalog))
+        if (seedCatalog == null || resources == null ||
+            !plot.CanUse(ActivityKind.Harvest, dayCycle.CurrentDay, seedCatalog))
         {
             RejectAction("A plantação ainda não está pronta.");
             return;
@@ -879,7 +897,7 @@ public sealed class ActionResolver : MonoBehaviour
                 return;
             }
             Plot target = targets[index];
-            if (target == null || !target.IsReady(dayCycle.CurrentDay, seedCatalog))
+            if (target == null || !target.CanUse(ActivityKind.Harvest, dayCycle.CurrentDay, seedCatalog))
             {
                 HarvestNext(index + 1);
                 return;
@@ -968,6 +986,7 @@ public sealed class ActionResolver : MonoBehaviour
         WorkerAssignment worker = pendingPlotWorker;
         pendingPlotWorker = null;
         pendingPlotCard = null;
+        plotHighlightsDirty = false;
         if (cancelSelectionButton != null) cancelSelectionButton.gameObject.SetActive(false);
         PendingSelectionChanged?.Invoke(false);
         Plot.ClearHighlights();

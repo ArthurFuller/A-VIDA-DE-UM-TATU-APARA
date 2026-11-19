@@ -13,24 +13,29 @@ MonoBehaviour:
   m_Name: DeliveryMissions
   m_EditorClassIdentifier: Assembly-CSharp::DeliveryMissionCatalog
   entries:
-  - title: "Reparos na comunidade"
-    description: "O pessoal daqui começou a consertar as casas e pediu madeira para terminar o serviço."
+  - title: Reparos na comunidade
+    description: "O pessoal daqui come\xE7ou a consertar as casas e pediu madeira
+      para terminar o servi\xE7o."
     requirements:
     - item: 0
       quantity: 2
     coinReward: 5
     availableFromDay: 1
     deliveryDays: 2
-  - title: "Lenha para as famílias"
-    description: "O mercador ficou de levar lenha ao vilarejo vizinho para as famílias acenderem o fogão."
+    largeOrder: 0
+  - title: "Lenha para as fam\xEDlias"
+    description: "O mercador ficou de levar lenha ao vilarejo vizinho para as fam\xEDlias
+      acenderem o fog\xE3o."
     requirements:
     - item: 0
       quantity: 3
     coinReward: 6
     availableFromDay: 1
     deliveryDays: 2
-  - title: "Madeira para o abrigo"
-    description: "O pessoal da comunidade vizinha pediu madeira para cobrir o abrigo e macaxeira para o almoço."
+    largeOrder: 0
+  - title: Madeira para o abrigo
+    description: "O pessoal da comunidade vizinha pediu madeira para cobrir o abrigo
+      e macaxeira para o almo\xE7o."
     requirements:
     - item: 0
       quantity: 4
@@ -39,8 +44,10 @@ MonoBehaviour:
     coinReward: 11
     availableFromDay: 4
     deliveryDays: 2
-  - title: "Alimentos para a feira"
-    description: "O mercador vai servir almoço a duas turmas que chegam para montar a feira. Pediu comida pronta, leite para o café e ovos para a banca."
+    largeOrder: 0
+  - title: Alimentos para a feira
+    description: "O mercador vai servir almo\xE7o a duas turmas que chegam para montar
+      a feira. Pediu comida pronta, leite para o caf\xE9 e ovos para a banca."
     requirements:
     - item: 4
       quantity: 5
@@ -52,8 +59,9 @@ MonoBehaviour:
     availableFromDay: 8
     deliveryDays: 2
     largeOrder: 1
-  - title: "Provisões da comunidade"
-    description: "A cozinheira do vilarejo vizinho vai servir peixe, milho e macaxeira para todo mundo que trabalhou no mutirão."
+  - title: "Provis\xF5es da comunidade"
+    description: "A cozinheira do vilarejo vizinho vai servir peixe, milho e macaxeira
+      para todo mundo que trabalhou no mutir\xE3o."
     requirements:
     - item: 1
       quantity: 5
@@ -65,40 +73,49 @@ MonoBehaviour:
     availableFromDay: 7
     deliveryDays: 2
     largeOrder: 1
-  - title: "Comida para os viajantes"
-    description: "O pessoal que viaja com o mercador ainda tem chão pela frente e pediu comida pronta para levar."
+  - title: Comida para os viajantes
+    description: "O pessoal que viaja com o mercador ainda tem ch\xE3o pela frente
+      e pediu comida pronta para levar."
     requirements:
     - item: 4
       quantity: 2
     coinReward: 7
     availableFromDay: 2
     deliveryDays: 2
-  - title: "Peixes para a comunidade"
-    description: "O pessoal daqui combinou de almoçar junto e pediu peixe para colocar na panela."
+    largeOrder: 0
+  - title: Peixes para a comunidade
+    description: "O pessoal daqui combinou de almo\xE7ar junto e pediu peixe para
+      colocar na panela."
     requirements:
     - item: 1
       quantity: 2
     coinReward: 6
     availableFromDay: 1
     deliveryDays: 2
-  - title: "Encomenda de peixe"
-    description: "Uma feirante da cidade reservou espaço na banca para os peixes que o mercador ficou de trazer."
+    largeOrder: 0
+  - title: Encomenda de peixe
+    description: "Uma feirante da cidade reservou espa\xE7o na banca para os peixes
+      que o mercador ficou de trazer."
     requirements:
     - item: 1
       quantity: 3
     coinReward: 9
     availableFromDay: 1
     deliveryDays: 2
-  - title: "Milho para a feira"
-    description: "A feirante quer milho para assar na brasa e diz que o cheiro já basta para chamar freguês."
+    largeOrder: 0
+  - title: Milho para a feira
+    description: "A feirante quer milho para assar na brasa e diz que o cheiro j\xE1
+      basta para chamar fregu\xEAs."
     requirements:
     - item: 2
       quantity: 4
     coinReward: 16
     availableFromDay: 4
     deliveryDays: 2
-  - title: "Milho para a festa"
-    description: "O pessoal do vilarejo vizinho encomendou milho para assar na brasa durante a festa."
+    largeOrder: 0
+  - title: Milho para a festa
+    description: O pessoal do vilarejo vizinho encomendou milho para assar na brasa
+      durante a festa.
     requirements:
     - item: 2
       quantity: 8
@@ -106,8 +123,9 @@ MonoBehaviour:
     availableFromDay: 8
     deliveryDays: 3
     largeOrder: 1
-  - title: "Colheita encomendada"
-    description: "O mercador vai levar milho, jerimum e macaxeira a três cozinhas da cidade que dividiram a mesma encomenda."
+  - title: Colheita encomendada
+    description: "O mercador vai levar milho, jerimum e macaxeira a tr\xEAs cozinhas
+      da cidade que dividiram a mesma encomenda."
     requirements:
     - item: 2
       quantity: 6
@@ -119,8 +137,9 @@ MonoBehaviour:
     availableFromDay: 9
     deliveryDays: 2
     largeOrder: 1
-  - title: "Macaxeira da comunidade"
-    description: "As famílias da comunidade vizinha vão cozinhar juntas e pediram macaxeira e ovos para servir as duas mesas."
+  - title: Macaxeira da comunidade
+    description: "As fam\xEDlias da comunidade vizinha v\xE3o cozinhar juntas e pediram
+      macaxeira e ovos para servir as duas mesas."
     requirements:
     - item: 3
       quantity: 6
@@ -130,16 +149,19 @@ MonoBehaviour:
     availableFromDay: 6
     deliveryDays: 2
     largeOrder: 1
-  - title: "Macaxeira para a feira"
-    description: "Na última feira, a macaxeira acabou antes do meio-dia, então a feirante resolveu encomendar com antecedência."
+  - title: Macaxeira para a feira
+    description: "Na \xFAltima feira, a macaxeira acabou antes do meio-dia, ent\xE3o
+      a feirante resolveu encomendar com anteced\xEAncia."
     requirements:
     - item: 3
       quantity: 3
     coinReward: 8
     availableFromDay: 2
     deliveryDays: 2
-  - title: "Madeira para uma casa"
-    description: "A família do vilarejo pediu madeira para levantar a parede e comida para quem vai passar o dia ajudando na obra."
+    largeOrder: 0
+  - title: Madeira para uma casa
+    description: "A fam\xEDlia do vilarejo pediu madeira para levantar a parede e
+      comida para quem vai passar o dia ajudando na obra."
     requirements:
     - item: 0
       quantity: 8
@@ -149,8 +171,9 @@ MonoBehaviour:
     availableFromDay: 6
     deliveryDays: 2
     largeOrder: 1
-  - title: "Almoço de quem constrói"
-    description: "O pessoal que está levantando as casas pediu comida para a pausa e madeira para continuar o serviço."
+  - title: "Almo\xE7o de quem constr\xF3i"
+    description: "O pessoal que est\xE1 levantando as casas pediu comida para a pausa
+      e madeira para continuar o servi\xE7o."
     requirements:
     - item: 4
       quantity: 3
@@ -159,8 +182,10 @@ MonoBehaviour:
     coinReward: 12
     availableFromDay: 4
     deliveryDays: 2
-  - title: "Peixe com macaxeira"
-    description: "A cozinheira do vilarejo vizinho pediu peixe e macaxeira e avisou que quem chegar tarde vai pegar só o caldo."
+    largeOrder: 0
+  - title: Peixe com macaxeira
+    description: "A cozinheira do vilarejo vizinho pediu peixe e macaxeira e avisou
+      que quem chegar tarde vai pegar s\xF3 o caldo."
     requirements:
     - item: 1
       quantity: 3
@@ -169,8 +194,10 @@ MonoBehaviour:
     coinReward: 16
     availableFromDay: 4
     deliveryDays: 2
-  - title: "Espiga e lenha"
-    description: "Um feirante da cidade pediu milho para assar e lenha para manter a brasa acesa durante a feira."
+    largeOrder: 0
+  - title: Espiga e lenha
+    description: Um feirante da cidade pediu milho para assar e lenha para manter
+      a brasa acesa durante a feira.
     requirements:
     - item: 2
       quantity: 2
@@ -179,8 +206,10 @@ MonoBehaviour:
     coinReward: 12
     availableFromDay: 3
     deliveryDays: 2
-  - title: "Cesta da vizinha"
-    description: "Uma vizinha vai receber a família e pediu milho para o cuscuz e macaxeira para servir à mesa."
+    largeOrder: 0
+  - title: Cesta da vizinha
+    description: "Uma vizinha vai receber a fam\xEDlia e pediu milho para o cuscuz
+      e macaxeira para servir \xE0 mesa."
     requirements:
     - item: 2
       quantity: 2
@@ -189,8 +218,10 @@ MonoBehaviour:
     coinReward: 15
     availableFromDay: 3
     deliveryDays: 2
-  - title: "Peixe para a viagem"
-    description: "O mercador quer levar peixe e um pouco de lenha para cozinhar numa parada do caminho."
+    largeOrder: 0
+  - title: Peixe para a viagem
+    description: O mercador quer levar peixe e um pouco de lenha para cozinhar numa
+      parada do caminho.
     requirements:
     - item: 1
       quantity: 1
@@ -199,16 +230,20 @@ MonoBehaviour:
     coinReward: 5
     availableFromDay: 1
     deliveryDays: 2
-  - title: "Doce de jerimum"
-    description: "A doceira da cidade já separou os potes e está esperando o jerimum para fazer a primeira leva."
+    largeOrder: 0
+  - title: Doce de jerimum
+    description: "A doceira da cidade j\xE1 separou os potes e est\xE1 esperando
+      o jerimum para fazer a primeira leva."
     requirements:
     - item: 7
       quantity: 3
     coinReward: 12
     availableFromDay: 4
     deliveryDays: 3
-  - title: "Leite para o café"
-    description: "A banca do café vai atender o pessoal de dois vilarejos. A dona pediu leite, ovos e comida pronta para dar conta da manhã."
+    largeOrder: 0
+  - title: "Leite para o caf\xE9"
+    description: "A banca do caf\xE9 vai atender o pessoal de dois vilarejos. A dona
+      pediu leite, ovos e comida pronta para dar conta da manh\xE3."
     requirements:
     - item: 9
       quantity: 5
@@ -216,12 +251,13 @@ MonoBehaviour:
       quantity: 3
     - item: 10
       quantity: 3
-    coinReward: 29
+    coinReward: 36
     availableFromDay: 8
     deliveryDays: 2
     largeOrder: 1
-  - title: "Bolo de milho"
-    description: "Uma família do vilarejo ficou de levar os bolos para a feira e pediu milho, ovos e leite para repetir a fornada."
+  - title: Bolo de milho
+    description: "Uma fam\xEDlia do vilarejo ficou de levar os bolos para a feira
+      e pediu milho, ovos e leite para repetir a fornada."
     requirements:
     - item: 2
       quantity: 5
@@ -229,20 +265,23 @@ MonoBehaviour:
       quantity: 5
     - item: 9
       quantity: 3
-    coinReward: 39
+    coinReward: 45
     availableFromDay: 9
     deliveryDays: 2
     largeOrder: 1
-  - title: "Ovos para a feira"
-    description: "A feirante pediu ovos para levar à cidade e lembrou o mercador de forrar o cesto antes da viagem."
+  - title: Ovos para a feira
+    description: "A feirante pediu ovos para levar \xE0 cidade e lembrou o mercador
+      de forrar o cesto antes da viagem."
     requirements:
     - item: 10
       quantity: 3
-    coinReward: 9
+    coinReward: 12
     availableFromDay: 5
     deliveryDays: 2
-  - title: "Creme de jerimum"
-    description: "A cozinheira do vilarejo vizinho vai servir creme de jerimum no jantar da comunidade e pediu leite para a panela maior."
+    largeOrder: 0
+  - title: Creme de jerimum
+    description: A cozinheira do vilarejo vizinho vai servir creme de jerimum no
+      jantar da comunidade e pediu leite para a panela maior.
     requirements:
     - item: 7
       quantity: 5
@@ -252,18 +291,21 @@ MonoBehaviour:
     availableFromDay: 7
     deliveryDays: 2
     largeOrder: 1
-  - title: "Macaxeira com leite"
-    description: "Uma família do vilarejo vizinho pediu macaxeira e leite para o café de domingo."
+  - title: Macaxeira com leite
+    description: "Uma fam\xEDlia do vilarejo vizinho pediu macaxeira e leite para
+      o caf\xE9 de domingo."
     requirements:
     - item: 3
       quantity: 3
     - item: 9
       quantity: 2
-    coinReward: 13
+    coinReward: 15
     availableFromDay: 5
     deliveryDays: 2
-  - title: "Comida para a cozinha da feira"
-    description: "A dona da banca vai servir ovos com macaxeira, mas também pediu comida pronta para quem chegar antes de o fogão esquentar."
+    largeOrder: 0
+  - title: Comida para a cozinha da feira
+    description: "A dona da banca vai servir ovos com macaxeira, mas tamb\xE9m pediu
+      comida pronta para quem chegar antes de o fog\xE3o esquentar."
     requirements:
     - item: 10
       quantity: 4
@@ -275,8 +317,9 @@ MonoBehaviour:
     availableFromDay: 7
     deliveryDays: 2
     largeOrder: 1
-  - title: "Ensopado do vilarejo"
-    description: "O pessoal do vilarejo vai fazer uma panela de ensopado para a comunidade e pediu peixe, jerimum e macaxeira."
+  - title: Ensopado do vilarejo
+    description: O pessoal do vilarejo vai fazer uma panela de ensopado para a comunidade
+      e pediu peixe, jerimum e macaxeira.
     requirements:
     - item: 1
       quantity: 4
@@ -288,8 +331,9 @@ MonoBehaviour:
     availableFromDay: 8
     deliveryDays: 2
     largeOrder: 1
-  - title: "Broa da feira"
-    description: "A vizinha que vende broa na cidade aceitou mais encomendas do que esperava e pediu milho e leite para outra fornada."
+  - title: Broa da feira
+    description: A vizinha que vende broa na cidade aceitou mais encomendas do que
+      esperava e pediu milho e leite para outra fornada.
     requirements:
     - item: 2
       quantity: 2
@@ -298,8 +342,10 @@ MonoBehaviour:
     coinReward: 13
     availableFromDay: 5
     deliveryDays: 2
-  - title: "Cesta da manhã"
-    description: "O mercador vai levar leite e ovos para o café que as famílias da comunidade vizinha vão tomar juntas."
+    largeOrder: 0
+  - title: "Cesta da manh\xE3"
+    description: "O mercador vai levar leite e ovos para o caf\xE9 que as fam\xEDlias
+      da comunidade vizinha v\xE3o tomar juntas."
     requirements:
     - item: 9
       quantity: 5
@@ -309,8 +355,9 @@ MonoBehaviour:
     availableFromDay: 10
     deliveryDays: 2
     largeOrder: 1
-  - title: "Torta de jerimum"
-    description: "A feirante prometeu levar duas tortas de jerimum à cidade e pediu ovos e leite para preparar a massa."
+  - title: Torta de jerimum
+    description: "A feirante prometeu levar duas tortas de jerimum \xE0 cidade e
+      pediu ovos e leite para preparar a massa."
     requirements:
     - item: 7
       quantity: 4
@@ -322,8 +369,9 @@ MonoBehaviour:
     availableFromDay: 9
     deliveryDays: 2
     largeOrder: 1
-  - title: "Jantar no caminho"
-    description: "O mercador quer separar comida para a viagem e levar peixe e jerimum para o jantar no vilarejo onde vai dormir."
+  - title: Jantar no caminho
+    description: O mercador quer separar comida para a viagem e levar peixe e jerimum
+      para o jantar no vilarejo onde vai dormir.
     requirements:
     - item: 7
       quantity: 4
