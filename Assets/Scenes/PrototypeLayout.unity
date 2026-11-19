@@ -312447,7 +312447,7 @@ MonoBehaviour:
   daysHeight: 96
   cardsHeight: 200
   topBarHeight: 192.1875
-  panelOffset: {x: 77.508484, y: 96.48372}
+  panelOffset: {x: 75.32428, y: 94.59758}
   dayButtonWidth: 34
   dayButtonHeight: 22
   dayLineHeight: 3
