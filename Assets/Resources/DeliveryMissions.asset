@@ -287,7 +287,7 @@ MonoBehaviour:
       quantity: 5
     - item: 9
       quantity: 4
-    coinReward: 30
+    coinReward: 36
     availableFromDay: 7
     deliveryDays: 2
     largeOrder: 1
@@ -313,7 +313,7 @@ MonoBehaviour:
       quantity: 4
     - item: 3
       quantity: 4
-    coinReward: 31
+    coinReward: 44
     availableFromDay: 7
     deliveryDays: 2
     largeOrder: 1
@@ -351,7 +351,7 @@ MonoBehaviour:
       quantity: 5
     - item: 10
       quantity: 6
-    coinReward: 28
+    coinReward: 37
     availableFromDay: 10
     deliveryDays: 2
     largeOrder: 1
@@ -365,7 +365,7 @@ MonoBehaviour:
       quantity: 4
     - item: 9
       quantity: 2
-    coinReward: 31
+    coinReward: 36
     availableFromDay: 9
     deliveryDays: 2
     largeOrder: 1
@@ -379,7 +379,7 @@ MonoBehaviour:
       quantity: 5
     - item: 1
       quantity: 3
-    coinReward: 35
+    coinReward: 40
     availableFromDay: 10
     deliveryDays: 2
     largeOrder: 1

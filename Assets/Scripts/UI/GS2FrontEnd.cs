@@ -598,7 +598,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
             RestoreNavigation();
             if (current == Page.Leaderboard && leaderboardPage != null &&
                 leaderboardPage.TryGetComponent(out GS2LeaderboardView ranking))
-                ranking.RevealRows(leaderboardBackground);
+                ranking.RevealRows();
         }
     }
 
@@ -1066,7 +1066,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
         rect.anchoredPosition = position;
     }
 
-    internal static Rect FitMaskToFrame(RectMask2D mask, Image frame, bool fitHeight = true)
+    internal static Rect FitMaskToFrame(RectMask2D mask, Image frame)
     {
         RectTransform frameRect = frame.rectTransform;
         Rect inner = frame.GetPixelAdjustedRect();
@@ -1085,10 +1085,8 @@ public sealed class GS2FrontEnd : MonoBehaviour
         Vector3 min = canvas.InverseTransformPoint(frameRect.TransformPoint(inner.min));
         Vector3 max = canvas.InverseTransformPoint(frameRect.TransformPoint(inner.max));
         Rect outer = mask.canvasRect;
-        Vector4 padding = mask.padding;
-        Vector4 fittedPadding = new Vector4(min.x - outer.xMin, fitHeight ? min.y - outer.yMin : padding.y,
-            outer.xMax - max.x, fitHeight ? outer.yMax - max.y : padding.w);
-        if (fittedPadding != padding) mask.padding = fittedPadding;
+        mask.padding = new Vector4(min.x - outer.xMin, min.y - outer.yMin,
+            outer.xMax - max.x, outer.yMax - max.y);
         return inner;
     }
 

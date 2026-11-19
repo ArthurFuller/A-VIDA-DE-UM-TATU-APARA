@@ -7,13 +7,13 @@ public sealed class GS2LeaderboardView : MonoBehaviour
 {
     [SerializeField] private Text status;
     [SerializeField] private RectTransform rowTemplate;
+    [SerializeField] private Image resultsPanel;
     [SerializeField, Min(0)] private float rowGap = 8f;
     [SerializeField, Min(1)] private float visibleHeight = 165f;
 
     private RectTransform content;
     private ScrollRect scroll;
     private RectMask2D viewportMask;
-    private Image pageFrame;
     private readonly List<(RectTransform Rect, CanvasGroup Fade, float Alpha)> pendingRows = new();
     private Sequence rowEntrance;
     private bool pageRevealed;
@@ -22,6 +22,12 @@ public sealed class GS2LeaderboardView : MonoBehaviour
     private void Awake()
     {
         if (rowTemplate == null) return;
+        if (resultsPanel == null)
+        {
+            // As cenas existentes têm o painel costurado como filho "Image" de Ranking.
+            Transform panel = transform.Find("Image");
+            if (panel != null) resultsPanel = panel.GetComponent<Image>();
+        }
         var viewport = new GameObject("Recorte dos resultados", typeof(RectTransform),
             typeof(Image), typeof(RectMask2D)).GetComponent<RectTransform>();
         viewport.SetParent(transform, false);
@@ -75,14 +81,12 @@ public sealed class GS2LeaderboardView : MonoBehaviour
     {
         loadVersion++;
         pageRevealed = false;
-        pageFrame = null;
         pendingRows.Clear();
         rowEntrance?.Kill();
     }
 
-    internal void RevealRows(Image frame)
+    internal void RevealRows()
     {
-        pageFrame = frame;
         pageRevealed = true;
         AnimateRows();
     }
@@ -134,13 +138,10 @@ public sealed class GS2LeaderboardView : MonoBehaviour
         if (pendingRows.Count == 0) return;
         Canvas.ForceUpdateCanvases();
 
-        Image frame = pageFrame;
-        bool useFrame = frame != null && frame.canvas != null &&
-            frame.type == Image.Type.Sliced && frame.overrideSprite != null;
+        bool usePanel = resultsPanel != null && resultsPanel.canvas != null;
         Vector4 listPadding = viewportMask.padding;
-        RectTransform edge = useFrame ? frame.rectTransform : scroll.viewport;
-        // The frame clips the slide horizontally; the list keeps its vertical scroll bounds.
-        Rect inner = useFrame ? GS2FrontEnd.FitMaskToFrame(viewportMask, frame, fitHeight: false) : edge.rect;
+        RectTransform edge = usePanel ? resultsPanel.rectTransform : scroll.viewport;
+        Rect inner = usePanel ? FitMaskToResultsPanel(listPadding) : edge.rect;
 
         rowEntrance = DOTween.Sequence().SetUpdate(true).SetAutoKill(true);
         for (int i = 0; i < pendingRows.Count; i++)
@@ -154,15 +155,40 @@ public sealed class GS2LeaderboardView : MonoBehaviour
             rowEntrance.Insert(delay, fade.DOFade(alpha, 0.24f).SetEase(Ease.OutSine));
         }
         pendingRows.Clear();
-        if (useFrame)
+        if (usePanel)
             rowEntrance.OnUpdate(() =>
             {
-                if (frame != null) GS2FrontEnd.FitMaskToFrame(viewportMask, frame, fitHeight: false);
+                if (resultsPanel != null && resultsPanel.canvas != null)
+                    FitMaskToResultsPanel(listPadding);
             });
         rowEntrance.OnKill(() =>
         {
             if (viewportMask != null) viewportMask.padding = listPadding;
             rowEntrance = null;
         });
+    }
+
+    private Rect FitMaskToResultsPanel(Vector4 listPadding)
+    {
+        Rect inner = resultsPanel.GetPixelAdjustedRect();
+        float width = inner.width;
+        float height = inner.height;
+        // Margens proporcionais do desenho, medidas até a parte interna da costura.
+        inner.xMin += width * 0.027f;
+        inner.xMax -= width * 0.030f;
+        inner.yMin += height * 0.057f;
+        inner.yMax -= height * 0.070f;
+
+        Transform panel = resultsPanel.rectTransform;
+        Transform canvas = resultsPanel.canvas.rootCanvas.transform;
+        Vector3 min = canvas.InverseTransformPoint(panel.TransformPoint(inner.min));
+        Vector3 max = canvas.InverseTransformPoint(panel.TransformPoint(inner.max));
+        Rect viewport = viewportMask.canvasRect;
+        // O recorte lateral segue o painel e a lista conserva sua janela vertical de rolagem.
+        Vector4 padding = new Vector4(min.x - viewport.xMin,
+            Mathf.Max(listPadding.y, min.y - viewport.yMin), viewport.xMax - max.x,
+            Mathf.Max(listPadding.w, viewport.yMax - max.y));
+        if (viewportMask.padding != padding) viewportMask.padding = padding;
+        return inner;
     }
 }
