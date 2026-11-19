@@ -104,7 +104,8 @@ public sealed class GS2FrontEnd : MonoBehaviour
         Time.timeScale = 0f;
         ApplyAnimationSettings(Resources.Load<MainMenuAnimationSettings>(MainMenuAnimationSettings.ResourceName));
         bool returningFromMatch = SertaoMatchResultsView.BindReturningMenu(this, out returnToRanking);
-        if (!returningFromMatch && GS2StudioIntro.ShouldPlay(studioOpeningVideo))
+        bool returningFromPause = PauseIrisTransition.ReturningToMenu;
+        if (!returningFromPause && !returningFromMatch && GS2StudioIntro.ShouldPlay(studioOpeningVideo))
         {
             studioIntro = gameObject.AddComponent<GS2StudioIntro>();
             studioIntro.Initialize(studioOpeningVideo, studioBlackHoldSeconds,
@@ -130,7 +131,8 @@ public sealed class GS2FrontEnd : MonoBehaviour
 #if UNITY_EDITOR
         previewNickname = SertaoPlayModeTests.TakeNicknamePreview();
 #endif
-        if ((previewNickname || !GS2Profile.HasNickname) && root != null && optionsPage != null &&
+        if (!returningFromPause && (previewNickname || !GS2Profile.HasNickname) &&
+            root != null && optionsPage != null &&
             optionsPage.TryGetComponent(out GS2Profile profile) &&
             profile.ShowFirstRun(nicknamePage, root.transform, CompleteFirstRun, previewNickname))
         {
@@ -594,6 +596,9 @@ public sealed class GS2FrontEnd : MonoBehaviour
         {
             if (inputShield != null) inputShield.gameObject.SetActive(false);
             RestoreNavigation();
+            if (current == Page.Leaderboard && leaderboardPage != null &&
+                leaderboardPage.TryGetComponent(out GS2LeaderboardView ranking))
+                ranking.RevealRows(leaderboardBackground);
         }
     }
 
@@ -1061,7 +1066,7 @@ public sealed class GS2FrontEnd : MonoBehaviour
         rect.anchoredPosition = position;
     }
 
-    internal static Rect FitMaskToFrame(RectMask2D mask, Image frame)
+    internal static Rect FitMaskToFrame(RectMask2D mask, Image frame, bool fitHeight = true)
     {
         RectTransform frameRect = frame.rectTransform;
         Rect inner = frame.GetPixelAdjustedRect();
@@ -1080,8 +1085,10 @@ public sealed class GS2FrontEnd : MonoBehaviour
         Vector3 min = canvas.InverseTransformPoint(frameRect.TransformPoint(inner.min));
         Vector3 max = canvas.InverseTransformPoint(frameRect.TransformPoint(inner.max));
         Rect outer = mask.canvasRect;
-        mask.padding = new Vector4(min.x - outer.xMin, min.y - outer.yMin,
-            outer.xMax - max.x, outer.yMax - max.y);
+        Vector4 padding = mask.padding;
+        Vector4 fittedPadding = new Vector4(min.x - outer.xMin, fitHeight ? min.y - outer.yMin : padding.y,
+            outer.xMax - max.x, fitHeight ? outer.yMax - max.y : padding.w);
+        if (fittedPadding != padding) mask.padding = fittedPadding;
         return inner;
     }
 

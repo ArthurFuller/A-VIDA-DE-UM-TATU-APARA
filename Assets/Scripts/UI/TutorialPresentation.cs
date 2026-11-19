@@ -25,7 +25,8 @@ public sealed class TutorialPresentation : ScriptableObject
         [InspectorName("Finalizar dia")] EndDay,
         [InspectorName("Alimentação")] Feeding,
         [InspectorName("Carta do dia seguinte")] Reward,
-        [InspectorName("Despedida do tutorial")] Farewell
+        [InspectorName("Despedida do tutorial")] Farewell,
+        [InspectorName("Câmera")] Camera
     }
 
     public enum SpriteLayout
@@ -127,7 +128,7 @@ public sealed class TutorialPresentation : ScriptableObject
     public const string AssetPath = "Assets/Resources/" + ResourceName + ".asset";
     private static readonly Color TextColor = new Color(1f, .95f, .84f);
 
-    [SerializeField] private Tip[] tips = new Tip[(int)Page.Farewell + 1];
+    [SerializeField] private Tip[] tips = new Tip[(int)Page.Camera + 1];
     [SerializeField] private Sprite skipSprite;
     [SerializeField] private Sprite continueSprite;
     [SerializeField] private bool showSkipLabel = true;
@@ -154,12 +155,17 @@ public sealed class TutorialPresentation : ScriptableObject
     {
         // Preserve the existing pages when upgrading the appearance asset from the V5.
         int previousCount = tips?.Length ?? 0;
-        int count = (int)Page.Farewell + 1;
+        int count = (int)Page.Camera + 1;
         if (previousCount < count) Array.Resize(ref tips, count);
         int firstNew = hasAppearance ? previousCount : 0;
         for (int i = firstNew; i < count; i++)
-            tips[i].box = i == (int)Page.Farewell ? CreateFarewellBox()
-                : new BoxAppearance(i == (int)Page.Event ? 205f : 234f);
+            tips[i].box = (Page)i switch
+            {
+                Page.Farewell => CreateFarewellBox(),
+                Page.Camera => new BoxAppearance(270f),
+                Page.Event => new BoxAppearance(205f),
+                _ => new BoxAppearance(234f)
+            };
         if (!hasAppearance)
         {
             skipStyle = new ButtonAppearance(false);

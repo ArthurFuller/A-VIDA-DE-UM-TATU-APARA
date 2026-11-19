@@ -946,7 +946,8 @@ public sealed class DayTimeline : MonoBehaviour
             hand != null ? hand.InspectionDescriptionGap : 18f);
         CardDescriptionCatalog.Entry saved = CardDescriptionCatalog.Instance != null ?
             CardDescriptionCatalog.Instance.Find(key) : null;
-        if (saved != null && key != CardDescriptionCatalog.EventKey(SertaoEventKind.HeadOfCuia))
+        if (saved != null && key != CardDescriptionCatalog.EventKey(SertaoEventKind.HeadOfCuia) &&
+            key != CardDescriptionCatalog.EventKey(SertaoEventKind.Pests))
             description = saved.text;
         CardDescriptionCatalog.Entry entry = key.StartsWith("E:") ? null : saved;
         float panelWidth = entry != null ? entry.boxSize.x :

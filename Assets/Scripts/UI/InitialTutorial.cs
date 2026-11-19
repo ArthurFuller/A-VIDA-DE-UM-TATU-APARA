@@ -15,7 +15,7 @@ public sealed class InitialTutorial : MonoBehaviour
 
     private enum Stage
     {
-        Event, Resources, Day, Timeline, Inspect, PlayCard, Action, Shop, ShopOverview,
+        Event, Camera, Resources, Day, Timeline, Inspect, PlayCard, Action, Shop, ShopOverview,
         OrdersTab, OrdersIntro, AcceptOrder, Missions, EndDay, WaitForEndDay, Feeding, Reward, WaitForCampaign, Farewell, Done
     }
 
@@ -303,9 +303,13 @@ public sealed class InitialTutorial : MonoBehaviour
         switch (stage)
         {
             case Stage.Event:
-                if (days.CanAcceptActions) { stage = Stage.Resources; break; }
+                if (days.CanAcceptActions) { stage = Stage.Camera; break; }
                 if (eventCard != null && eventCard.TutorialRevealReady && Add(eventCard.TutorialRevealTarget))
                     Prompt(Page.Event, "Todo dia tem um evento. Clique em Revelar para ler o que aconteceu.", Lane.Event);
+                break;
+            case Stage.Camera:
+                Prompt(Page.Camera, "Mova a câmera com W, A, S e D.\nAjuste o zoom com a rodinha do mouse.",
+                    Lane.ModalTop, true);
                 break;
             case Stage.Resources:
                 if (!PrepareHud()) break;
@@ -497,6 +501,7 @@ public sealed class InitialTutorial : MonoBehaviour
         if (!running || !canContinue) return;
         switch (stage)
         {
+            case Stage.Camera: stage = Stage.Resources; break;
             case Stage.Resources: stage = Stage.Day; break;
             case Stage.Day: stage = Stage.Timeline; break;
             case Stage.Timeline:
@@ -559,7 +564,7 @@ public sealed class InitialTutorial : MonoBehaviour
     private void Prompt(Page page, string text, Lane position, bool advance = false, RectTransform panel = null)
     {
         visiblePage = page;
-        dimBackground = page != Page.Feeding && page != Page.Reward && page != Page.Farewell;
+        dimBackground = page is not (Page.Camera or Page.Feeding or Page.Reward or Page.Farewell);
         message = text;
         lane = position;
         canContinue = advance;

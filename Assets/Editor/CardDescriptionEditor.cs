@@ -92,7 +92,9 @@ public sealed class CardDescriptionEditor : EditorWindow
     private static string EventText(SertaoEventKind kind) => kind switch
     {
         SertaoEventKind.Drought => "A seca reduz a pesca e atrasa o crescimento.",
-        SertaoEventKind.Pests => "As pragas afetam uma das lavouras.",
+        SertaoEventKind.Pests => "Cultura afetada: " + DayEventController.PestCropToken +
+            ".\n\nA praga atrasa o crescimento das plantas sem proteção, inclusive as que estavam prontas." +
+            "\n\nDuração: " + DayEventController.PestDurationToken + ".",
         SertaoEventKind.Rain => "A chuva acelera o crescimento e reduz o impacto da coleta de madeira.",
         SertaoEventKind.Comadre => "A exploração da floresta desorientou um trabalhador por um dia.",
         SertaoEventKind.Calm => "Nenhum novo evento especial começou hoje.",
@@ -225,6 +227,10 @@ public sealed class CardDescriptionEditor : EditorWindow
             if (entry.key == CardDescriptionCatalog.EventKey(SertaoEventKind.HeadOfCuia))
                 EditorGUILayout.HelpBox("Use " + DayEventController.HeadOfCuiaLossToken +
                     " para mostrar a quantidade roubada, com peixe no singular ou plural.", MessageType.Info);
+            if (entry.key == CardDescriptionCatalog.EventKey(SertaoEventKind.Pests))
+                EditorGUILayout.HelpBox("Use " + DayEventController.PestCropToken +
+                    " para mostrar a cultura escolhida e " + DayEventController.PestDurationToken +
+                    " para mostrar a duração do evento.", MessageType.Info);
             EditorGUILayout.HelpBox("Eventos usam o tamanho e a fonte da caixa da cena. O deslocamento acima vale para todas as cartas de evento.", MessageType.Info);
             if (GUILayout.Button("Selecionar caixa do evento na Hierarchy"))
             {

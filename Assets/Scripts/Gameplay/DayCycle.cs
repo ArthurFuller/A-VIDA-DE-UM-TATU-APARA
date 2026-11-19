@@ -304,7 +304,7 @@ public sealed class DayCycle : MonoBehaviour
         {
             using (PrepareFirstDayMarker.Auto())
             {
-                if (dayEvents != null) dayEvents.PrepareFirstDay(currentDay);
+                if (dayEvents != null) dayEvents.PrepareFirstDay(currentDay, seedCatalog);
                 if (dayEvents != null) dayEvents.ApplyPendingPestRegression(seedCatalog);
                 if (actions != null) actions.BeginNextDay();
                 UpdateMarket();
@@ -513,7 +513,7 @@ public sealed class DayCycle : MonoBehaviour
         actions?.ReturnWorkersHome();
         currentDay = 1;
         ProduceAnimalResources();
-        dayEvents?.PrepareFirstDay(currentDay);
+        dayEvents?.PrepareFirstDay(currentDay, seedCatalog);
         PrepareDayState(false);
         if (dayEvents == null || !dayEvents.HasPreparedEvent) return false;
         dayEvents.RevealPreparedBackdrop();
@@ -532,7 +532,7 @@ public sealed class DayCycle : MonoBehaviour
     {
         currentDay++;
         ProduceAnimalResources();
-        if (dayEvents != null) dayEvents.StartDay(currentDay);
+        if (dayEvents != null) dayEvents.StartDay(currentDay, seedCatalog);
         PrepareDayState(true);
         OpenDayAfterEvent(true);
     }

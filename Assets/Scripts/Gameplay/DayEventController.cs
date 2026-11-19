@@ -7,6 +7,8 @@ public enum SertaoEventKind { None, Drought, Pests, Rain, Comadre, Calm, HeadOfC
 public sealed class DayEventController : MonoBehaviour
 {
     public const string HeadOfCuiaLossToken = "{peixesRoubados}";
+    public const string PestCropToken = "{cultura}";
+    public const string PestDurationToken = "{duracao}";
 
     public readonly struct TimelineEvent
     {
@@ -182,14 +184,14 @@ public sealed class DayEventController : MonoBehaviour
             resourceHud.FlyFromRect(ResourceKind.Wood, wood, card.CardRect);
     }
 
-    public void StartDay(int day, Color? previousBackdrop = null) =>
-        StartDay(day, previousBackdrop, false);
+    public void StartDay(int day, SeedCatalog catalog, Color? previousBackdrop = null) =>
+        StartDay(day, catalog, previousBackdrop, false);
 
-    internal void PrepareFirstDay(int day) => StartDay(day, null, true);
+    internal void PrepareFirstDay(int day, SeedCatalog catalog) => StartDay(day, catalog, null, true);
 
     internal bool HasPreparedEvent => preparedEvent != SertaoEventKind.None && card != null;
 
-    private void StartDay(int day, Color? previousBackdrop, bool deferPresentation)
+    private void StartDay(int day, SeedCatalog catalog, Color? previousBackdrop, bool deferPresentation)
     {
         preparedEvent = SertaoEventKind.None;
         currentDay = day;
@@ -262,7 +264,15 @@ public sealed class DayEventController : MonoBehaviour
         }
         else if (IsActive(SertaoEventKind.Rain))
         {
-            foreach (var plot in plots) if (plot != null) plot.AdvanceGrowth(rainGrowthBonus);
+            if (catalog != null && rainGrowthBonus > 0)
+                foreach (Plot plot in plots)
+                {
+                    if (plot == null) continue;
+                    CropSettings crop = catalog.Get(plot.Crop);
+                    if (crop == null) continue;
+                    int advance = Mathf.Min(rainGrowthBonus, crop.growthDays - plot.GrowthAge(day));
+                    if (advance > 0) plot.AdvanceGrowth(advance);
+                }
             forestExploitation = Mathf.Max(0, forestExploitation - rainForestRecovery);
         }
         if (announced == SertaoEventKind.None) announced = SertaoEventKind.Calm;
@@ -288,11 +298,11 @@ public sealed class DayEventController : MonoBehaviour
         if (announced == SertaoEventKind.None || card == null) return;
         if (deferPresentation)
         {
-            card.Prepare(Title(announced), Description(announced), Art(announced), previousBackdrop);
+            card.Prepare(Title(announced), AnnouncedDescription(announced), Art(announced), previousBackdrop);
             preparedEvent = announced;
             return;
         }
-        card.Show(Title(announced), Description(announced), Art(announced), previousBackdrop);
+        card.Show(Title(announced), AnnouncedDescription(announced), Art(announced), previousBackdrop);
         PlayEventSound(announced);
     }
 
@@ -398,6 +408,7 @@ public sealed class DayEventController : MonoBehaviour
     {
         CardDescriptionCatalog.Entry entry = CardDescriptionCatalog.Instance != null ?
             CardDescriptionCatalog.Instance.Find(CardDescriptionCatalog.EventKey(kind)) : null;
+        if (kind == SertaoEventKind.Pests) return PestDescription(entry?.text);
         if (kind == SertaoEventKind.HeadOfCuia)
         {
             string text = entry?.text;
@@ -416,14 +427,41 @@ public sealed class DayEventController : MonoBehaviour
         return entry != null ? entry.text : DefaultDescription(kind);
     }
 
+    private string PestCropName => pestTarget switch
+    {
+        CropType.Pumpkin => "Macaxeira",
+        CropType.Corn => "Milho",
+        CropType.Jerimum => "Jerimum",
+        _ => ""
+    };
+
+    private string AnnouncedDescription(SertaoEventKind kind)
+    {
+        string text = Description(kind);
+        if (kind == SertaoEventKind.Pests || !IsActive(SertaoEventKind.Pests) ||
+            pestTarget == CropType.None) return text;
+        return text + "\n\nPraga ainda ativa. Cultura afetada: " + PestCropName + ".";
+    }
+
+    private string PestDescription(string text)
+    {
+        int duration = DurationFor(SertaoEventKind.Pests);
+        string durationText = duration + (duration == 1 ? " dia" : " dias");
+        string durationLabel = "\n\nDuração: " + durationText + ".";
+        if (pestTarget == CropType.None)
+            return "A praga chegou quando não havia plantações." + durationLabel;
+        if (string.IsNullOrWhiteSpace(text))
+            return "Cultura afetada: " + PestCropName +
+                ".\n\nA praga atrasa o crescimento das plantas sem proteção, inclusive as que estavam prontas." +
+                durationLabel;
+        bool hasCropToken = text.Contains(PestCropToken);
+        text = text.Replace(PestCropToken, PestCropName).Replace(PestDurationToken, durationText);
+        return hasCropToken ? text : "Cultura afetada: " + PestCropName + ".\n\n" + text;
+    }
+
     private string DefaultDescription(SertaoEventKind kind) => kind switch
     {
         SertaoEventKind.Drought => "A seca reduz a pesca e atrasa o crescimento. Duração: " + DurationFor(kind) + " dia(s).",
-        SertaoEventKind.Pests => "As pragas afetam " +
-            (pestTarget == CropType.Pumpkin ? "a macaxeira" :
-             pestTarget == CropType.Corn ? "o milho" :
-             pestTarget == CropType.Jerimum ? "o jerimum" : "as lavouras") +
-            ". Duração: " + DurationFor(kind) + " dia(s).",
         SertaoEventKind.Rain => "A chuva acelera o crescimento e reduz o impacto da coleta de madeira. Duração: " + DurationFor(kind) + " dia(s).",
         SertaoEventKind.Calm => "Nenhum novo evento especial começou hoje.",
         SertaoEventKind.HeadOfCuia => "O Cabeça de Cuia roubou " + StolenFishLabel + ".",

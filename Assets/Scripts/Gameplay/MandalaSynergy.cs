@@ -180,18 +180,27 @@ public sealed class MandalaSynergy : MonoBehaviour
         }
         if (source.Animal == AnimalKind.Chicken && other.Crop != CropType.None)
         {
-            next[source] |= MandalaCombo.ChickenCrop;
-            next[other] |= MandalaCombo.ChickenCrop;
+            MarkConnectedCombo(source, MandalaCombo.ChickenCrop, next);
+            MarkConnectedCombo(other, MandalaCombo.ChickenCrop, next);
         }
         if (source == water && source.IsWater && other.Crop != CropType.None)
         {
             next[source] |= MandalaCombo.WaterCrop;
-            next[other] |= MandalaCombo.WaterCrop;
+            MarkConnectedCombo(other, MandalaCombo.WaterCrop, next);
         }
         if (source == water && source.IsWater && other.Animal == AnimalKind.Cow)
         {
             next[source] |= MandalaCombo.CowWater;
-            next[other] |= MandalaCombo.CowWater;
+            MarkConnectedCombo(other, MandalaCombo.CowWater, next);
         }
+    }
+
+    private static void MarkConnectedCombo(Plot plot, MandalaCombo combo,
+        Dictionary<Plot, MandalaCombo> next)
+    {
+        next[plot] |= combo;
+        if (plot.Crop == CropType.Corn || plot.JoinedPlots == null) return;
+        foreach (Plot member in plot.JoinedPlots)
+            if (member != null && next.ContainsKey(member)) next[member] |= combo;
     }
 }

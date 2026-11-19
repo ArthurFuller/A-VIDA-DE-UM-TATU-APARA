@@ -460,7 +460,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
                 canvas.worldCamera, out Vector2 destination)) return;
         destination += rect.anchoredPosition - (Vector2)rect.localPosition;
         rect.DOAnchorPos(destination, duration).SetEase(Ease.OutCubic);
-        rect.DOScale(originalScale * 0.72f, duration).SetEase(Ease.OutBack);
+        rect.DOScale(originalScale * 0.90f, duration).SetEase(Ease.OutBack);
         selectionTurn = rect.DOLocalRotate(new Vector3(0f, 0f, -8f), duration)
             .OnComplete(() =>
             {

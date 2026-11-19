@@ -1034,30 +1034,8 @@ public sealed class ActionResolver : MonoBehaviour
     }
 
     private void MoveWorker(WorkerAssignment worker, Vector3 destination, System.Action onArrived,
-        bool countAsBusy = true, bool isReturn = false, float speedOverride = 0f)
-    {
-        bool braking = returningHome.Contains(worker) && !isReturn;
-        StopMovement(worker);
-        if (countAsBusy)
-        {
-            busyWorkers++;
-            busyMovements.Add(worker);
-        }
-        if (isReturn) returningHome.Add(worker);
-        float speed = speedOverride > 0f ? speedOverride : movementSpeed;
-        float duration = Mathf.Max(0.01f, Vector3.Distance(worker.transform.position, destination) / speed);
-        worker.FaceForRoute(isReturn);
-        Tween travel = worker.transform.DOMove(destination, duration).SetEase(Ease.InOutSine);
-        if (braking) travel = DOTween.Sequence().AppendInterval(0.1f).Append(travel);
-        movements[worker] = travel;
-        travel.OnComplete(() =>
-        {
-            movements.Remove(worker);
-            if (busyMovements.Remove(worker)) busyWorkers--;
-            returningHome.Remove(worker);
-            onArrived?.Invoke();
-        });
-    }
+        bool countAsBusy = true, bool isReturn = false, float speedOverride = 0f) =>
+        MoveAlongRoute(worker, new[] { destination }, onArrived, countAsBusy, speedOverride, isReturn);
 
     public void BringWorkerOutOfHouse(WorkerAssignment worker, Vector3 doorwayPosition)
     {
@@ -1101,7 +1079,8 @@ public sealed class ActionResolver : MonoBehaviour
         void Arrived()
         {
             worker.RestoreHomeFacing();
-            worker.SetStatus("em casa");
+            if (worker != pendingPlotWorker && worker != pendingFoodWorker)
+                worker.SetStatus("em casa");
         }
         if (hasRoute)
         {
@@ -1416,7 +1395,8 @@ public sealed class ActionResolver : MonoBehaviour
         MoveAlongRoute(worker, GatheringRoute(worker, activity, worker.HomePosition, true), () =>
         {
             worker.RestoreHomeFacing();
-            if (dayCycle.CurrentDay == returnDay) worker.SetStatus("em casa");
+            if (dayCycle.CurrentDay == returnDay && worker != pendingPlotWorker &&
+                worker != pendingFoodWorker) worker.SetStatus("em casa");
         }, false, GatheringTravelSpeed(activity), isReturn: true);
     }
 
@@ -1463,15 +1443,16 @@ public sealed class ActionResolver : MonoBehaviour
     private void MoveAlongRoute(WorkerAssignment worker, Vector3[] points, System.Action onArrived,
         bool countAsBusy = true, float speedOverride = 0f, bool isReturn = false)
     {
-        bool braking = returningHome.Contains(worker) && countAsBusy;
+        bool redirecting = countAsBusy && !isReturn && returningHome.Contains(worker);
         StopMovement(worker);
         if (countAsBusy)
         {
             busyWorkers++;
             busyMovements.Add(worker);
         }
-        else returningHome.Add(worker);
+        if (isReturn) returningHome.Add(worker);
         Vector3 from = worker.transform.position;
+        if (redirecting) points = JoinOutboundRoute(from, worker.HomePosition, points);
         float distance = 0f;
         foreach (Vector3 point in points)
         {
@@ -1480,12 +1461,13 @@ public sealed class ActionResolver : MonoBehaviour
         }
         float speed = speedOverride > 0f ? speedOverride : movementSpeed;
         float duration = Mathf.Max(0.01f, distance / speed);
-        worker.FaceForRoute(isReturn);
+        if (redirecting) worker.FaceTowards(points[0]);
+        else worker.FaceForRoute(isReturn);
         Tween route = points.Length == 1
             ? worker.transform.DOMove(points[0], duration)
             : worker.transform.DOPath(points, duration, PathType.Linear, PathMode.Full3D);
         route.SetEase(Ease.InOutSine);
-        if (braking) route = DOTween.Sequence().AppendInterval(0.1f).Append(route);
+        if (redirecting) route = DOTween.Sequence().AppendInterval(0.1f).Append(route);
         movements[worker] = route;
         route.OnComplete(() =>
         {
@@ -1494,5 +1476,49 @@ public sealed class ActionResolver : MonoBehaviour
             returningHome.Remove(worker);
             onArrived?.Invoke();
         });
+    }
+
+    private Vector3[] JoinOutboundRoute(Vector3 position, Vector3 home, Vector3[] points)
+    {
+        var route = new System.Collections.Generic.List<Vector3>(points.Length + 2);
+        Vector3 gate = fencePassage != null ? fencePassage.position : Vector3.zero;
+        Vector3 towardFarm = fencePassage != null && workerRoutePointB != null
+            ? workerRoutePointB.position - gate : Vector3.zero;
+        towardFarm.y = 0f;
+        float currentSide = Vector3.Dot(position - gate, towardFarm);
+        float destinationSide = Vector3.Dot(points[points.Length - 1] - gate, towardFarm);
+        if (currentSide < 0f && destinationSide >= 0f)
+        {
+            route.Add(gate);
+            position = gate;
+        }
+
+        // Rejoin the configured outbound route at its nearest segment.
+        Vector3 from = home;
+        Vector3 entry = home;
+        float nearest = float.PositiveInfinity;
+        int firstWaypoint = 0;
+        for (int i = 0; i < points.Length; i++)
+        {
+            Vector3 segment = points[i] - from;
+            float lengthSquared = segment.sqrMagnitude;
+            float progress = lengthSquared > 0f
+                ? Mathf.Clamp01(Vector3.Dot(position - from, segment) / lengthSquared) : 1f;
+            Vector3 candidate = from + segment * progress;
+            float distance = (position - candidate).sqrMagnitude;
+            if (distance <= nearest)
+            {
+                nearest = distance;
+                entry = candidate;
+                firstWaypoint = i;
+            }
+            from = points[i];
+        }
+
+        if (currentSide >= 0f && Vector3.Dot(entry - gate, towardFarm) < 0f) route.Add(gate);
+        if (entry != home && entry != points[firstWaypoint] && nearest > 0.15f * 0.15f)
+            route.Add(entry);
+        for (int i = firstWaypoint; i < points.Length; i++) route.Add(points[i]);
+        return route.ToArray();
     }
 }
