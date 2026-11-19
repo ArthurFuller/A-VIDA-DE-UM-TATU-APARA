@@ -134,7 +134,11 @@ public sealed class TutorialPresentation : ScriptableObject
     [SerializeField] private bool showContinueLabel = true;
     [SerializeField] private ButtonAppearance skipStyle;
     [SerializeField] private ButtonAppearance continueStyle;
+    [SerializeField] private Sprite farewellContinueSprite;
+    [SerializeField] private bool showFarewellContinueLabel = true;
+    [SerializeField] private ButtonAppearance farewellContinueStyle;
     [SerializeField, HideInInspector] private bool hasAppearance;
+    [SerializeField, HideInInspector] private bool hasSeparateFarewellButton;
 
     internal Sprite SkipSprite => skipSprite;
     internal Sprite ContinueSprite => continueSprite;
@@ -142,6 +146,9 @@ public sealed class TutorialPresentation : ScriptableObject
     internal bool ShowContinueLabel => showContinueLabel;
     internal ButtonAppearance SkipStyle => skipStyle;
     internal ButtonAppearance ContinueStyle => continueStyle;
+    internal Sprite FarewellContinueSprite => farewellContinueSprite;
+    internal bool ShowFarewellContinueLabel => showFarewellContinueLabel;
+    internal ButtonAppearance FarewellContinueStyle => farewellContinueStyle;
 
     private void OnEnable()
     {
@@ -158,6 +165,17 @@ public sealed class TutorialPresentation : ScriptableObject
             skipStyle = new ButtonAppearance(false);
             continueStyle = new ButtonAppearance(true);
             hasAppearance = true;
+        }
+        if (!hasSeparateFarewellButton)
+        {
+            // Existing shared adjustments belong to the farewell card.
+            // Regular tutorial cards return to their own default appearance.
+            farewellContinueSprite = continueSprite;
+            showFarewellContinueLabel = showContinueLabel;
+            farewellContinueStyle = continueStyle;
+            continueSprite = null;
+            continueStyle = new ButtonAppearance(true);
+            hasSeparateFarewellButton = true;
         }
     }
 

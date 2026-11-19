@@ -8,6 +8,7 @@ public sealed class InitialTutorialEditor : Editor
     private bool showBox = true;
     private bool showSkip;
     private bool showContinue;
+    private bool showFarewellContinue;
     private TutorialPresentation.Page selectedPage;
 
     public override void OnInspectorGUI()
@@ -61,11 +62,14 @@ public sealed class InitialTutorialEditor : Editor
         }
 
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Botões · aplicados a todas as etapas", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Botões do tutorial", EditorStyles.boldLabel);
         showSkip = EditorGUILayout.Foldout(showSkip, "Pular tutorial", true);
         if (showSkip) DrawButton(presentation, "skipStyle", "skipSprite", "showSkipLabel");
-        showContinue = EditorGUILayout.Foldout(showContinue, "Continuar", true);
+        showContinue = EditorGUILayout.Foldout(showContinue, "Continuar · etapas normais", true);
         if (showContinue) DrawButton(presentation, "continueStyle", "continueSprite", "showContinueLabel");
+        showFarewellContinue = EditorGUILayout.Foldout(showFarewellContinue, "Continuar · despedida", true);
+        if (showFarewellContinue)
+            DrawButton(presentation, "farewellContinueStyle", "farewellContinueSprite", "showFarewellContinueLabel");
 
         if (presentation.ApplyModifiedProperties())
         {

@@ -761,7 +761,10 @@ public sealed class InitialTutorial : MonoBehaviour
             ApplyImage(boxImage, frame, tint, look.spriteLayout, look.borderThickness);
             ApplyTypography(farewell ? farewellText : hint, look.typography);
             ApplyButton(skip, skipLabel, presentation.SkipSprite, presentation.ShowSkipLabel, presentation.SkipStyle);
-            ApplyButton(next, nextLabel, presentation.ContinueSprite, presentation.ShowContinueLabel, presentation.ContinueStyle);
+            ApplyButton(next, nextLabel,
+                farewell ? presentation.FarewellContinueSprite : presentation.ContinueSprite,
+                farewell ? presentation.ShowFarewellContinueLabel : presentation.ShowContinueLabel,
+                farewell ? presentation.FarewellContinueStyle : presentation.ContinueStyle);
         }
 
         if (!layoutValid || placedLane != lane || placedViewport != viewport.rect ||

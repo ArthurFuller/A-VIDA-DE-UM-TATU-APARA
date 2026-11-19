@@ -512,6 +512,39 @@ MonoBehaviour:
         top: 0
         bottom: 0
   continueStyle:
+    size: {x: 84.2, y: 21.2}
+    anchor: {x: 1, y: 0}
+    offset: {x: -10, y: 5}
+    spriteLayout: 1
+    borderThickness: 1
+    spriteTint: {r: 1, g: 1, b: 1, a: 1}
+    fillTint: {r: 0.91, g: 0.78, b: 0.53, a: 1}
+    colors:
+      m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
+      m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+      m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+      m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+      m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
+      m_ColorMultiplier: 1
+      m_FadeDuration: 0.1
+    caption: Continuar
+    typography:
+      color: {r: 0.80392164, g: 0.7960785, b: 0.70980394, a: 1}
+      font: {fileID: 0}
+      size: 10
+      fontStyle: 0
+      alignment: 4
+      lineSpacing: 1
+      fit: 0
+      minimumSize: 10
+      insets:
+        left: 0
+        right: 0
+        top: 0
+        bottom: 0
+  farewellContinueSprite: {fileID: 21300000, guid: 20913ec24384dd94ba6eb7ca643ab8cc, type: 2}
+  showFarewellContinueLabel: 1
+  farewellContinueStyle:
     size: {x: 100.5, y: 32.3}
     anchor: {x: 1, y: 0}
     offset: {x: -18.4, y: 17.96}
@@ -543,3 +576,4 @@ MonoBehaviour:
         top: 0
         bottom: 0
   hasAppearance: 1
+  hasSeparateFarewellButton: 1
