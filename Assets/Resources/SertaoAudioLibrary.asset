@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SertaoAudioLibrary
   musicOpening: {fileID: 8300000, guid: be81dff97ecc536e88984b650a4486b0, type: 3}
   musicLoop: {fileID: 8300000, guid: 9818bd72999758c59f1d1245b353a735, type: 3}
-  musicGain: 0.62
+  musicGain: 0.48
   wind: {fileID: 0}
   rain: {fileID: 8300000, guid: dfdbfa45ff1f54f1bc9069f57a35a0a5, type: 3}
   windVolume: 0

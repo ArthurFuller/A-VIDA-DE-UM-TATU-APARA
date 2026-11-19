@@ -200,15 +200,16 @@ public sealed class GS2LeaderboardOnline : MonoBehaviour
         done(true, null);
     }
 
-    private IEnumerator Submit(int coins)
+    private IEnumerator Submit(int coins, Action saved = null)
     {
+        string nickname = GS2Profile.Nickname;
         bool claimed = false;
-        yield return ClaimNickname(GS2Profile.Nickname, (ok, _) => claimed = ok);
-        if (!claimed) yield break;
+        yield return ClaimNickname(nickname, (ok, _) => claimed = ok);
+        if (!claimed || nickname != GS2Profile.Nickname) yield break;
         var entry = new Entry
         {
-            nickname = GS2Profile.Nickname,
-            nicknameKey = NameKey(GS2Profile.Nickname),
+            nickname = nickname,
+            nicknameKey = NameKey(nickname),
             coins = coins
         };
         using (var put = UnityWebRequest.Put(DatabaseUrl("ranking/" + uid), JsonUtility.ToJson(entry)))
@@ -217,29 +218,53 @@ public sealed class GS2LeaderboardOnline : MonoBehaviour
             yield return put.SendWebRequest();
             if (put.result != UnityWebRequest.Result.Success)
                 Debug.LogWarning("Ranking: pontuação não enviada: " + put.error);
+            else saved?.Invoke();
         }
     }
 
     private IEnumerator LoadEntries(Action<List<Entry>, string> done)
     {
-        if (GS2LeaderboardScore.HasLocalScore && GS2Profile.HasNickname)
-            yield return Submit(GS2LeaderboardScore.LocalBestCoins);
         bool authenticated = false;
         yield return Authenticate(ok => authenticated = ok);
         if (!authenticated)
         { done(null, Configured ? "Não foi possível conectar ao Firebase." : "Ranking Firebase ainda não configurado."); yield break; }
+
+        List<Entry> current = null;
+        yield return ReadRanking(result => current = result);
+        done(current, current == null ? "Não foi possível carregar o ranking." : null);
+
+        // A lista já pode aparecer enquanto um recorde local pendente é sincronizado.
+        yield return null;
+        if (!GS2LeaderboardScore.HasLocalScore || !GS2Profile.HasNickname) yield break;
+        string nickname = GS2Profile.Nickname;
+        string nicknameKey = NameKey(nickname);
+        int best = GS2LeaderboardScore.LocalBestCoins;
+        if (current != null && current.Exists(entry => entry.coins >= best &&
+            (entry.nicknameKey == nicknameKey ||
+             string.Equals(entry.nickname, nickname, StringComparison.OrdinalIgnoreCase))))
+            yield break;
+
+        bool saved = false;
+        yield return Submit(best, () => saved = true);
+        if (!saved) yield break;
+
+        yield return ReadRanking(result => { if (result != null) done(result, null); });
+    }
+
+    private IEnumerator ReadRanking(Action<List<Entry>> done)
+    {
         using (var get = UnityWebRequest.Get(DatabaseUrl("ranking")))
         {
             yield return get.SendWebRequest();
             if (get.result != UnityWebRequest.Result.Success)
-            { done(null, "Não foi possível carregar o ranking."); yield break; }
+            { done(null); yield break; }
             var entries = ParseEntries(get.downloadHandler.text);
             entries.Sort((a, b) =>
             {
                 int scoreOrder = b.coins.CompareTo(a.coins);
                 return scoreOrder != 0 ? scoreOrder : string.Compare(a.nickname, b.nickname, StringComparison.OrdinalIgnoreCase);
             });
-            done(entries, null);
+            done(entries);
         }
     }
 

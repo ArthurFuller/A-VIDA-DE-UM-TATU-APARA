@@ -5,11 +5,13 @@ using UnityEngine.UI;
 using UnityEngine.Video;
 
 // Vinheta opcional do estúdio, exibida sobre a MainMenu sem trocar de cena.
-// Sem VideoClip atribuído, o GS2FrontEnd conserva integralmente o fluxo anterior.
+// Na Web, a vinheta usa o MP4 de StreamingAssets.
 public sealed class GS2StudioIntro : MonoBehaviour
 {
     private const float MaxPrepareSeconds = 6f;
     private const float MaxPlaybackSeconds = 45f;
+    private const float NicknameMusicDelay = 0.5f;
+    private static bool UseWebVideo => Application.platform == RuntimePlatform.WebGLPlayer;
     private static bool playedThisSession;
 
     private GameObject overlayObject;
@@ -20,6 +22,7 @@ public sealed class GS2StudioIntro : MonoBehaviour
     private Color videoBackground;
     private VideoPlayer player;
     private RenderTexture videoTexture;
+    private RawImage videoImage;
     private AudioSource videoAudio;
     private VideoClip clip;
     private float initialBlackSeconds;
@@ -34,7 +37,7 @@ public sealed class GS2StudioIntro : MonoBehaviour
     private bool previousAudioPause;
     private bool finished;
 
-    public static bool ShouldPlay(VideoClip video) => video != null && !playedThisSession;
+    public static bool ShouldPlay(VideoClip video) => !playedThisSession && (UseWebVideo || video != null);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetSession() => playedThisSession = false;
@@ -63,7 +66,7 @@ public sealed class GS2StudioIntro : MonoBehaviour
 
     public void Begin(Action revealMenu, bool useOriginalMenuEntrance = false)
     {
-        if (clip == null || overlay == null)
+        if (player == null || overlay == null)
         {
             Finish(revealMenu);
             ReleaseAudio();
@@ -110,13 +113,12 @@ public sealed class GS2StudioIntro : MonoBehaviour
         Stretch(imageRect);
         var ratio = imageObject.GetComponent<AspectRatioFitter>();
         ratio.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-        ratio.aspectRatio = clip.width > 0 && clip.height > 0
-            ? (float)clip.width / clip.height : 16f / 9f;
-        RawImage image = imageObject.GetComponent<RawImage>();
-        image.raycastTarget = false;
+        int width = clip != null && clip.width > 0 ? (int)clip.width : 1920;
+        int height = clip != null && clip.height > 0 ? (int)clip.height : 1080;
+        ratio.aspectRatio = (float)width / height;
+        videoImage = imageObject.GetComponent<RawImage>();
+        videoImage.raycastTarget = false;
 
-        int width = clip.width > 0 ? (int)clip.width : 1920;
-        int height = clip.height > 0 ? (int)clip.height : 1080;
         float factor = Mathf.Min(1f, 1920f / Mathf.Max(width, height));
         width = Mathf.Max(16, Mathf.RoundToInt(width * factor));
         height = Mathf.Max(16, Mathf.RoundToInt(height * factor));
@@ -126,7 +128,7 @@ public sealed class GS2StudioIntro : MonoBehaviour
             antiAliasing = 1
         };
         videoTexture.Create();
-        image.texture = videoTexture;
+        videoImage.texture = videoTexture;
 
         // Cortina da cor do fundo: cobre a textura antes do primeiro frame e
         // evita o flash preto de uma RenderTexture ainda nao preenchida.
@@ -142,8 +144,17 @@ public sealed class GS2StudioIntro : MonoBehaviour
 
         player = videoStage.AddComponent<VideoPlayer>();
         player.playOnAwake = false;
-        player.source = VideoSource.VideoClip;
-        player.clip = clip;
+        if (UseWebVideo)
+        {
+            player.source = VideoSource.Url;
+            player.url = Application.streamingAssetsPath + "/SertaoStudioOpening.mp4";
+            player.timeUpdateMode = VideoTimeUpdateMode.UnscaledGameTime;
+        }
+        else
+        {
+            player.source = VideoSource.VideoClip;
+            player.clip = clip;
+        }
         player.isLooping = false;
         player.waitForFirstFrame = true;
         player.skipOnDrop = true;
@@ -154,7 +165,7 @@ public sealed class GS2StudioIntro : MonoBehaviour
         player.frameReady += OnFrameReady;
         player.loopPointReached += OnVideoEnded;
         player.errorReceived += OnVideoError;
-        if (clip.audioTrackCount > 0)
+        if (!UseWebVideo && clip != null && clip.audioTrackCount > 0)
         {
             videoAudio = videoStage.AddComponent<AudioSource>();
             videoAudio.playOnAwake = false;
@@ -209,16 +220,11 @@ public sealed class GS2StudioIntro : MonoBehaviour
 
         // Decodifica o primeiro quadro enquanto o preto continua 100% opaco.
         // Congelá-lo evita perder a entrada da logo durante o clareamento.
-        try { player.Play(); }
-        catch (Exception error)
-        {
-            failed = true;
-            Debug.LogWarning("Abertura do estúdio: falha ao reproduzir MP4: " + error.Message, this);
-        }
+        StartVideoPlayback();
         deadline = Time.realtimeSinceStartup + 2.5f;
-        while (!firstFrame && !failed && Time.realtimeSinceStartup < deadline)
+        while (!HasVideoFrame && !failed && Time.realtimeSinceStartup < deadline)
             yield return null;
-        if (failed || !firstFrame)
+        if (failed || !HasVideoFrame)
         {
             if (!failed) Debug.LogWarning("Abertura do estúdio: primeiro quadro não chegou.", this);
             yield return RevealFallback(revealMenu, useOriginalMenuEntrance);
@@ -240,15 +246,34 @@ public sealed class GS2StudioIntro : MonoBehaviour
         }
 
         // A animação do vídeo começa somente depois da revelação lenta.
-        player.Play();
+        double resumeTime = player.time;
+        StartVideoPlayback();
+        if (UseWebVideo)
+        {
+            float resumeDeadline = Time.realtimeSinceStartup + 0.9f;
+            while (!ended && !failed && player.time <= resumeTime && Time.realtimeSinceStartup < resumeDeadline)
+                yield return null;
+            if (failed || (!ended && player.time <= resumeTime))
+            {
+                yield return RevealFallback(revealMenu, useOriginalMenuEntrance);
+                yield break;
+            }
+        }
         float playbackStartedAt = Time.realtimeSinceStartup;
-        float darkenAt = Mathf.Max(0f, (float)clip.length - videoDarkenSeconds);
+        double duration = UseWebVideo ? player.length : clip.length;
+        if (double.IsNaN(duration) || double.IsInfinity(duration) || duration <= 0d) duration = 3d;
+        float darkenAt = Mathf.Max(0f, (float)duration - videoDarkenSeconds);
         deadline = Time.realtimeSinceStartup + Mathf.Min(MaxPlaybackSeconds,
-            Mathf.Max(2f, (float)clip.length + 2f));
-        while (!ended && !failed && player.isPlaying &&
+            Mathf.Max(2f, (float)duration + 2f));
+        while (!ended && !failed && (UseWebVideo || player.isPlaying) &&
             player.time < darkenAt && Time.realtimeSinceStartup - playbackStartedAt < darkenAt &&
             Time.realtimeSinceStartup < deadline)
             yield return null;
+        if (UseWebVideo && (failed || (!ended && player.time < darkenAt - 0.25f)))
+        {
+            yield return RevealFallback(revealMenu, useOriginalMenuEntrance);
+            yield break;
+        }
 
         // Começa a escurecer ANTES do fim do MP4, sobre a saída da logo.
         // Não esperamos o vídeo clarear sozinho para só então fechar a cortina.
@@ -273,24 +298,41 @@ public sealed class GS2StudioIntro : MonoBehaviour
             Cleanup();
             yield break;
         }
-        // Nickname: preserva a pausa no preto e a revelacao lenta existentes.
-        Finish(revealMenu);
-        // Mantém o preto COMPLETO por 1,35s (ou o valor do Inspector),
-        // contado desde o fim do fade, mesmo se o vídeo demorou a desligar.
-        while (Time.realtimeSinceStartup - fullyDarkAt < postVideoBlackSeconds)
-            yield return null;
-        // É a MESMA cortina que clareia uma única vez para o próximo estado.
-        yield return Fade(blackCurtain, 1f, 0f, menuRevealSeconds);
-        ReleaseAudio();
-        Cleanup();
+        yield return RevealNickname(revealMenu, fullyDarkAt);
+    }
+
+    private bool HasVideoFrame => firstFrame || (UseWebVideo && player.time > 0d);
+
+    private void StartVideoPlayback()
+    {
+        try { player.Play(); }
+        catch (Exception error)
+        {
+            failed = true;
+            Debug.LogWarning("Abertura do estúdio: falha ao reproduzir MP4: " + error.Message, this);
+        }
     }
 
     private IEnumerator RevealFallback(Action revealMenu, bool useOriginalMenuEntrance)
     {
         if (blackCurtain != null && blackCurtain.alpha < 1f)
             yield return Fade(blackCurtain, blackCurtain.alpha, 1f, videoDarkenSeconds);
-        float fullyDarkAt = Time.realtimeSinceStartup;
         ShutdownVideo();
+        if (UseWebVideo)
+        {
+            Texture2D still = Resources.Load<Texture2D>("SertaoStudioOpeningFallback");
+            if (still != null)
+            {
+                player.enabled = false;
+                videoImage.texture = still;
+                videoStage.SetActive(true);
+                yield return Fade(blackCurtain, 1f, 0f, 0.3f);
+                yield return new WaitForSecondsRealtime(1.15f);
+                yield return Fade(blackCurtain, 0f, 1f, 0.35f);
+                videoStage.SetActive(false);
+            }
+        }
+        float fullyDarkAt = Time.realtimeSinceStartup;
         if (useOriginalMenuEntrance)
         {
             Finish(revealMenu);
@@ -298,10 +340,15 @@ public sealed class GS2StudioIntro : MonoBehaviour
             Cleanup();
             yield break;
         }
+        yield return RevealNickname(revealMenu, fullyDarkAt);
+    }
+
+    private IEnumerator RevealNickname(Action revealMenu, float fullyDarkAt)
+    {
         Finish(revealMenu);
         while (Time.realtimeSinceStartup - fullyDarkAt < postVideoBlackSeconds)
             yield return null;
-        yield return Fade(blackCurtain, 1f, 0f, menuRevealSeconds);
+        yield return Fade(blackCurtain, 1f, 0f, menuRevealSeconds, NicknameMusicDelay);
         ReleaseAudio();
         Cleanup();
     }
@@ -318,7 +365,8 @@ public sealed class GS2StudioIntro : MonoBehaviour
         if (paleCurtain != null) paleCurtain.gameObject.SetActive(false);
     }
 
-    private static IEnumerator Fade(CanvasGroup target, float from, float to, float duration)
+    private IEnumerator Fade(CanvasGroup target, float from, float to, float duration,
+        float releaseAudioAfter = float.PositiveInfinity)
     {
         if (target == null) yield break;
         target.alpha = from;
@@ -330,6 +378,7 @@ public sealed class GS2StudioIntro : MonoBehaviour
             float t = Mathf.Clamp01(elapsed / duration);
             t = t * t * (3f - 2f * t);
             target.alpha = Mathf.Lerp(from, to, t);
+            if (elapsed >= releaseAudioAfter) ReleaseAudio();
             yield return null;
         }
         if (target != null) target.alpha = to;
@@ -339,8 +388,7 @@ public sealed class GS2StudioIntro : MonoBehaviour
     {
         if (finished) return;
         finished = true;
-        // Prepara o nickname/menu sob o preto. A musica so e liberada
-        // depois do unico fade de revelacao, em PlaySequence/RevealFallback.
+        // Prepara o nickname ou o menu sob o preto.
         revealMenu?.Invoke();
     }
 

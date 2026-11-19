@@ -49,6 +49,7 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     public CropType Crop { get; private set; }
     public AnimalKind Animal { get; private set; }
     public int PlantedDay { get; private set; }
+    internal bool IsWilting => willWilt;
     private int growthAdjustment;
     private int mandalaGrowthAdjustment;
     private int lastMandalaGrowthDay = -1;

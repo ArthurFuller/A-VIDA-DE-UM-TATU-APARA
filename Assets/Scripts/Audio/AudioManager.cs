@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+#if UNITY_WEBGL && !UNITY_EDITOR
+using UnityEngine.InputSystem;
+#endif
 
 // A biblioteca compartilhada se sobrepõe às entradas antigas nas duas cenas.
 public sealed class AudioManager : MonoBehaviour
@@ -54,8 +57,16 @@ public sealed class AudioManager : MonoBehaviour
     private static float musicTransitionGain = 1f;
     private static AudioSource sharedOpening;
     private static AudioSource sharedLoop;
+    private static AudioClip soundtrackLoopClip;
+#if UNITY_WEBGL && !UNITY_EDITOR
+    private static bool webMusicUnlocked;
+    private static bool webMusicStarted;
+    private static bool webMusicPaused;
+    private static bool webOpeningPlayed;
+#else
     private static double soundtrackStartDsp = double.NaN;
     private static double soundtrackPausedAt;
+#endif
     private bool UsesSoundtrack => library != null && library.musicLoop != null;
 
     public static AudioManager Instance { get; private set; }
@@ -175,7 +186,7 @@ public sealed class AudioManager : MonoBehaviour
     private void StartMusic()
     {
         AudioClip loop = UsesSoundtrack ? library.musicLoop : null;
-        if (loop != null && sharedLoop != null && sharedLoop.clip == loop)
+        if (loop != null && sharedLoop != null && soundtrackLoopClip == loop)
         {
             ApplySoundtrackPause();
             return;
@@ -197,16 +208,33 @@ public sealed class AudioManager : MonoBehaviour
 
         var track = new GameObject("Trilha do Sertão");
         DontDestroyOnLoad(track);
+        soundtrackLoopClip = loop;
         sharedLoop = AddMusicSource(track, loop, true);
+#if !UNITY_WEBGL || UNITY_EDITOR
         if (library.musicOpening != null)
             sharedOpening = AddMusicSource(track, library.musicOpening, false);
+#endif
         ApplyMusicVolume();
-
-        soundtrackStartDsp = double.NaN;
-        soundtrackPausedAt = 0d;
-        if (!musicMuted) ScheduleSoundtrack(0.18);
+        ResetSoundtrack();
+        ApplySoundtrackPause();
     }
 
+    private void ResetSoundtrack()
+    {
+        sharedLoop.Stop();
+#if UNITY_WEBGL && !UNITY_EDITOR
+        // Na Web, a mesma fonte toca a abertura e depois o loop.
+        sharedLoop.clip = library.musicOpening != null ? library.musicOpening : soundtrackLoopClip;
+        sharedLoop.loop = library.musicOpening == null;
+        webMusicStarted = webMusicPaused = webOpeningPlayed = false;
+#else
+        if (sharedOpening != null) sharedOpening.Stop();
+        soundtrackStartDsp = double.NaN;
+        soundtrackPausedAt = 0d;
+#endif
+    }
+
+#if !UNITY_WEBGL || UNITY_EDITOR
     private static void ScheduleSoundtrack(double leadTime)
     {
         double begins = AudioSettings.dspTime + leadTime;
@@ -230,13 +258,36 @@ public sealed class AudioManager : MonoBehaviour
         }
         sharedLoop.PlayScheduled(begins);
     }
+#endif
 
     private void ApplySoundtrackPause()
     {
         if (sharedLoop == null) return;
+#if UNITY_WEBGL && !UNITY_EDITOR
+        if (musicMuted)
+        {
+            if (webMusicStarted && !webMusicPaused)
+            {
+                sharedLoop.Pause();
+                webMusicPaused = true;
+            }
+            return;
+        }
+        if (!webMusicUnlocked || AudioListener.pause) return;
+        if (!webMusicStarted)
+        {
+            webMusicStarted = true;
+            sharedLoop.Play();
+        }
+        else if (webMusicPaused)
+        {
+            webMusicPaused = false;
+            sharedLoop.UnPause();
+        }
+#else
         if (!musicMuted)
         {
-            if (double.IsNaN(soundtrackStartDsp)) ScheduleSoundtrack(0.05);
+            if (!AudioListener.pause && double.IsNaN(soundtrackStartDsp)) ScheduleSoundtrack(0.05);
             return;
         }
 
@@ -244,8 +295,9 @@ public sealed class AudioManager : MonoBehaviour
         // Cancela também a entrada já agendada do loop enquanto a introdução toca.
         soundtrackPausedAt = Math.Max(0d, AudioSettings.dspTime - soundtrackStartDsp);
         soundtrackStartDsp = double.NaN;
-        sharedOpening?.Stop();
+        if (sharedOpening != null) sharedOpening.Stop();
         sharedLoop.Stop();
+#endif
     }
 
     private AudioSource AddMusicSource(GameObject root, AudioClip clip, bool loop)
@@ -287,6 +339,14 @@ public sealed class AudioManager : MonoBehaviour
 
     private void Update()
     {
+        if (UsesSoundtrack && sharedLoop != null)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            UpdateWebSoundtrack();
+#else
+            if (!musicMuted && double.IsNaN(soundtrackStartDsp)) ApplySoundtrackPause();
+#endif
+        }
         if (rainSource != null)
         {
             if (rainWanted && !rainSource.isPlaying) rainSource.Play();
@@ -297,6 +357,27 @@ public sealed class AudioManager : MonoBehaviour
         }
         UpdateFishingPull();
     }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+    private void UpdateWebSoundtrack()
+    {
+        if (!webMusicUnlocked)
+            webMusicUnlocked = Mouse.current?.leftButton.wasPressedThisFrame == true ||
+                Keyboard.current?.anyKey.wasPressedThisFrame == true ||
+                Touchscreen.current?.primaryTouch.press.wasPressedThisFrame == true;
+
+        ApplySoundtrackPause();
+        if (!webMusicStarted || webMusicPaused || AudioListener.pause || sharedLoop.loop) return;
+        if (sharedLoop.isPlaying) webOpeningPlayed = true;
+        else if (webOpeningPlayed)
+        {
+            sharedLoop.Stop();
+            sharedLoop.clip = soundtrackLoopClip;
+            sharedLoop.loop = true;
+            sharedLoop.Play();
+        }
+    }
+#endif
 
     private void UpdateFishingPull()
     {
@@ -434,6 +515,7 @@ public sealed class AudioManager : MonoBehaviour
 
     internal static void RestartMusicAfterTransition()
     {
+        if (musicTransitionGain >= 1f) return;
         var audio = Instance;
         if (audio == null)
         {
@@ -443,11 +525,8 @@ public sealed class AudioManager : MonoBehaviour
 
         if (audio.UsesSoundtrack && sharedLoop != null)
         {
-            sharedLoop.Stop();
-            if (sharedOpening != null) sharedOpening.Stop();
-            soundtrackStartDsp = double.NaN;
-            soundtrackPausedAt = 0d;
-            if (!audio.musicMuted) ScheduleSoundtrack(0.05);
+            audio.ResetSoundtrack();
+            audio.ApplySoundtrackPause();
         }
         else if (audio.musicSource != null && audio.musicSource.clip != null)
         {

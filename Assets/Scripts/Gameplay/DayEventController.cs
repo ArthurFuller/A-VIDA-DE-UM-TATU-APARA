@@ -120,12 +120,13 @@ public sealed class DayEventController : MonoBehaviour
     }
     private bool pestRegressionPending;
     private CropType pestTarget = CropType.None;
+    private readonly HashSet<Plot> pestTargetsWithEmptyBar = new();
     public bool IsRaining => IsActive(SertaoEventKind.Rain);
     public bool IsDrought => IsActive(SertaoEventKind.Drought);
     public event System.Action WeatherChanged;
     public CropType PestTarget => pestTarget;
     public int HarvestReductionFor(Plot plot) =>
-        plot != null && plot.Crop != CropType.None && plot.Crop == pestTarget &&
+        plot != null && plot.Crop != CropType.None && plot.Crop == pestTarget && !plot.IsWilting &&
         IsActive(SertaoEventKind.Pests) &&
         (MandalaSynergy.Instance == null || !MandalaSynergy.Instance.ProtectsFromPests(plot))
             ? pestHarvestReduction : 0;
@@ -197,6 +198,7 @@ public sealed class DayEventController : MonoBehaviour
         currentDay = day;
         stolenFishToday = 0;
         pestRegressionPending = false;
+        pestTargetsWithEmptyBar.Clear();
         for (int i = activeGeneralEvents.Count - 1; i >= 0; i--)
             if (--activeGeneralEvents[i].DaysRemaining <= 0) activeGeneralEvents.RemoveAt(i);
         for (int i = activeComadre.Count - 1; i >= 0; i--)
@@ -247,6 +249,11 @@ public sealed class DayEventController : MonoBehaviour
                 {
                     pestTarget = SelectAffectedCrop();
                     pestRegressionPending = true;
+                    // Guarda o progresso da véspera antes da Seca ou dos bônus da mandala.
+                    if (pestTarget != CropType.None)
+                        foreach (Plot plot in plots)
+                            if (plot != null && plot.Crop == pestTarget && plot.GrowthAge(day - 1) <= 0)
+                                pestTargetsWithEmptyBar.Add(plot);
                 }
                 activeGeneralEvents.Add(new ActiveGeneral
                 {
@@ -258,7 +265,7 @@ public sealed class DayEventController : MonoBehaviour
         if (IsActive(SertaoEventKind.Drought))
         {
             foreach (var plot in plots)
-                if (plot != null && (MandalaSynergy.Instance == null ||
+                if (plot != null && !plot.IsWilting && (MandalaSynergy.Instance == null ||
                     !MandalaSynergy.Instance.ProtectsFromDrought(plot)))
                     plot.AdvanceGrowth(-droughtGrowthDelay);
         }
@@ -357,6 +364,7 @@ public sealed class DayEventController : MonoBehaviour
         if (!pestRegressionPending) return;
         pestRegressionPending = false;
         ApplyPestRegression(catalog);
+        pestTargetsWithEmptyBar.Clear();
     }
 
     private void ApplyPestRegression(SeedCatalog catalog)
@@ -364,10 +372,11 @@ public sealed class DayEventController : MonoBehaviour
         if (pestTarget == CropType.None || plots == null || catalog == null) return;
         foreach (Plot plot in plots)
         {
-            if (plot == null || plot.Crop != pestTarget) continue;
+            if (plot == null || plot.Crop != pestTarget || plot.IsWilting) continue;
             if (MandalaSynergy.Instance != null &&
                 MandalaSynergy.Instance.ProtectsFromPests(plot)) continue;
-            plot.RegressGrowthFromPests(pestGrowthRegression, currentDay, catalog);
+            if (pestTargetsWithEmptyBar.Contains(plot)) plot.Harvest();
+            else plot.RegressGrowthFromPests(pestGrowthRegression, currentDay, catalog);
         }
     }
 

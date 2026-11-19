@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
@@ -11,33 +12,51 @@ public sealed class GS2LeaderboardView : MonoBehaviour
     [SerializeField, Min(0)] private float rowGap = 8f;
     [SerializeField, Min(1)] private float visibleHeight = 165f;
 
+    private sealed class Row
+    {
+        public RectTransform Rect;
+        public Text Position;
+        public Text Nickname;
+        public Text Coins;
+        public CanvasGroup Fade;
+        public float Alpha;
+    }
+
+    private readonly List<Row> rows = new();
+    private List<GS2LeaderboardOnline.Entry> entries;
     private RectTransform content;
     private ScrollRect scroll;
-    private RectMask2D viewportMask;
-    private readonly List<(RectTransform Rect, CanvasGroup Fade, float Alpha)> pendingRows = new();
+    private CanvasGroup[] pageGroups;
     private Sequence rowEntrance;
-    private bool pageRevealed;
+    private float restingX;
+    private int firstBoundIndex = -1;
+    private bool layoutDirty;
+    private bool needsEntrance;
+    private bool localFallback;
     private int loadVersion;
+
+    private float RowHeight => rowTemplate.rect.height;
+    private float RowStride => Mathf.Max(1f, RowHeight + rowGap);
 
     private void Awake()
     {
         if (rowTemplate == null) return;
+        pageGroups = GetComponentsInParent<CanvasGroup>(true);
         if (resultsPanel == null)
         {
-            // As cenas existentes têm o painel costurado como filho "Image" de Ranking.
+            // A cena existente nomeia o painel costurado de "Image".
             Transform panel = transform.Find("Image");
             if (panel != null) resultsPanel = panel.GetComponent<Image>();
         }
+
         var viewport = new GameObject("Recorte dos resultados", typeof(RectTransform),
             typeof(Image), typeof(RectMask2D)).GetComponent<RectTransform>();
         viewport.SetParent(transform, false);
-        viewportMask = viewport.GetComponent<RectMask2D>();
-        float rowHeight = rowTemplate.rect.height;
         viewport.anchorMin = viewport.anchorMax = viewport.pivot = new Vector2(0.5f, 0.5f);
-        viewport.anchoredPosition = rowTemplate.anchoredPosition -
-            Vector2.up * ((visibleHeight - rowHeight) * 0.5f);
-        viewport.sizeDelta = new Vector2(rowTemplate.rect.width, visibleHeight);
-        viewport.GetComponent<Image>().color = new Color(0, 0, 0, 0);
+        Image input = viewport.GetComponent<Image>();
+        input.color = Color.clear;
+        input.raycastTarget = true;
+        input.canvasRenderer.cullTransparentMesh = false;
 
         content = new GameObject("Resultados", typeof(RectTransform)).GetComponent<RectTransform>();
         content.SetParent(viewport, false);
@@ -53,142 +72,228 @@ public sealed class GS2LeaderboardView : MonoBehaviour
         scroll.vertical = true;
         scroll.movementType = ScrollRect.MovementType.Clamped;
         scroll.scrollSensitivity = 30;
+        scroll.onValueChanged.AddListener(OnScrolled);
         rowTemplate.gameObject.SetActive(false);
     }
 
     private void OnEnable()
     {
         if (content == null) return;
-        for (int i = content.childCount - 1; i >= 0; i--)
-        {
-            GameObject row = content.GetChild(i).gameObject;
-            row.SetActive(false);
-            Destroy(row);
-        }
+        entries = null;
+        needsEntrance = true;
+        localFallback = false;
+        UpdateViewport();
         scroll.StopMovement();
-        content.sizeDelta = new Vector2(0f, visibleHeight);
         content.anchoredPosition = Vector2.zero;
-        if (status != null) status.text = "Carregando ranking...";
-        int request = ++loadVersion;
-        GS2LeaderboardOnline.Instance.Load((entries, error) =>
+        RefreshRows(true);
+        SetStatus("Carregando ranking...");
+        StartCoroutine(LoadAfterFirstFrame(++loadVersion));
+    }
+
+    private IEnumerator LoadAfterFirstFrame(int request)
+    {
+        // Deixa o menu iniciar a transição antes de preparar os resultados.
+        yield return null;
+        if (!isActiveAndEnabled || request != loadVersion) yield break;
+
+        if (Debug.isDebugBuild)
+        {
+            const int previewCount = 30;
+            var preview = new List<GS2LeaderboardOnline.Entry>(previewCount);
+            for (int i = 0; i < previewCount; i++)
+                preview.Add(new GS2LeaderboardOnline.Entry
+                {
+                    nickname = $"Teste {i + 1:00}",
+                    coins = 350 - i * 10
+                });
+            ShowEntries(preview, null);
+            yield break;
+        }
+
+        GS2LeaderboardOnline.Instance.Load((result, error) =>
         {
             if (this != null && isActiveAndEnabled && request == loadVersion)
-                ShowEntries(entries, error);
+                ShowEntries(result, error);
         });
     }
 
     private void OnDisable()
     {
         loadVersion++;
-        pageRevealed = false;
-        pendingRows.Clear();
         rowEntrance?.Kill();
+    }
+
+    private void OnRectTransformDimensionsChange() => layoutDirty = true;
+
+    private void LateUpdate()
+    {
+        if (content == null) return;
+        if (layoutDirty)
+        {
+            rowEntrance?.Complete();
+            UpdateViewport();
+            RefreshRows(true);
+        }
+
+        RevealRows();
     }
 
     internal void RevealRows()
     {
-        pageRevealed = true;
+        if (!isActiveAndEnabled || !needsEntrance || entries == null || entries.Count == 0) return;
+        foreach (CanvasGroup group in pageGroups)
+            if (group != null && group.isActiveAndEnabled && (!group.blocksRaycasts || group.alpha < 0.99f))
+                return;
         AnimateRows();
     }
 
-    private void ShowEntries(List<GS2LeaderboardOnline.Entry> entries, string error)
+    private void ShowEntries(List<GS2LeaderboardOnline.Entry> result, string error)
     {
-        if (entries == null)
+        rowEntrance?.Complete();
+        bool firstResult = entries == null;
+        localFallback = result == null && GS2LeaderboardScore.HasLocalScore;
+        entries = result;
+        if (localFallback)
+            entries = new List<GS2LeaderboardOnline.Entry>
+            {
+                new()
+                {
+                    nickname = GS2Profile.HasNickname ? GS2Profile.Nickname : "Jogador",
+                    coins = GS2LeaderboardScore.LocalBestCoins
+                }
+            };
+
+        SetStatus(result == null ? error : result.Count == 0 ? "Nenhuma partida no ranking." : "");
+        if (firstResult)
         {
-            if (status != null) status.text = error;
-            if (GS2LeaderboardScore.HasLocalScore)
-                AddRow("—", GS2Profile.HasNickname ? GS2Profile.Nickname : "Jogador",
-                    GS2LeaderboardScore.LocalBestCoins.ToString(), 0);
+            scroll.StopMovement();
+            content.anchoredPosition = Vector2.zero;
         }
-        else
-        {
-            for (int i = 0; i < entries.Count; i++)
-                AddRow((i + 1).ToString(), entries[i].nickname, entries[i].coins.ToString(), i);
-            if (status != null) status.text = entries.Count == 0 ? "Nenhuma partida no ranking." : string.Empty;
-        }
-        int count = entries == null ? (GS2LeaderboardScore.HasLocalScore ? 1 : 0) : entries.Count;
-        float rowHeight = rowTemplate.rect.height;
-        content.sizeDelta = new Vector2(0, Mathf.Max(visibleHeight,
-            count * rowHeight + Mathf.Max(0, count - 1) * rowGap));
-        scroll.verticalNormalizedPosition = 1f;
-        if (pageRevealed) AnimateRows();
+        UpdateViewport();
+        RefreshRows(true);
     }
 
-    private void AddRow(string position, string nickname, string coins, int index)
+    private void SetStatus(string message)
     {
-        RectTransform row = Instantiate(rowTemplate, content);
-        row.anchorMin = row.anchorMax = new Vector2(0.5f, 1);
-        row.pivot = new Vector2(0.5f, 0.5f);
-        float restingY = -row.rect.height * 0.5f - index * (row.rect.height + rowGap);
-        row.anchoredPosition = new Vector2(0f, restingY);
-        row.GetChild(0).GetComponent<Text>().text = position;
-        row.GetChild(1).GetComponent<Text>().text = nickname;
-        row.GetChild(2).GetComponent<Text>().text = coins;
+        if (status == null) return;
+        status.text = message;
+        status.gameObject.SetActive(!string.IsNullOrEmpty(message));
+    }
 
-        CanvasGroup fade = row.GetComponent<CanvasGroup>();
-        if (fade == null) fade = row.gameObject.AddComponent<CanvasGroup>();
-        float restingAlpha = fade.alpha;
-        fade.alpha = 0f;
-        row.gameObject.SetActive(true);
-        pendingRows.Add((row, fade, restingAlpha));
+    private void UpdateViewport()
+    {
+        layoutDirty = false;
+        var parent = (RectTransform)transform;
+        Vector2 center = parent.InverseTransformPoint(rowTemplate.TransformPoint(rowTemplate.rect.center));
+        float top = center.y + RowHeight * 0.5f;
+        var bounds = new Rect(center.x - rowTemplate.rect.width * 0.5f,
+            top - visibleHeight, rowTemplate.rect.width, visibleHeight);
+
+        if (resultsPanel != null)
+        {
+            Rect inner = resultsPanel.GetPixelAdjustedRect();
+            float width = inner.width;
+            float height = inner.height;
+            // Margens do painel costurado, medidas até a borda interna.
+            inner.xMin += width * 0.027f;
+            inner.xMax -= width * 0.030f;
+            inner.yMin += height * 0.057f;
+            inner.yMax -= height * 0.070f;
+            RectTransform panel = resultsPanel.rectTransform;
+            Vector2 min = parent.InverseTransformPoint(panel.TransformPoint(inner.min));
+            Vector2 max = parent.InverseTransformPoint(panel.TransformPoint(inner.max));
+            // O primeiro resultado começa abaixo dos cabeçalhos fixos.
+            float listTop = Mathf.Min(top, max.y);
+            if (listTop > min.y && max.x > min.x)
+                bounds = Rect.MinMaxRect(min.x, min.y, max.x, listTop);
+        }
+
+        scroll.viewport.sizeDelta = bounds.size;
+        scroll.viewport.anchoredPosition = bounds.center - parent.rect.center;
+        restingX = center.x - bounds.center.x;
+        UpdateContentHeight();
+        Vector2 offset = content.anchoredPosition;
+        offset.y = Mathf.Clamp(offset.y, 0f, Mathf.Max(0f, content.rect.height - bounds.height));
+        content.anchoredPosition = offset;
+    }
+
+    private void UpdateContentHeight()
+    {
+        int total = entries?.Count ?? 0;
+        float height = total > 0 ? total * RowStride - rowGap : 0f;
+        content.sizeDelta = new Vector2(0f, Mathf.Max(scroll.viewport.rect.height, height));
+    }
+
+    private void OnScrolled(Vector2 _)
+    {
+        if (rowEntrance != null && content.anchoredPosition.y > 0.01f)
+            rowEntrance.Complete();
+        RefreshRows();
+    }
+
+    private void RefreshRows(bool force = false)
+    {
+        int total = entries?.Count ?? 0;
+        int first = Mathf.Max(0, Mathf.FloorToInt(content.anchoredPosition.y / RowStride));
+        if (!force && firstBoundIndex == first) return;
+        firstBoundIndex = first;
+        int poolSize = Mathf.CeilToInt(scroll.viewport.rect.height / RowStride) + 1;
+        int visible = Mathf.Clamp(total - first, 0, poolSize);
+        while (rows.Count < visible) rows.Add(CreateRow());
+        for (int i = 0; i < rows.Count; i++)
+        {
+            Row row = rows[i];
+            if (i >= visible)
+            {
+                row.Rect.gameObject.SetActive(false);
+                continue;
+            }
+
+            int index = first + i;
+            GS2LeaderboardOnline.Entry entry = entries[index];
+            row.Rect.anchoredPosition = new Vector2(restingX, -RowHeight * 0.5f - index * RowStride);
+            row.Position.text = localFallback ? "—" : (index + 1).ToString();
+            row.Nickname.text = entry.nickname;
+            row.Coins.text = entry.coins.ToString();
+            row.Fade.alpha = needsEntrance ? 0f : row.Alpha;
+            row.Rect.gameObject.SetActive(true);
+        }
+    }
+
+    private Row CreateRow()
+    {
+        RectTransform rect = Instantiate(rowTemplate, content);
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        CanvasGroup fade = rect.GetComponent<CanvasGroup>();
+        if (fade == null) fade = rect.gameObject.AddComponent<CanvasGroup>();
+        fade.blocksRaycasts = false;
+        return new Row
+        {
+            Rect = rect,
+            Position = rect.GetChild(0).GetComponent<Text>(),
+            Nickname = rect.GetChild(1).GetComponent<Text>(),
+            Coins = rect.GetChild(2).GetComponent<Text>(),
+            Fade = fade,
+            Alpha = fade.alpha
+        };
     }
 
     private void AnimateRows()
     {
-        if (pendingRows.Count == 0) return;
-        Canvas.ForceUpdateCanvases();
-
-        bool usePanel = resultsPanel != null && resultsPanel.canvas != null;
-        Vector4 listPadding = viewportMask.padding;
-        RectTransform edge = usePanel ? resultsPanel.rectTransform : scroll.viewport;
-        Rect inner = usePanel ? FitMaskToResultsPanel(listPadding) : edge.rect;
-
+        needsEntrance = false;
+        RectTransform viewport = scroll.viewport;
         rowEntrance = DOTween.Sequence().SetUpdate(true).SetAutoKill(true);
-        for (int i = 0; i < pendingRows.Count; i++)
+        for (int i = 0; i < rows.Count; i++)
         {
-            var (row, fade, alpha) = pendingRows[i];
-            float restingX = row.anchoredPosition.x;
-            Vector2 offset = GS2FrontEnd.OffsetOutsideFrame(row, edge, inner, Vector2.right);
-            row.anchoredPosition += offset;
+            Row row = rows[i];
+            if (!row.Rect.gameObject.activeSelf) continue;
+            row.Rect.anchoredPosition += GS2FrontEnd.OffsetOutsideFrame(
+                row.Rect, viewport, viewport.rect, Vector2.right);
             float delay = Mathf.Min(i, 4) * 0.075f;
-            rowEntrance.Insert(delay, row.DOAnchorPosX(restingX, 0.44f).SetEase(Ease.OutCubic));
-            rowEntrance.Insert(delay, fade.DOFade(alpha, 0.24f).SetEase(Ease.OutSine));
+            rowEntrance.Insert(delay, row.Rect.DOAnchorPosX(restingX, 0.44f).SetEase(Ease.OutCubic));
+            rowEntrance.Insert(delay, row.Fade.DOFade(row.Alpha, 0.24f).SetEase(Ease.OutSine));
         }
-        pendingRows.Clear();
-        if (usePanel)
-            rowEntrance.OnUpdate(() =>
-            {
-                if (resultsPanel != null && resultsPanel.canvas != null)
-                    FitMaskToResultsPanel(listPadding);
-            });
-        rowEntrance.OnKill(() =>
-        {
-            if (viewportMask != null) viewportMask.padding = listPadding;
-            rowEntrance = null;
-        });
-    }
-
-    private Rect FitMaskToResultsPanel(Vector4 listPadding)
-    {
-        Rect inner = resultsPanel.GetPixelAdjustedRect();
-        float width = inner.width;
-        float height = inner.height;
-        // Margens proporcionais do desenho, medidas até a parte interna da costura.
-        inner.xMin += width * 0.027f;
-        inner.xMax -= width * 0.030f;
-        inner.yMin += height * 0.057f;
-        inner.yMax -= height * 0.070f;
-
-        Transform panel = resultsPanel.rectTransform;
-        Transform canvas = resultsPanel.canvas.rootCanvas.transform;
-        Vector3 min = canvas.InverseTransformPoint(panel.TransformPoint(inner.min));
-        Vector3 max = canvas.InverseTransformPoint(panel.TransformPoint(inner.max));
-        Rect viewport = viewportMask.canvasRect;
-        // O recorte lateral segue o painel e a lista conserva sua janela vertical de rolagem.
-        Vector4 padding = new Vector4(min.x - viewport.xMin,
-            Mathf.Max(listPadding.y, min.y - viewport.yMin), viewport.xMax - max.x,
-            Mathf.Max(listPadding.w, viewport.yMax - max.y));
-        if (viewportMask.padding != padding) viewportMask.padding = padding;
-        return inner;
+        rowEntrance.OnKill(() => rowEntrance = null);
     }
 }

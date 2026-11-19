@@ -136,7 +136,6 @@ public sealed class GS2Profile : MonoBehaviour
         HoverPunchButton feedback = HoverPunchButton.Bind(proceed);
         feedback.AnimatePointerClick = false;
         bool submitting = false;
-        bool sessionRequested = false;
         Color noticeColor = message.color;
         RectTransform inputRect = (RectTransform)input.transform;
         RectTransform buttonRect = (RectTransform)proceed.transform;
@@ -148,16 +147,12 @@ public sealed class GS2Profile : MonoBehaviour
         message.gameObject.SetActive(true);
         proceed.gameObject.SetActive(false);
         page.Root.SetActive(true);
+        if (!preview) GS2LeaderboardOnline.Instance.PrepareSession();
 
         void Refresh(string value)
         {
             bool valid = IsValidNickname(value.Trim());
             proceed.gameObject.SetActive(valid);
-            if (valid && !preview && !sessionRequested)
-            {
-                sessionRequested = true;
-                GS2LeaderboardOnline.Instance.PrepareSession();
-            }
         }
 
         void ClearNotice()
@@ -209,6 +204,7 @@ public sealed class GS2Profile : MonoBehaviour
             proceed.onClick.RemoveListener(Submit);
             done(() =>
             {
+                if (!preview) PlayerPrefs.Save();
                 page.Root.SetActive(false);
                 if (temporary) Destroy(page.Root);
             });
@@ -224,7 +220,7 @@ public sealed class GS2Profile : MonoBehaviour
             if (preview)
                 Complete();
             else
-                Save(input, proceed, message, Complete, ShowFirstRunError);
+                Save(input, proceed, message, Complete, ShowFirstRunError, saveImmediately: false);
         }
 
         input.onValueChanged.AddListener(Refresh);
@@ -291,7 +287,7 @@ public sealed class GS2Profile : MonoBehaviour
     }
 
     private void Save(InputField input, Button button, Text message, Action onSaved,
-        Action<string> onRejected)
+        Action<string> onRejected, bool saveImmediately = true)
     {
         if (input == null) return;
         string value = input.text.Trim();
@@ -322,7 +318,7 @@ public sealed class GS2Profile : MonoBehaviour
                 return;
             }
             PlayerPrefs.SetString(NicknameKey, value);
-            PlayerPrefs.Save();
+            if (saveImmediately) PlayerPrefs.Save();
             input.SetTextWithoutNotify(value);
             onSaved();
             if (GS2LeaderboardScore.HasLocalScore)
