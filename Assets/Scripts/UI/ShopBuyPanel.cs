@@ -12,6 +12,9 @@ public sealed class ShopBuyPanel : MonoBehaviour
     [SerializeField] private ShopQuantityRow foodRow;
     [SerializeField] private ShopQuantityRow fenceRow;
     [SerializeField] private Text totalText;
+    [SerializeField] private Text coinTotalText;
+    [SerializeField] private GameObject woodTotalGroup;
+    [SerializeField] private Text woodTotalText;
     [SerializeField] private Button buyButton;
     [SerializeField] private Button resetButton;
     private ShopQuantityRow[] rows;
@@ -89,7 +92,10 @@ public sealed class ShopBuyPanel : MonoBehaviour
             rows[i].SetLimit(limit);
         }
         int woodTotal = resources.Wood - woodBudget;
-        if (totalText != null) totalText.text = "TOTAL: " + ShopQuantityRow.FormatCost(total, woodTotal);
+        if (coinTotalText != null) coinTotalText.text = total.ToString();
+        else if (totalText != null) totalText.text = "TOTAL: " + ShopQuantityRow.FormatCost(total, woodTotal);
+        if (woodTotalText != null) woodTotalText.text = woodTotal.ToString();
+        if (woodTotalGroup != null) woodTotalGroup.SetActive(woodTotal > 0);
         if (buyButton != null)
             buyButton.interactable = canBuy && (foodRow.Quantity > 0 || fenceRow.Quantity > 0);
     }

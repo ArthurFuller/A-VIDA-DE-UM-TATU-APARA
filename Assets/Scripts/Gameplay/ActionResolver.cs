@@ -80,6 +80,7 @@ public sealed class ActionResolver : MonoBehaviour
 
     private WorkerAssignment pendingPlotWorker;
     private ActivityCardDrag pendingPlotCard;
+    private ActivityCardDrag pendingReplayDisposable;
     private ActivityKind pendingPlotAction;
     private readonly System.Collections.Generic.HashSet<Plot> plotsBeingPlowed = new();
     private int busyWorkers;
@@ -88,6 +89,7 @@ public sealed class ActionResolver : MonoBehaviour
     private WorkerAssignment pendingFoodWorker;
     private ActivityCardDrag pendingFoodCard;
     private bool pendingFoodPlus;
+    private bool pendingFoodReady;
     private bool servingPreparedFood;
     private GatheringTask[] forestTasks;
     private GatheringTask[] fishingTasks;
@@ -106,6 +108,7 @@ public sealed class ActionResolver : MonoBehaviour
         pendingPlotWorker != null || servingPreparedFood ||
         HasGatheringWorker(forestTasks) || HasGatheringWorker(fishingTasks);
     public bool HasPendingSelection => pendingPlotWorker != null;
+    internal GatheringMinigame GatheringGame => gatheringGame;
     internal bool TutorialGatheringInView => activeMinigame != null ||
         (communityCamera != null && communityCamera.IsFollowingWorker);
 
@@ -280,8 +283,7 @@ public sealed class ActionResolver : MonoBehaviour
             }
             if (!replayAnimationComplete && card != null)
             {
-                ActivityCardAvailability hand = card.transform.parent
-                    .GetComponentInChildren<ActivityCardAvailability>(true);
+                ActivityCardAvailability hand = card.Hand;
                 bool disposable = repeated == ActivityKind.BuildFence ||
                     repeated == ActivityKind.BuildHouse;
                 if (disposable && (hand == null || !hand.HasDisposable(repeated.Value)))
@@ -293,14 +295,14 @@ public sealed class ActionResolver : MonoBehaviour
                 AssignmentVersion++;
                 replayAnimations++;
                 ActivityKind revealed = repeated.Value;
-                bool deliverDuringReplay = !RequiresTargetSelection(revealed);
+                bool deliverDuringReplay = !RequiresTargetSelection(revealed) &&
+                    revealed != ActivityKind.PrepareFood && revealed != ActivityKind.FoodPlus;
                 card.PlayReplay(worker, revealed, deliverDuringReplay, () =>
                 {
                     replayAnimations--;
                     TryAssignInternal(worker, ActivityKind.Replay, activityName, card, true);
-                    if (pendingFoodCard != card) card.RestoreUnspentReplay();
+                    card.RestoreUnspentReplay();
                 });
-                if (disposable) hand.ConsumeReplayDisposable(revealed);
                 return;
             }
             activity = repeated.Value;
@@ -458,7 +460,14 @@ public sealed class ActionResolver : MonoBehaviour
         pendingFoodPlus = activity == ActivityKind.FoodPlus;
         worker.Select();
         worker.SetStatus("escolha os ingredientes");
-        foodPreparationPanel.Show(pendingFoodPlus);
+        void OpenPreparation()
+        {
+            if (pendingFoodWorker != worker || pendingFoodCard != card) return;
+            pendingFoodReady = true;
+            foodPreparationPanel.Show(pendingFoodPlus);
+        }
+        if (card != null) card.FlyToFoodPreparation(worker, activity, OpenPreparation);
+        else OpenPreparation();
     }
 
     private void ClearPendingPlot()
@@ -467,6 +476,8 @@ public sealed class ActionResolver : MonoBehaviour
         Plot.ClearHighlights();
         HouseSite.ClearHighlights();
         pendingPlotCard?.ReturnFromSelection();
+        if (pendingReplayDisposable != null) pendingReplayDisposable.ReturnFromReplayReservation();
+        pendingReplayDisposable = null;
         if (pendingPlotWorker != null && !pendingPlotWorker.UsedToday)
             pendingPlotWorker.SetStatus("livre");
         pendingPlotWorker = null;
@@ -478,8 +489,10 @@ public sealed class ActionResolver : MonoBehaviour
     public void CancelPendingSelection()
     {
         if (pendingPlotWorker == null) return;
+        bool hadReplayDisposable = pendingReplayDisposable != null;
         ClearPendingPlot();
-        feedback.ShowMessage("Escolha cancelada. A carta voltou para a mão.");
+        feedback.ShowMessage(hadReplayDisposable ? "Escolha cancelada. As cartas voltaram para a mão." :
+            "Escolha cancelada. A carta voltou para a mão.");
     }
 
     private static bool IsPlanting(ActivityKind activity) =>
@@ -496,6 +509,17 @@ public sealed class ActionResolver : MonoBehaviour
             RejectAction("Não há alvo disponível para essa carta.");
             card?.PlayRejectedReplay();
             return;
+        }
+        if (card != null && card.Kind == ActivityKind.Replay &&
+            activity is ActivityKind.BuildFence or ActivityKind.BuildHouse)
+        {
+            pendingReplayDisposable = card.Hand?.ReserveReplayDisposable(activity);
+            if (pendingReplayDisposable == null)
+            {
+                RejectAction("Replay precisa da carta descartável na mão.");
+                card.PlayRejectedReplay();
+                return;
+            }
         }
         AssignmentVersion++;
         pendingPlotWorker = worker;
@@ -670,6 +694,7 @@ public sealed class ActionResolver : MonoBehaviour
             return;
         }
         ActivityCardDrag card = pendingPlotCard;
+        if (!ConsumeReplayConstructionCard(card)) return;
         WorkerAssignment worker = TakePendingWorker();
         CommitAction(worker, ActivityKind.BuildFence, "construindo cerca", card);
         MoveAndWork(worker, plot, plowWorkDuration, () =>
@@ -687,6 +712,7 @@ public sealed class ActionResolver : MonoBehaviour
             pendingPlotAction != ActivityKind.BuildHouse || dayCycle == null ||
             !dayCycle.CanAcceptActions) return;
         ActivityCardDrag card = pendingPlotCard;
+        if (!ConsumeReplayConstructionCard(card)) return;
         WorkerAssignment builder = TakePendingWorker();
         CommitAction(builder, ActivityKind.BuildHouse, "construindo casa", card);
         MoveAndWork(builder, site.ConstructionPosition, site.ConstructionFacingPosition,
@@ -700,6 +726,20 @@ public sealed class ActionResolver : MonoBehaviour
             }
             SendWorkerHome(builder);
         }, () => site.PlayConstructionSmoke(plowWorkDuration));
+    }
+
+    private bool ConsumeReplayConstructionCard(ActivityCardDrag card)
+    {
+        if (card == null || card.Kind != ActivityKind.Replay) return true;
+        if (card.IsReplaySelectionInTransit) return false;
+        if (card.Hand?.ConsumeReplayDisposable(pendingReplayDisposable) == true)
+        {
+            pendingReplayDisposable = null;
+            return true;
+        }
+        ClearPendingPlot();
+        RejectAction("Replay precisa da carta descartável na mão.");
+        return false;
     }
 
     public void RegisterWorker(WorkerAssignment worker)
@@ -874,7 +914,7 @@ public sealed class ActionResolver : MonoBehaviour
     public bool ConfirmFoodPreparation(int fish, int corn, int pumpkin, int jerimum, int milk, int eggs,
         RectTransform resultOrigin = null, System.Action onAllArrived = null)
     {
-        if (servingPreparedFood || pendingFoodWorker == null ||
+        if (servingPreparedFood || !pendingFoodReady || pendingFoodWorker == null ||
             (pendingFoodWorker.UsedToday &&
              (pendingFoodCard == null || pendingFoodCard.Kind != ActivityKind.Replay)) ||
             inventoryTrading == null ||
@@ -891,6 +931,7 @@ public sealed class ActionResolver : MonoBehaviour
         pendingFoodWorker = null;
         pendingFoodCard = null;
         pendingFoodPlus = false;
+        pendingFoodReady = false;
         servingPreparedFood = true;
         CommitAction(worker, plus ? ActivityKind.FoodPlus : ActivityKind.PrepareFood, "comida preparada", card);
         resources.AddFood(preparedFood);
@@ -915,10 +956,11 @@ public sealed class ActionResolver : MonoBehaviour
     public void CancelFoodPreparation()
     {
         if (pendingFoodWorker != null && !pendingFoodWorker.UsedToday) pendingFoodWorker.SetStatus("livre");
-        pendingFoodCard?.RestoreUnspentReplay();
+        pendingFoodCard?.ReturnFromFoodPreparation();
         pendingFoodWorker = null;
         pendingFoodCard = null;
         pendingFoodPlus = false;
+        pendingFoodReady = false;
     }
 
     private WorkerAssignment TakePendingWorker()
@@ -930,8 +972,6 @@ public sealed class ActionResolver : MonoBehaviour
         PendingSelectionChanged?.Invoke(false);
         Plot.ClearHighlights();
         HouseSite.ClearHighlights();
-        pendingFoodCard = null;
-        pendingFoodWorker = null;
         return worker;
     }
 
@@ -952,9 +992,7 @@ public sealed class ActionResolver : MonoBehaviour
         plotsBeingPlowed.Clear();
         if (forestTrees != null) forestTrees.ResetTrees();
         ClearPendingPlot();
-        pendingFoodCard?.RestoreUnspentReplay();
-        pendingFoodWorker = null;
-        pendingFoodCard = null;
+        CancelFoodPreparation();
         WoodGainedToday = 0;
         FoodGainedToday = 0;
         FishGainedToday = 0;
@@ -1276,9 +1314,9 @@ public sealed class ActionResolver : MonoBehaviour
                 if (fishDrops != null)
                 {
                     Camera camera = Camera.main;
-                    Vector2 landing = camera != null
-                        ? (Vector2)camera.WorldToScreenPoint(worker.transform.position + Vector3.up)
-                        : gatheringGame.FishDropScreenPosition;
+                    Vector2? landing = camera != null
+                        ? (Vector2)camera.WorldToScreenPoint(worker.transform.position)
+                        : null;
                     resourceHud.DropOneAtScreen(fishDrops,
                         gatheringGame.FishDropScreenPosition, landing);
                 }

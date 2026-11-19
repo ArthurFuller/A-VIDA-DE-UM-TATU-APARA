@@ -8,6 +8,7 @@ public sealed class ShopSellPanel : MonoBehaviour
     [SerializeField] private ResourceHud resourceHud;
     [SerializeField] private ShopQuantityRow[] rows;
     [SerializeField] private Text totalText;
+    [SerializeField] private Text coinTotalText;
     [SerializeField] private Button sellButton;
     [SerializeField] private Button resetButton;
     private MandalaSynergy mandala;
@@ -88,7 +89,8 @@ public sealed class ShopSellPanel : MonoBehaviour
             row.SetLimit(trading.GetStock(item));
             total += (long)row.Quantity * price;
         }
-        if (totalText != null) totalText.text = "RECEBER: " + ShopQuantityRow.FormatCost(total);
+        if (coinTotalText != null) coinTotalText.text = total.ToString();
+        else if (totalText != null) totalText.text = "RECEBER: " + ShopQuantityRow.FormatCost(total);
         if (sellButton != null) sellButton.interactable = total > 0;
     }
 }

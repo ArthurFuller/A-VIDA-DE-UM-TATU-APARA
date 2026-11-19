@@ -48,6 +48,8 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
     private ActivityCardDrag hovered;
     private ActivityCardDrag dragging;
     private Tween shopPositionTween;
+    private float shopTargetY;
+    internal bool IsGatheringBarVisible { get; private set; }
     private bool pointerInside;
     private float firstCenter;
     private float spacing;
@@ -115,7 +117,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         for (int i = 0; i < shown.Count; i++)
         {
             ActivityCardDrag card = shown[i];
-            if (card == null || !card.gameObject.activeSelf || card.IsDragging) continue;
+            if (card == null || !card.gameObject.activeSelf || card.IsDragging || card.IsReturning) continue;
             RectTransform rect = (RectTransform)card.transform;
             rect.DOKill();
             float delay = i * dayExitWaveDelay;
@@ -173,19 +175,28 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         if (merchant != null && merchant.IsOpen) merchant.HideShop();
     }
     public bool HasDisposable(ActivityKind kind) => FindDisposable(kind) != null;
-    public bool ConsumeReplayDisposable(ActivityKind kind)
+    internal ActivityCardDrag ReserveReplayDisposable(ActivityKind kind)
     {
         ActivityCardDrag card = FindDisposable(kind);
-        if (card == null) return false;
-        OnCardUsed(card);
-        return true;
+        if (card == null || !ClearHoverForDrag(card, out Vector2 position,
+                out float scale, out Quaternion rotation)) return null;
+        card.LeaveHandForReplay(position, scale, rotation);
+        return card;
+    }
+
+    internal bool ConsumeReplayDisposable(ActivityCardDrag card)
+    {
+        if (card == null || !shown.Contains(card)) return false;
+        testCards.Remove(card);
+        pendingEntrances.Remove(card);
+        return RemoveCard(card);
     }
 
     private ActivityCardDrag FindDisposable(ActivityKind kind)
     {
         if (kind != ActivityKind.BuildFence && kind != ActivityKind.BuildHouse) return null;
         foreach (ActivityCardDrag card in shown)
-            if (card != null && card.Kind == kind) return card;
+            if (card != null && card.Kind == kind && card.isActiveAndEnabled && !card.IsReturning) return card;
         return null;
     }
     public RectTransform DragBoundary => (RectTransform)transform.parent;
@@ -206,6 +217,11 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         if (activeMissionsPanel != null) activeMissionsPanel.Closed += ShowPendingEntrances;
         if (actions != null) actions.CardUsed += OnCardUsed;
         if (actions != null) actions.PendingSelectionChanged += SetSelectionLocked;
+        if (actions != null && actions.GatheringGame != null)
+        {
+            actions.GatheringGame.BarVisibilityChanged += SetGatheringBarVisible;
+            IsGatheringBarVisible = actions.GatheringGame.IsBarVisible;
+        }
         if (dayCycle == null) dayCycle = FindFirstObjectByType<DayCycle>();
         if (dayCycle != null) dayCycle.DayChanged += OnDayChanged;
         if (descriptionPanel != null) descriptionPanel.gameObject.SetActive(false);
@@ -224,6 +240,8 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
         if (activeMissionsPanel != null) activeMissionsPanel.Closed -= ShowPendingEntrances;
         if (actions != null) actions.CardUsed -= OnCardUsed;
         if (actions != null) actions.PendingSelectionChanged -= SetSelectionLocked;
+        if (actions != null && actions.GatheringGame != null)
+            actions.GatheringGame.BarVisibilityChanged -= SetGatheringBarVisible;
         if (dayCycle != null) dayCycle.DayChanged -= OnDayChanged;
         DOTween.Kill(this);
         shopPositionTween?.Kill();
@@ -293,11 +311,7 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
             if (card != null && card.Kind == ActivityKind.BuySeeds)
             {
                 SetVisible(card, !entranceSuspended);
-                RectTransform shopCard = (RectTransform)card.transform;
-                float targetY = merchant != null && merchant.IsAvailable ? 77f : -43f;
-                shopPositionTween?.Kill();
-                shopPositionTween = shopCard.DOAnchorPosY(targetY, 0.2f)
-                    .SetEase(Ease.OutCubic);
+                MoveShopCard((RectTransform)card.transform, IsGatheringBarVisible);
             }
 
         if (shown.Count > maxHandCards)
@@ -307,6 +321,26 @@ public sealed class ActivityCardAvailability : MonoBehaviour, IPointerEnterHandl
             changed = true;
         }
         if (changed) Layout(true);
+    }
+
+    private void SetGatheringBarVisible(bool visible)
+    {
+        IsGatheringBarVisible = visible;
+        RectTransform shopCard = TutorialShopCard;
+        if (!entranceSuspended && shopCard != null && shopCard.gameObject.activeInHierarchy)
+            MoveShopCard(shopCard, true);
+    }
+
+    private void MoveShopCard(RectTransform shopCard, bool gatheringTransition)
+    {
+        bool shopCardRaised = !IsGatheringBarVisible && merchant != null && merchant.IsAvailable;
+        float targetY = shopCardRaised ? 77f : -43f;
+        if (shopPositionTween != null && shopPositionTween.IsActive() && shopTargetY == targetY) return;
+        shopPositionTween?.Kill();
+        if (Mathf.Approximately(shopCard.anchoredPosition.y, targetY)) return;
+        shopTargetY = targetY;
+        shopPositionTween = shopCard.DOAnchorPosY(targetY, gatheringTransition ? 0.34f : 0.2f)
+            .SetEase(gatheringTransition ? Ease.InOutSine : Ease.OutCubic);
     }
 
     private void CollectEditorCards()

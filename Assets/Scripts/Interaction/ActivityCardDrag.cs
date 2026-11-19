@@ -61,11 +61,16 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
     private float lastPointerMove;
     private Vector2 previousPointer;
     private bool waitingForTarget;
+    private const float ReturnDropDuration = 0.18f;
+    private CanvasGroup pendingFoodGroup;
+    private bool pendingFoodRaycasts;
+    private ActivityKind replaySelectionActivity;
+    private Tween selectionTurn;
     private Image replaySelectionImage;
     private Sprite replaySelectionOriginal;
     private SeedCatalog seedCatalog;
     private InventoryTrading trading;
-    private ActivityCardAvailability Hand => transform.parent != null ?
+    internal ActivityCardAvailability Hand => transform.parent != null ?
         transform.parent.GetComponentInChildren<ActivityCardAvailability>(true) : null;
 
     public ActivityKind Kind => activity;
@@ -107,6 +112,8 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
     public bool IsDragging => dragging;
     public void EndHoverForInspection() => RestoreHover(true);
     public bool IsReplayAnimating => replayAnimating;
+    internal bool IsReplaySelectionInTransit => activity == ActivityKind.Replay &&
+        selectionTurn != null && selectionTurn.IsActive();
     public void ResetHoverForSelection() => RestoreHover(true);
 
     public void PlayRejectedReplay()
@@ -122,7 +129,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             .Append(rect.DOAnchorPosX(center - 12f, 0.055f))
             .Append(rect.DOAnchorPosX(center, 0.05f))
             .SetTarget(rect)
-            .OnComplete(AnimateReturn)
+            .OnComplete(() => AnimateReturn())
             .OnKill(() => { if (!waitingForTarget) returning = false; });
     }
 
@@ -140,8 +147,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         replayAnimating = true;
         returning = true;
         Image source = GetComponent<Image>();
-        ActivityCardDrag templateCard = transform.parent
-            .GetComponentInChildren<ActivityCardAvailability>(true)?.TemplateFor(repeated);
+        ActivityCardDrag templateCard = Hand?.TemplateFor(repeated);
         Image template = templateCard != null ? templateCard.GetComponent<Image>() : null;
         Vector2 startScreen = RectTransformUtility.WorldToScreenPoint(canvas.worldCamera,
             rect.TransformPoint(rect.rect.center));
@@ -164,7 +170,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         ghost.SetParent(root, false);
         ghost.anchorMin = ghost.anchorMax = new Vector2(0.5f, 0.5f);
         ghost.sizeDelta = rect.rect.size;
-        ghost.anchoredPosition = start;
+        ghost.localPosition = start;
         ghost.localScale = rect.localScale;
         Image image = ghostObject.GetComponent<Image>();
         image.sprite = source != null ? source.overrideSprite ?? source.sprite : null;
@@ -226,6 +232,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             returning = deliverDuringReplay;
             replayAlreadyDelivered = deliverDuringReplay;
             if (!deliverDuringReplay) replaySelectionStart = ghost;
+            ghostObject.SetActive(false);
             try
             {
                 onFinished?.Invoke();
@@ -233,7 +240,8 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             finally
             {
                 replaySelectionStart = null;
-                if (!deliverDuringReplay && originalGroup != null) originalGroup.alpha = 1f;
+                if (!deliverDuringReplay && pendingFoodGroup == null && originalGroup != null)
+                    originalGroup.alpha = 1f;
                 Destroy(ghostObject);
             }
         }
@@ -252,7 +260,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         RectTransform rect = (RectTransform)transform;
         rect.DOKill();
         pendingFloat?.Kill();
-        if (replayAlreadyDelivered)
+        if (ReleaseFoodCard() || replayAlreadyDelivered)
         {
             replayAlreadyDelivered = false;
             deliveryWorker = null;
@@ -262,9 +270,11 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             return;
         }
         returning = true;
-        if (activity == ActivityKind.BuildHouse || activity == ActivityKind.BuildFence)
+        bool replayingDisposable = activity == ActivityKind.Replay &&
+            replaySelectionActivity is ActivityKind.BuildHouse or ActivityKind.BuildFence;
+        if (activity == ActivityKind.BuildHouse || activity == ActivityKind.BuildFence || replayingDisposable)
         {
-            DissolveDisposable(onFinished);
+            DissolveDisposable(onFinished, replayingDisposable);
             return;
         }
         if (deliveryWorker != null && !replayAnimating)
@@ -290,7 +300,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             });
     }
 
-    private void DissolveDisposable(System.Action onFinished)
+    private void DissolveDisposable(System.Action onFinished, bool replayingDisposable)
     {
         Canvas canvas = GetComponentInParent<Canvas>();
         RectTransform canvasRoot = canvas != null ? canvas.rootCanvas.transform as RectTransform : null;
@@ -316,13 +326,18 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         ghost.anchorMin = ghost.anchorMax = Vector2.one * 0.5f;
         ghost.pivot = Vector2.one * 0.5f;
         ghost.sizeDelta = card.rect.size;
-        ghost.anchoredPosition = start;
+        ghost.localPosition = start;
         ghost.localScale = card.lossyScale / canvasRoot.lossyScale.x;
         Image art = visual.GetComponent<Image>();
-        art.sprite = source.sprite;
+        art.sprite = replayingDisposable ? source.overrideSprite : source.sprite;
         art.type = source.type;
         art.color = source.color;
         art.raycastTarget = false;
+        if (replayingDisposable)
+        {
+            ghost.rotation = card.rotation;
+            art.preserveAspect = source.preserveAspect;
+        }
         Material ghostMaterial = new Material(preset);
         ghostMaterial.SetFloat("_Cutoff", 0f);
         ghostMaterial.SetVector("_RectSize", new Vector4(ghost.rect.width, ghost.rect.height, 0f, 0f));
@@ -330,6 +345,8 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
 
         CanvasGroup original = GetComponent<CanvasGroup>();
         if (original == null) original = gameObject.AddComponent<CanvasGroup>();
+        bool wasInteractable = original.interactable;
+        bool blockedRaycasts = original.blocksRaycasts;
         original.alpha = 0f;
         original.interactable = false;
         original.blocksRaycasts = false;
@@ -338,6 +355,11 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         {
             if (cleaned) return;
             cleaned = true;
+            if (replayingDisposable && original != null)
+            {
+                original.interactable = wasInteractable;
+                original.blocksRaycasts = blockedRaycasts;
+            }
             Destroy(ghostMaterial);
             Destroy(visual);
         }
@@ -363,6 +385,62 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         pendingFloat?.Kill();
     }
 
+    internal void FlyToFoodPreparation(WorkerAssignment worker, ActivityKind selectedActivity,
+        System.Action onArrived)
+    {
+        RectTransform rect = (RectTransform)transform;
+        rect.DOKill();
+        returning = true;
+        if (replaySelectionStart != null)
+        {
+            ShowReplaySelectionArt(selectedActivity);
+            MatchReplayPose(rect);
+        }
+        pendingFoodGroup = GetComponent<CanvasGroup>();
+        if (pendingFoodGroup == null) pendingFoodGroup = gameObject.AddComponent<CanvasGroup>();
+        pendingFoodRaycasts = pendingFoodGroup.blocksRaycasts;
+        pendingFoodGroup.blocksRaycasts = false;
+        pendingFoodGroup.alpha = 1f;
+        AnimateDelivery(rect, worker, () =>
+        {
+            if (pendingFoodGroup == null) return;
+            pendingFoodGroup.alpha = 0f;
+            returning = true;
+            onArrived?.Invoke();
+        });
+    }
+
+    internal void ReturnFromFoodPreparation()
+    {
+        CanvasGroup group = pendingFoodGroup;
+        if (!ReleaseFoodCard()) return;
+        AnimateReturn(revealBelowScreen: true);
+        group.alpha = 1f;
+    }
+
+    private bool ReleaseFoodCard()
+    {
+        if (pendingFoodGroup == null) return false;
+        pendingFoodGroup.blocksRaycasts = pendingFoodRaycasts;
+        pendingFoodGroup = null;
+        return true;
+    }
+
+    internal void LeaveHandForReplay(Vector2 handPosition, float handScale, Quaternion handRotation)
+    {
+        RectTransform rect = (RectTransform)transform;
+        rect.DOKill();
+        originalPosition = handPosition;
+        originalScale = Vector3.one * handScale;
+        homeRotation = handRotation;
+        homePivot = rect.pivot;
+        dragSibling = rect.GetSiblingIndex();
+        returning = true;
+        rect.DOAnchorPosY(BelowHandPosition(rect).y, ReturnDropDuration).SetEase(Ease.InCubic);
+    }
+
+    internal void ReturnFromReplayReservation() => AnimateReturn(playSound: false);
+
     public void FlyToSelection(ActivityKind selectedActivity)
     {
         RectTransform rect = (RectTransform)transform;
@@ -375,20 +453,15 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         if (activity == ActivityKind.Replay) ShowReplaySelectionArt(selectedActivity);
         RectTransform parent = (RectTransform)rect.parent;
         float duration = replaySelectionStart != null ? replaySelectionDuration : 0.42f;
-        if (replaySelectionStart != null)
-        {
-            rect.localScale = replaySelectionStart.lossyScale / parent.lossyScale.x;
-            rect.rotation = replaySelectionStart.rotation;
-            rect.position += replaySelectionStart.TransformPoint(replaySelectionStart.rect.center) -
-                rect.TransformPoint(rect.rect.center);
-        }
+        if (replaySelectionStart != null) MatchReplayPose(rect);
         else rect.localRotation = homeRotation;
         Vector2 screen = new Vector2(Screen.width * 0.17f, Screen.height * 0.82f);
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(parent, screen,
                 canvas.worldCamera, out Vector2 destination)) return;
+        destination += rect.anchoredPosition - (Vector2)rect.localPosition;
         rect.DOAnchorPos(destination, duration).SetEase(Ease.OutCubic);
         rect.DOScale(originalScale * 0.72f, duration).SetEase(Ease.OutBack);
-        rect.DOLocalRotate(new Vector3(0f, 0f, -8f), duration)
+        selectionTurn = rect.DOLocalRotate(new Vector3(0f, 0f, -8f), duration)
             .OnComplete(() =>
             {
                 if (!waitingForTarget) return;
@@ -397,8 +470,17 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             });
     }
 
+    private void MatchReplayPose(RectTransform rect)
+    {
+        RectTransform ghost = replaySelectionStart;
+        rect.localScale = ghost.lossyScale / rect.parent.lossyScale.x;
+        rect.rotation = ghost.rotation;
+        rect.position += ghost.TransformPoint(ghost.rect.center) - rect.TransformPoint(rect.rect.center);
+    }
+
     private void ShowReplaySelectionArt(ActivityKind selectedActivity)
     {
+        replaySelectionActivity = selectedActivity;
         ActivityCardDrag template = Hand?.TemplateFor(selectedActivity);
         if (template == null || !template.TryGetComponent(out Image art) ||
             !TryGetComponent(out Image image)) return;
@@ -411,6 +493,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
 
     private void RestoreReplaySelectionArt()
     {
+        replaySelectionActivity = default;
         if (replaySelectionImage == null) return;
         replaySelectionImage.overrideSprite = replaySelectionOriginal == replaySelectionImage.sprite
             ? null : replaySelectionOriginal;
@@ -444,15 +527,19 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         RectTransform flightParent = originalParent;
         if (fromSelection && canvas.rootCanvas.transform is RectTransform root)
         {
-            rect.SetParent(root, true);
+            if (root != originalParent)
+            {
+                rect.SetParent(root, true);
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+                flightParent = root;
+            }
             rect.SetAsLastSibling();
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
-            flightParent = root;
         }
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.position += visualCenter - rect.TransformPoint(rect.rect.center);
         float liftScale = Mathf.Max(rect.localScale.x, 0.1f) * 1.16f;
         float flightDuration = fromReplay ? replayDeliveryDuration : 0.47f;
+        Vector2 anchorOffset = rect.anchoredPosition - (Vector2)rect.localPosition;
         Vector2 flightStart = rect.anchoredPosition;
         float flightProgress = 0f;
         Sequence delivery = DOTween.Sequence().SetTarget(rect);
@@ -469,7 +556,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
                 worker.transform.position + Vector3.up);
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(flightParent,
                     screen, canvas.worldCamera, out Vector2 destination))
-                rect.anchoredPosition = Vector2.LerpUnclamped(flightStart, destination, progress);
+                rect.anchoredPosition = Vector2.LerpUnclamped(flightStart, destination + anchorOffset, progress);
         }, 1f, flightDuration).SetEase(Ease.InCubic));
         delivery.Join(rect.DOLocalRotate(new Vector3(0f, 0f,
             rect.localEulerAngles.z + 360f), flightDuration, RotateMode.FastBeyond360));
@@ -481,7 +568,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         delivery.Join(fadeGroup.DOFade(0f, 0.08f));
         delivery.OnComplete(() =>
         {
-            if (fromSelection && rect != null && originalParent != null)
+            if (flightParent != originalParent && rect != null && originalParent != null)
             {
                 rect.SetParent(originalParent, false);
                 rect.anchorMin = originalAnchorMin;
@@ -525,6 +612,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
 
     private void OnDisable()
     {
+        ReleaseFoodCard();
         RestoreReplaySelectionArt();
         if (preview != null) preview.CancelRequested -= CancelDrag;
         shopClickTween?.Kill();
@@ -617,7 +705,7 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         if (eventData.button != PointerEventData.InputButton.Left) return;
         if (activity == ActivityKind.BuySeeds)
         {
-            if (shop == null) return;
+            if (shop == null || Hand != null && Hand.IsGatheringBarVisible) return;
             shopClickTween?.Kill();
             shopClicking = true;
             shopHoverTween?.Kill();
@@ -774,21 +862,22 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
         hoveredWorker = null;
     }
 
-    private void AnimateReturn()
+    private void AnimateReturn(bool revealBelowScreen = false, bool playSound = true)
     {
         waitingForTarget = false;
         pendingFloat?.Kill();
         RectTransform rect = (RectTransform)transform;
         rect.DOKill();
         returning = true;
-        AudioManager.Play(SoundCue.CardReturn);
+        if (playSound) AudioManager.Play(SoundCue.CardReturn);
         Vector3 cardCenter = rect.TransformPoint(rect.rect.center);
         rect.pivot = homePivot;
         rect.position += cardCenter - rect.TransformPoint(rect.rect.center);
-        Vector2 belowScreen = new Vector2(originalPosition.x,
-            -rect.rect.height * Mathf.Max(0.4f, originalScale.y) - 90f);
-        DOTween.Sequence().Append(rect.DOAnchorPos(belowScreen, 0.18f).SetEase(Ease.InCubic))
-            .AppendCallback(() =>
+        Vector2 belowScreen = BelowHandPosition(rect);
+        Sequence sequence = DOTween.Sequence();
+        if (revealBelowScreen) rect.anchoredPosition = belowScreen;
+        else sequence.Append(rect.DOAnchorPos(belowScreen, ReturnDropDuration).SetEase(Ease.InCubic));
+        sequence.AppendCallback(() =>
             {
                 RestoreReplaySelectionArt();
                 rect.localRotation = homeRotation;
@@ -799,6 +888,9 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
             .OnComplete(() => RestoreDragSibling(rect))
             .OnKill(() => { if (!waitingForTarget) returning = false; });
     }
+
+    private Vector2 BelowHandPosition(RectTransform rect) =>
+        new Vector2(originalPosition.x, -rect.rect.height * Mathf.Max(0.4f, originalScale.y) - 90f);
 
     private void RestoreDragSibling(RectTransform rect)
     {

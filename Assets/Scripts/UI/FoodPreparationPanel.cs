@@ -262,7 +262,7 @@ public sealed class FoodPreparationPanel : MonoBehaviour
         transitioning = true;
         if (group != null) group.interactable = false;
         RectTransform origin = resultText != null ? resultText.rectTransform : prepareButton;
-        if (actions.ConfirmFoodPreparation(fish, corn, pumpkin, jerimum, milk, eggs, origin, Hide)) return;
+        if (actions.ConfirmFoodPreparation(fish, corn, pumpkin, jerimum, milk, eggs, origin, () => Hide())) return;
         transitioning = false;
         if (group != null) group.interactable = true;
     }
@@ -270,20 +270,24 @@ public sealed class FoodPreparationPanel : MonoBehaviour
     public void Cancel()
     {
         if (transitioning) return;
-        if (actions != null) actions.CancelFoodPreparation();
-        Hide();
+        Hide(() => actions?.CancelFoodPreparation());
     }
 
-    private void Hide()
+    private void Hide(System.Action onClosed = null)
     {
-        if (panel == null) { HideImmediate(); return; }
+        void CompleteClose()
+        {
+            HideImmediate();
+            onClosed?.Invoke();
+        }
+        if (panel == null) { CompleteClose(); return; }
         AudioManager.Play(SoundCue.UiPaper);
         transitioning = true;
         transition?.Kill();
         transition = DOTween.Sequence().SetTarget(this)
             .Append(panel.DOAnchorPos(panelHome + Vector2.down * BelowViewport(),
                 panelDuration).SetEase(Ease.InOutSine))
-            .OnComplete(HideImmediate);
+            .OnComplete(CompleteClose);
         if (backdrop != null)
             transition.Insert(0f, backdrop.DOFade(0f, panelDuration)
                 .SetEase(Ease.InOutSine));

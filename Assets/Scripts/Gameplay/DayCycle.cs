@@ -41,6 +41,10 @@ public sealed class DayCycle : MonoBehaviour
     private bool firstDayOpening = true;
     private bool firstDayEventPresented;
     private HoverPunchButton finishDayFeedback;
+    private Tween finishDaySlide;
+    private float finishDayHomeX;
+    private bool finishDayShifted;
+    private bool finishDayWasInteractable;
     private bool feedingOpen;
     private bool gameOver;
     private int todayMilk;
@@ -208,6 +212,58 @@ public sealed class DayCycle : MonoBehaviour
         }
 
         if (hand != null) hand.SuspendEntranceForEvent();
+    }
+
+    private void OnEnable()
+    {
+        if (actions == null || actions.GatheringGame == null) return;
+        actions.GatheringGame.BarVisibilityChanged += SetGatheringBarVisible;
+        if (actions.GatheringGame.IsBarVisible) SetGatheringBarVisible(true);
+    }
+
+    private void OnDisable()
+    {
+        if (actions != null && actions.GatheringGame != null)
+            actions.GatheringGame.BarVisibilityChanged -= SetGatheringBarVisible;
+        finishDaySlide?.Kill();
+        if (finishDayShifted && finishDayButton != null)
+        {
+            RectTransform rect = (RectTransform)finishDayButton.transform;
+            rect.anchoredPosition = new Vector2(finishDayHomeX, rect.anchoredPosition.y);
+            finishDayButton.interactable = finishDayWasInteractable;
+            finishDayShifted = false;
+        }
+    }
+
+    private void SetGatheringBarVisible(bool visible)
+    {
+        if (finishDayButton == null || !visible && !finishDayShifted) return;
+        RectTransform rect = (RectTransform)finishDayButton.transform;
+        finishDaySlide?.Kill();
+        if (visible && !finishDayShifted)
+        {
+            finishDayHomeX = rect.anchoredPosition.x;
+            finishDayWasInteractable = finishDayButton.interactable;
+            finishDayButton.interactable = false;
+            finishDayShifted = true;
+        }
+        float destination = finishDayHomeX;
+        if (visible)
+        {
+            var viewport = (RectTransform)rect.parent;
+            Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(viewport, rect);
+            destination = rect.anchoredPosition.x + Mathf.Max(0f, viewport.rect.xMax - bounds.min.x + 24f);
+        }
+        // O feedback de hover cancela tweens do RectTransform. Este movimento tem alvo próprio.
+        finishDaySlide = DOTween.To(() => rect.anchoredPosition.x,
+                x => rect.anchoredPosition = new Vector2(x, rect.anchoredPosition.y), destination, 0.34f)
+            .SetEase(Ease.InOutSine)
+            .OnComplete(() =>
+            {
+                if (visible) return;
+                finishDayButton.interactable = finishDayWasInteractable;
+                finishDayShifted = false;
+            });
     }
 
     internal bool RegisterTutorial(InitialTutorial guide)

@@ -11,6 +11,7 @@ public sealed class ResourceHud : MonoBehaviour
     {
         internal readonly ResourceKind Kind;
         internal readonly List<RectTransform> Icons = new();
+        internal float FishCollectionReadyTime;
         internal bool Released;
         internal DropBatch(ResourceKind kind) { Kind = kind; }
     }
@@ -241,8 +242,17 @@ public sealed class ResourceHud : MonoBehaviour
             : origin + new Vector2(Mathf.Cos(angle) * 18f,
                 -35f + Mathf.Sin(angle) * 7f);
         rect.DOScale(1f, 0.2f).SetEase(Ease.OutBack).SetId(this);
-        rect.DOAnchorPos(landing, screenLanding.HasValue ? 0.4f : 0.28f)
-            .SetEase(screenLanding.HasValue ? Ease.OutCubic : Ease.OutBounce).SetId(this);
+        if (batch.Kind == ResourceKind.Fish)
+        {
+            const float fallDuration = 0.46f;
+            const float groundPause = 0.16f;
+            batch.FishCollectionReadyTime = Time.time + fallDuration + groundPause;
+            rect.DOAnchorPosX(landing.x, fallDuration).SetEase(Ease.OutSine).SetId(this);
+            rect.DOAnchorPosY(landing.y, fallDuration).SetEase(Ease.InQuad).SetId(this);
+        }
+        else
+            rect.DOAnchorPos(landing, screenLanding.HasValue ? 0.4f : 0.28f)
+                .SetEase(screenLanding.HasValue ? Ease.OutCubic : Ease.OutBounce).SetId(this);
     }
 
     public void FlyDrops(DropBatch batch, System.Action onAllArrived = null)
@@ -280,9 +290,10 @@ public sealed class ResourceHud : MonoBehaviour
                 if (--pending == 0) onAllArrived?.Invoke();
                 continue;
             }
-            rect.DOKill();
+            if (batch.Kind != ResourceKind.Fish) rect.DOKill();
             Sequence flight = DOTween.Sequence().SetId(this);
-            flight.AppendInterval(FlightWait(batch.Kind, 0f));
+            float earliestDeparture = Mathf.Max(0f, batch.FishCollectionReadyTime - Time.time);
+            flight.AppendInterval(FlightWait(batch.Kind, earliestDeparture));
             flight.Append(FollowCounter(rect, target));
             flight.Join(rect.DOScale(0.4f, flightDuration).SetEase(Ease.InQuad));
             flight.OnComplete(() =>
@@ -344,7 +355,7 @@ public sealed class ResourceHud : MonoBehaviour
 
     private Tween FollowCounter(RectTransform icon, Text target)
     {
-        Vector2 start = icon.anchoredPosition;
+        Vector2 start = default;
         float progress = 0f;
         return DOTween.To(() => progress, value =>
         {
@@ -353,7 +364,8 @@ public sealed class ResourceHud : MonoBehaviour
             Vector2 screen = RectTransformUtility.WorldToScreenPoint(UiCamera,
                 target.rectTransform.TransformPoint(target.rectTransform.rect.center));
             icon.anchoredPosition = Vector2.LerpUnclamped(start, CanvasPoint(screen), value);
-        }, 1f, flightDuration).SetEase(Ease.InCubic);
+        }, 1f, flightDuration).SetEase(Ease.InCubic)
+            .OnStart(() => start = icon.anchoredPosition);
     }
 
     private void CreateIcon(ResourceKind kind, int index, int count, Vector2 origin,

@@ -89,7 +89,9 @@ public sealed class GatheringMinigame : MonoBehaviour
     private Color woodFillRestingColor;
 
     public bool CanStart() => ResolveReferences();
-    internal bool BlocksCameraZoom => isActiveAndEnabled && completed != null;
+    internal bool IsBarVisible => completed != null;
+    internal event Action<bool> BarVisibilityChanged;
+    internal bool BlocksCameraZoom => isActiveAndEnabled && IsBarVisible;
     internal bool TutorialReady => completed != null && !entering && !resolving;
     internal bool TutorialFishing => fishing;
     internal RectTransform TutorialActionButton => TutorialReady ? buttonRect : null;
@@ -103,8 +105,9 @@ public sealed class GatheringMinigame : MonoBehaviour
             Canvas canvas = source != null ? source.GetComponentInParent<Canvas>() : null;
             Camera camera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
                 ? canvas.worldCamera : null;
-            return source != null ? RectTransformUtility.WorldToScreenPoint(camera,
-                source.TransformPoint(source.rect.center)) : Vector2.zero;
+            if (source == null) return Vector2.zero;
+            Vector2 releasePoint = source.rect.center + Vector2.up * (source.rect.height * 0.25f);
+            return RectTransformUtility.WorldToScreenPoint(camera, source.TransformPoint(releasePoint));
         }
     }
 
@@ -114,7 +117,21 @@ public sealed class GatheringMinigame : MonoBehaviour
         Hide();
     }
 
-    private void OnDisable() => ClearWoodMissFlash();
+    private void OnDisable()
+    {
+        DOTween.Kill(this);
+        if (!IsBarVisible)
+        {
+            ClearWoodMissFlash();
+            return;
+        }
+        completed = null;
+        woodHit = null;
+        fishingTensionChanged = null;
+        fishDropped = null;
+        Hide();
+        BarVisibilityChanged?.Invoke(false);
+    }
 
     // A madeira devolve a classificação da rodada. A pesca devolve o total de peixes.
     public void Begin(ActivityKind activity, Action<int> onCompleted, int droughtFishingReduction = 0,
@@ -149,6 +166,7 @@ public sealed class GatheringMinigame : MonoBehaviour
         if (fishing) StartFishing();
         else StartWoodRound();
         entering = true;
+        BarVisibilityChanged?.Invoke(true);
         Vector2 destination = panelLayout.Position;
         float travel = fishing ? panel.rect.width + 100f : panel.rect.height + 100f;
         panel.anchoredPosition = destination + (fishing ? Vector2.right : Vector2.down) * travel;
@@ -302,7 +320,7 @@ public sealed class GatheringMinigame : MonoBehaviour
         fishingTensionChanged?.Invoke(false);
         if (!fishing)
         {
-            DOVirtual.DelayedCall(0.23f, () => Complete(rating)).SetTarget(this);
+            DOVirtual.DelayedCall(0.23f, () => Exit(rating)).SetTarget(this);
             return;
         }
         int fishCount = fishingPlus ? (rating > 0 ? 4 : 2) : (rating > 0 ? 2 : 1);
@@ -323,7 +341,7 @@ public sealed class GatheringMinigame : MonoBehaviour
             if (i < fishCount - 1) sequence.AppendInterval(fishDropPunchGap);
         }
         sequence.AppendInterval(0.2f);
-        sequence.OnComplete(() => Complete(rating, fishCount));
+        sequence.OnComplete(() => Exit(rating, fishCount));
     }
 
     private void FlashWoodMiss()
@@ -401,17 +419,31 @@ public sealed class GatheringMinigame : MonoBehaviour
         if (fishingFill != null) fishingFill.fillAmount = fishingProgress;
     }
 
-    private void Complete(int rating, int fishCount = 0)
+    private void Exit(int rating, int fishCount = 0)
     {
         if (fishing)
             AudioManager.Play(rating > 0 ? SoundCue.FishingCaught : SoundCue.FishingFailed);
-        Action<int> callback = completed;
-        completed = null;
-        woodHit = null;
-        fishingTensionChanged = null;
-        fishDropped = null;
-        Hide();
-        callback?.Invoke(fishing ? fishCount : rating);
+        group.interactable = false;
+        group.blocksRaycasts = false;
+        RectTransform viewport = (RectTransform)panel.parent;
+        Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(viewport, panel);
+        float travel = fishing ? viewport.rect.xMax - bounds.min.x : bounds.max.y - viewport.rect.yMin;
+        Vector2 direction = fishing ? Vector2.right : Vector2.down;
+        panel.DOAnchorPos(panel.anchoredPosition + direction * (travel + 16f),
+                fishing ? fishingEntryDuration : woodEntryDuration)
+            .SetEase(Ease.InOutSine)
+            .OnComplete(() =>
+            {
+                Action<int> callback = completed;
+                int result = fishing ? fishCount : rating;
+                completed = null;
+                woodHit = null;
+                fishingTensionChanged = null;
+                fishDropped = null;
+                Hide();
+                BarVisibilityChanged?.Invoke(false);
+                callback?.Invoke(result);
+            });
     }
 
     private void Hide()
