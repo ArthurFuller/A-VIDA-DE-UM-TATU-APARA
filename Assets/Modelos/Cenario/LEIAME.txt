@@ -1,0 +1,28 @@
+PACOTE: CENARIO DA LAGOA (estilo xilogravura do sertao)
+=====================================================
+
+REQUISITO: o projeto precisa usar URP (Universal Render Pipeline), Unity 6.
+Num projeto 3D comum (Built-in) os objetos ficam rosa.
+
+COMO USAR
+- Ou use os prefabs separados:
+    Assets/Modelos/Lagoa/Lagoa.prefab
+    Assets/Modelos/Pedras/PedrasLagoa.prefab
+    Assets/Modelos/ChaoAreia/Chao_AreiaComMato.prefab
+    Assets/Modelos/ChaoAreia/Chao_Vegetacao.prefab
+    Assets/Modelos/Grama/Grama.prefab
+
+ORGANIZACAO
+    Assets/Modelos/<Objeto>/Modelo     -> FBX
+    Assets/Modelos/<Objeto>/Materiais  -> M_<Objeto>_...
+    Assets/Modelos/<Objeto>/Texturas   -> T_<Objeto>_..._Albedo / _Normal
+    Assets/Shaders/XiloCartoon         -> shaders usados pelos materiais
+
+SHADERS (ja inclusos, nao precisa configurar nada no projeto)
+- XiloCartoonCompleto.shader ("Sertao/XiloCartoon Completo"):
+  cartoon + traco de xilogravura + contorno. Usado no chao e nas pedras.
+- XiloLago.shader ("Sertao/Xilo Lago"): agua de acude no estilo xilogravura. Usado na lagoa.
+- A grama usa o shader padrao "Universal Render Pipeline/Unlit" (ja vem com a URP).
+
+Para usar os shaders em outro objeto: botao direito no shader > Create > Material,
+e arraste o material no objeto.

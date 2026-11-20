@@ -75,7 +75,6 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
 
     public ActivityKind Kind => activity;
     public string DisplayName => activityName;
-    public string WrittenDescription => description;
     public string Description
     {
         get
@@ -111,7 +110,6 @@ public sealed class ActivityCardDrag : MonoBehaviour, IBeginDragHandler, IDragHa
     public bool IsReturning => returning;
     public bool IsDragging => dragging;
     public void EndHoverForInspection() => RestoreHover(true);
-    public bool IsReplayAnimating => replayAnimating;
     internal bool IsReplaySelectionInTransit => activity == ActivityKind.Replay &&
         selectionTurn != null && selectionTurn.IsActive();
     public void ResetHoverForSelection() => RestoreHover(true);

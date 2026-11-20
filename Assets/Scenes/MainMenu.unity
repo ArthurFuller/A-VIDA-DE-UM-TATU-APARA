@@ -614,7 +614,7 @@ GameObject:
   - component: {fileID: 9850000002}
   - component: {fileID: 169113626}
   m_Layer: 0
-  m_Name: Bloqueio e paginas
+  m_Name: "P\u00e1ginas do menu"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -897,7 +897,7 @@ GameObject:
   - component: {fileID: 188939413}
   - component: {fileID: 5000000599}
   m_Layer: 0
-  m_Name: "Interface de refer\xEAncia"
+  m_Name: "Canvas - menu inicial"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6730,7 +6730,7 @@ GameObject:
   - component: {fileID: 9870000023}
   - component: {fileID: 9870000024}
   m_Layer: 0
-  m_Name: Main Camera - menu
+  m_Name: "C\u00e2mera do menu"
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7633,7 +7633,7 @@ GameObject:
   - component: {fileID: 8100000000002}
   - component: {fileID: 8100000000003}
   m_Layer: 0
-  m_Name: Audio Manager
+  m_Name: "Sistema de \u00e1udio"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

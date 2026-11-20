@@ -137,7 +137,8 @@ public sealed class CommunityCamera : MonoBehaviour
             if (Mouse.current != null)
             {
                 float scroll = Mouse.current.scroll.ReadValue().y;
-                if (scroll != 0f) zoom += Mathf.Sign(scroll);
+                if (scroll != 0f && (hand == null || !hand.UsesWheelAt(Mouse.current.position.ReadValue())))
+                    zoom += Mathf.Sign(scroll);
             }
         }
 

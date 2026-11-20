@@ -1,0 +1,269 @@
+using System;
+using DG.Tweening;
+using UnityEngine;
+using UnityEngine.UI;
+
+public sealed class SeedMerchant : MonoBehaviour
+{
+    [SerializeField] private ResourceBank resources;
+    [SerializeField] private ResourceHud resourceHud;
+    [SerializeField] private SeedCatalog catalog;
+    [SerializeField] private DayCycle dayCycle;
+    [SerializeField] private GameFeedback feedback;
+    [SerializeField] private CanvasGroup shopGroup;
+    [SerializeField] private Text shopStatusText;
+    [SerializeField] private DragCursorPreview dragPreview;
+    [SerializeField] private ActiveMissionsPanel activeMissionsPanel;
+    [SerializeField] private DayTimeline timeline;
+    [SerializeField] private ShopTabs shopTabs;
+    [SerializeField] private ActivityCardAvailability hand;
+    [SerializeField, HideInInspector, Min(0)] private int fenceWoodCost = 4;
+    [SerializeField, HideInInspector, Min(0)] private int fenceCoinCost = 8;
+    [SerializeField, HideInInspector] private int[] marketDays = { 1, 3, 5, 7, 9, 11 };
+    [SerializeField, HideInInspector, Min(1)] private int foodCoinCost = 1;
+    [SerializeField, Min(0)] private float panelFadeDuration = 0.25f;
+    [Header("Apresentação da mercearia")]
+    [SerializeField] private CanvasGroup backdropGroup;
+    [SerializeField, Min(0.1f)] private float panelEntranceDuration = 0.46f;
+    [SerializeField, Range(0.5f, 4f),
+        Tooltip("Multiplica a velocidade da entrada e saida da janela, sem alterar as distancias. 1 = tempo normal; 2 = duas vezes mais rapido.")]
+    private float panelAnimationSpeed = 1.35f;
+    [SerializeField, Min(0f)] private float entranceExtraDistance = 40f;
+    private RectTransform panelRect;
+    private Vector2 panelHome;
+    private Sequence panelTransition;
+    private float PanelTime(float duration) =>
+        Mathf.Max(0f, duration) / Mathf.Max(0.5f,
+            panelAnimationSpeed > 0f ? panelAnimationSpeed : 1.35f);
+
+    public event Action AvailabilityChanged;
+    public event Action Closed;
+    public bool IsAvailable { get; private set; }
+    public bool CanTrade { get; private set; }
+    public bool IsOpen => shopGroup != null && shopGroup.interactable;
+    internal bool BlocksCameraZoom => isActiveAndEnabled &&
+        (IsOpen || panelTransition != null ||
+         (backdropGroup != null && backdropGroup.isActiveAndEnabled && backdropGroup.blocksRaycasts));
+    internal RectTransform TutorialPanel => panelRect;
+    internal bool TutorialPanelSettled => panelTransition == null || !panelTransition.IsActive();
+    public int FenceWoodCost => GameBalance.Current != null ? GameBalance.Current.fenceWoodCost : fenceWoodCost;
+    public int FenceCoinCost => GameBalance.Current != null ? GameBalance.Current.fenceCoinCost : fenceCoinCost;
+    public bool CanBuyFenceCards => hand != null && hand.TemplateFor(ActivityKind.BuildFence) != null;
+
+    private void Awake()
+    {
+        GameBalance balance = GameBalance.Current;
+        if (balance != null)
+            marketDays = balance.marketDays;
+        if (shopGroup == null) return;
+        panelRect = shopGroup.transform as RectTransform;
+        if (panelRect != null) panelHome = panelRect.anchoredPosition;
+        shopGroup.DOKill();
+        shopGroup.alpha = 0f;
+        shopGroup.blocksRaycasts = false;
+        shopGroup.interactable = false;
+        if (backdropGroup != null)
+        {
+            FullscreenBackdrop.Cover(backdropGroup);
+            backdropGroup.alpha = 0f;
+            backdropGroup.interactable = false;
+            backdropGroup.blocksRaycasts = false;
+        }
+    }
+    public void ToggleShop()
+    {
+        if (!IsAvailable || dayCycle == null || !dayCycle.CanAcceptActions)
+        {
+            if (feedback != null) feedback.ShowMessage("A barraca está fechada hoje.");
+            return;
+        }
+        if (IsOpen) HideShop();
+        else ShowShop();
+    }
+
+    public void SetDay(int day, bool hasDeliveryDue = false)
+    {
+        bool scheduled = day == 0 || Array.IndexOf(marketDays, day) >= 0;
+        GameBalance balance = GameBalance.Current;
+        bool dailyOffers = balance != null && balance.dailyMissionOffers;
+        CanTrade = scheduled || day == 12 || (!dailyOffers && hasDeliveryDue);
+        IsAvailable = CanTrade || dailyOffers;
+        HideShop();
+        AvailabilityChanged?.Invoke();
+    }
+
+    public int GetUnitPrice(SaleItem item)
+    {
+        return item switch
+        {
+            SaleItem.CornSeeds => catalog != null ? catalog.Get(CropType.Corn).coinCost : 0,
+            SaleItem.PumpkinSeeds => catalog != null ? catalog.Get(CropType.Pumpkin).coinCost : 0,
+            SaleItem.JerimumSeeds => catalog != null ? catalog.Get(CropType.Jerimum).coinCost : 0,
+            SaleItem.Food => GameBalance.Current != null ? GameBalance.Current.foodCoinCost : foodCoinCost,
+            _ => 0
+        };
+    }
+
+    public bool TryBuyCart(int cornSeeds, int pumpkinSeeds, int jerimumSeeds, int food, int fences)
+    {
+        int woodPerFence = FenceWoodCost;
+        if (!CanTrade || !IsOpen || dayCycle == null || !dayCycle.CanAcceptActions || resources == null ||
+            (food == 0 && fences == 0) ||
+            cornSeeds != 0 || pumpkinSeeds != 0 || jerimumSeeds != 0 || food < 0 || fences < 0 ||
+            (fences > 0 && !CanBuyFenceCards) ||
+            resources.Wood < (long)fences * woodPerFence ||
+            (long)resources.Food + food > int.MaxValue) return false;
+        long total = (long)food * GetUnitPrice(SaleItem.Food) + (long)fences * FenceCoinCost;
+        if (resources.Coins <= 0 || total > resources.Coins || !resources.TrySpendCoins((int)total))
+        {
+            if (feedback != null) feedback.ShowMessage("Moedas insuficientes para essa compra.");
+            return false;
+        }
+        if (food > 0)
+        {
+            resources.AddFood(food);
+            if (resourceHud != null && shopGroup != null)
+                resourceHud.FlyFromRect(ResourceKind.Food, food,
+                    shopGroup.transform as RectTransform);
+        }
+        if (fences > 0)
+        {
+            resources.TrySpendWood(fences * woodPerFence);
+            for (int i = 0; i < fences; i++) hand.AddCard(ActivityKind.BuildFence);
+        }
+        if (feedback != null)
+            feedback.ShowMessage("Compra concluída. Gasto: " +
+                ShopQuantityRow.FormatCost(total, (long)fences * woodPerFence) + ".");
+        return true;
+    }
+
+    private float EntranceDistance()
+    {
+        if (panelRect == null) return 400f;
+        RectTransform parent = panelRect.parent as RectTransform;
+        // O limite inferior funciona mesmo se o Canvas ainda nao tiver resolvido o layout.
+        float parentHeight = parent != null ? parent.rect.height : 0f;
+        float safeHeight = Mathf.Max(parentHeight, panelRect.rect.height * 1.6f);
+        return (safeHeight + panelRect.rect.height) * 0.5f + entranceExtraDistance;
+    }
+
+    public void ShowShop()
+    {
+        if (!IsAvailable || shopGroup == null || IsOpen) return;
+        // A cena armazena o painel como inativo. Ativar antes de preparar
+        // o ShopTabs garante que o Awake capture as posicoes reais dos itens.
+        if (!shopGroup.gameObject.activeSelf)
+            shopGroup.gameObject.SetActive(true);
+        if (dragPreview != null) dragPreview.CancelCurrentDrag();
+        if (activeMissionsPanel != null) activeMissionsPanel.Close();
+        if (timeline != null) timeline.ClosePanel();
+        if (shopTabs != null) shopTabs.ShowDefault(CanTrade);
+        AudioManager.Play(SoundCue.UiPaper);
+
+        if (backdropGroup != null)
+        {
+            backdropGroup.transform.SetAsLastSibling();
+            backdropGroup.DOKill();
+            backdropGroup.alpha = 0f;
+            backdropGroup.blocksRaycasts = true;
+            backdropGroup.interactable = false;
+            backdropGroup.DOFade(1f, Mathf.Min(PanelTime(panelEntranceDuration), 0.3f))
+                .SetEase(Ease.OutSine).SetUpdate(true);
+        }
+        shopGroup.transform.SetAsLastSibling();
+        panelTransition?.Kill();
+        panelTransition = null;
+        shopGroup.DOKill();
+        if (panelRect != null)
+        {
+            panelRect.DOKill();
+            panelRect.anchoredPosition = panelHome + Vector2.down * EntranceDistance();
+            // As abas e os produtos so animam DEPOIS que a janela estiver no centro.
+            panelRect.DOAnchorPos(panelHome, PanelTime(panelEntranceDuration))
+                .SetEase(Ease.OutCubic).SetUpdate(true)
+                .OnComplete(() =>
+                {
+                    if (shopGroup != null && shopGroup.interactable)
+                        shopTabs?.OnShopOpened();
+                });
+        }
+        shopGroup.alpha = 1f;
+        shopGroup.blocksRaycasts = true;
+        shopGroup.interactable = true;
+        if (panelRect == null) shopTabs?.OnShopOpened();
+        if (shopStatusText != null) shopStatusText.text = "Role a lista para ver todos os itens.";
+    }
+
+    public void HideShop()
+    {
+        if (shopGroup == null) return;
+        bool wasOpen = IsOpen;
+        bool wasClosing = panelTransition != null;
+        if (wasOpen) AudioManager.Play(SoundCue.UiPaper);
+        if (shopTabs != null) shopTabs.OnShopClosed();
+        shopGroup.blocksRaycasts = false;
+        shopGroup.interactable = false;
+        panelTransition?.Kill();
+        panelTransition = null;
+        shopGroup.DOKill();
+
+        if (panelRect != null) panelRect.DOKill();
+        if (wasOpen && panelRect != null)
+        {
+            panelTransition = DOTween.Sequence().SetTarget(this).SetUpdate(true)
+                .Append(panelRect.DOAnchorPos(panelHome + Vector2.down * EntranceDistance(),
+                    PanelTime(panelFadeDuration)).SetEase(Ease.InCubic))
+                .Join(shopGroup.DOFade(0f, PanelTime(panelFadeDuration)))
+                .OnComplete(() =>
+                {
+                    if (panelRect != null) panelRect.anchoredPosition = panelHome;
+                    panelTransition = null;
+                    Closed?.Invoke();
+                });
+        }
+        else
+        {
+            shopGroup.alpha = 0f;
+            if (panelRect != null) panelRect.anchoredPosition = panelHome;
+            if (wasOpen || wasClosing) Closed?.Invoke();
+        }
+
+        if (backdropGroup != null)
+        {
+            backdropGroup.DOKill();
+            if (wasOpen)
+                backdropGroup.DOFade(0f, PanelTime(panelFadeDuration)).SetUpdate(true)
+                    .OnComplete(() => backdropGroup.blocksRaycasts = false);
+            else
+            {
+                backdropGroup.alpha = 0f;
+                backdropGroup.blocksRaycasts = false;
+            }
+        }
+    }
+
+    private void OnDisable()
+    {
+        panelTransition?.Kill();
+        panelTransition = null;
+        DOTween.Kill(this);
+        if (panelRect != null)
+        {
+            panelRect.DOKill();
+            panelRect.anchoredPosition = panelHome;
+        }
+        if (shopGroup != null)
+        {
+            shopGroup.DOKill();
+            shopGroup.alpha = 0f;
+            shopGroup.interactable = false;
+            shopGroup.blocksRaycasts = false;
+        }
+        if (backdropGroup != null)
+        {
+            backdropGroup.DOKill();
+            backdropGroup.alpha = 0f;
+            backdropGroup.blocksRaycasts = false;
+        }
+    }
+}

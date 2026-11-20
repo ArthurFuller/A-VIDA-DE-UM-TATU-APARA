@@ -101,6 +101,8 @@ Shader "Sertao/Terra Arada"
         // m = 1 dentro do canteiro (cai suave na borda); solta = faixa de terra solta em volta
         void Mascara(float2 uv, out float m, out float solta)
         {
+            m = 0.0;
+            solta = 0.0;
             if (_MandalaGround > 0.5)
             {
                 float2 maskUV = uv * _GroundMaskTransform.xy + _GroundMaskTransform.zw;
@@ -151,7 +153,7 @@ Shader "Sertao/Terra Arada"
             float x, v; Leiras(uv, x, v);
             leira = pow(saturate(cos((frac(x) - 0.5) * 6.28318) * 0.5 + 0.5), 1.5);
             float torrao = (Fbm(uv * _EscalaTorroes + Sem()) - 0.5) * _Torroes * 0.7;
-            return (leira + torrao) * pow(m, 1.6);
+            return (leira + torrao) * pow(saturate(m), 1.6);
         }
         float AlturaSo(float2 uv) { float l, m, s; return Altura(uv, l, m, s); }
         ENDHLSL

@@ -36,9 +36,7 @@ public sealed class WorkerAssignment : MonoBehaviour
     [SerializeField, Range(0.05f, 1f)] private float indoorScale = 0.4f;
 
     public static WorkerAssignment Selected { get; private set; }
-    public bool UsedToday => HousePreviewActive || IsUnavailableToday || actionsRemaining <= 0;
-    public bool HousePreviewActive { get; set; }
-    public Transform SpriteVisual => spriteVisual;
+    public bool UsedToday => IsUnavailableToday || actionsRemaining <= 0;
     internal void GetTutorialSprites(List<SpriteRenderer> sprites)
     {
         if (spriteRenderer != null) sprites.Add(spriteRenderer);
@@ -50,17 +48,12 @@ public sealed class WorkerAssignment : MonoBehaviour
     public ActivityKind? LastActivity { get; private set; }
     public bool IsUnavailableToday { get; private set; }
     public Vector3 HomePosition => homeMarker != null ? homeMarker.position : initialHomePosition;
-    public Transform OutsideMarker => outsideMarker;
-    public Transform DoorwayMarker => doorwayMarker;
-    public float IndoorScale => indoorScale;
-    public int ProductionReduction { get; private set; }
     public WorkProgress Progress => workProgress;
     public string DisplayName => workerName;
     public int OriginHouseNumber => originHouseNumber;
     public Transform HomeMarker => homeMarker;
     public int AssignmentVersion => actionResolver != null ? actionResolver.AssignmentVersion : 0;
 
-    private int nextDayProductionReduction;
     private int absenceDaysRemaining;
     private int actionsRemaining = 1;
     private int nextDayExtraActions;
@@ -284,7 +277,7 @@ public sealed class WorkerAssignment : MonoBehaviour
             statusText.text = workerName + ": " + status;
     }
 
-    public bool CanAct(ActivityKind activity) => !HousePreviewActive && !IsUnavailableToday && actionsRemaining > 0 &&
+    public bool CanAct(ActivityKind activity) => !IsUnavailableToday && actionsRemaining > 0 &&
         (actionsRemaining > coffeeActions || coffeeExcludedActivity != activity);
 
     public void MarkUsed(string activityName, ActivityKind activity)
@@ -354,13 +347,6 @@ public sealed class WorkerAssignment : MonoBehaviour
 
     public void SetOriginHouseNumber(int number) => originHouseNumber = number;
 
-    public void JoinDuringDay()
-    {
-        actionsRemaining = 0;
-        RefreshActionDots(false);
-        SetStatus("novo morador");
-    }
-
     public void BeginNextDay()
     {
         IsUnavailableToday = absenceDaysRemaining > 0;
@@ -380,10 +366,7 @@ public sealed class WorkerAssignment : MonoBehaviour
         coffeeActions = 0;
         coffeeExcludedActivity = null;
         LastActivity = null;
-        ProductionReduction = nextDayProductionReduction;
-        nextDayProductionReduction = 0;
-        SetStatus(IsUnavailableToday ? "ausente" : ProductionReduction > 0 ? "produção reduzida" :
-            "livre");
+        SetStatus(IsUnavailableToday ? "ausente" : "livre");
         SetHovered(false);
         if (Selected == this)
             Selected = null;
@@ -392,11 +375,6 @@ public sealed class WorkerAssignment : MonoBehaviour
     public void ScheduleAbsence(int days)
     {
         absenceDaysRemaining = Mathf.Max(absenceDaysRemaining, days);
-    }
-
-    public void ScheduleNextDayCondition(int productionReduction)
-    {
-        nextDayProductionReduction = Mathf.Max(0, productionReduction);
     }
 
     private void RefreshActionDots(bool animate, int? previewCount = null)
