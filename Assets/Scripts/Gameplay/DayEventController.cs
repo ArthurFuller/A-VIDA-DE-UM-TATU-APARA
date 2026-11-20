@@ -9,6 +9,7 @@ public sealed class DayEventController : MonoBehaviour
     public const string HeadOfCuiaLossToken = "{peixesRoubados}";
     public const string PestCropToken = "{cultura}";
     public const string PestDurationToken = "{duracao}";
+    private const int MaxConsecutiveCalmDays = 2;
 
     public readonly struct TimelineEvent
     {
@@ -82,6 +83,7 @@ public sealed class DayEventController : MonoBehaviour
     private readonly List<ActiveGeneral> activeGeneralEvents = new();
     private SertaoEventKind lastAnnounced;
     private SertaoEventKind preparedEvent;
+    private int consecutiveCalmDays;
     private int forestExploitation;
     private int stolenFishToday;
     private string StolenFishLabel => stolenFishToday + (stolenFishToday == 1 ? " peixe" : " peixes");
@@ -234,7 +236,8 @@ public sealed class DayEventController : MonoBehaviour
             lastReforestationDay = day;
             pendingWoodReward = reforestationWood;
         }
-        if (day > 0 && announced == SertaoEventKind.None && Random.value < generalEventChance)
+        if (day > 0 && announced == SertaoEventKind.None &&
+            (consecutiveCalmDays >= MaxConsecutiveCalmDays || Random.value < generalEventChance))
         {
             announced = RollGeneralEvent();
             if (announced == SertaoEventKind.HeadOfCuia)
@@ -301,6 +304,9 @@ public sealed class DayEventController : MonoBehaviour
         activeToday.Sort((a, b) => a.StartedOn.CompareTo(b.StartedOn));
         eventsByDay[day] = activeToday;
         lastAnnounced = announced;
+        consecutiveCalmDays = day > 0 && announced == SertaoEventKind.Calm
+            ? Mathf.Min(consecutiveCalmDays + 1, MaxConsecutiveCalmDays)
+            : 0;
         WeatherChanged?.Invoke();
         if (announced == SertaoEventKind.None || card == null) return;
         if (deferPresentation)
