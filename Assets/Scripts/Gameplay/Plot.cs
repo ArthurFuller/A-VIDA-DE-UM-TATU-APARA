@@ -231,10 +231,10 @@ public sealed class Plot : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         joinedVisual?.SetHovered(false);
     }
 
-    public bool CanUse(ActivityKind activity, int currentDay, SeedCatalog catalog)
+    public bool CanUse(ActivityKind activity, int currentDay, SeedCatalog catalog,
+        WorkerAssignment reservationOwner = null)
     {
-        if (isWater) return false;
-        if (activity == ActivityKind.Plow && actionResolver != null && actionResolver.IsPlowing(this))
+        if (isWater || (actionResolver != null && actionResolver.IsTargetReserved(this, reservationOwner)))
             return false;
         return activity switch
         {

@@ -690,7 +690,11 @@ MonoBehaviour:
   logoDropSeconds: 0.5
   buttonDropSeconds: 0.27
   studioOpeningVideo: {fileID: 32900000, guid: 4986b272dded5f847b7f8c710d7d563b, type: 3}
-  studioVideoFadeSeconds: 0.45
+  studioBlackHoldSeconds: 2.5
+  studioRevealSeconds: 1.05
+  studioDarkenSeconds: 0.68
+  studioPostVideoBlackSeconds: 1.35
+  studioMenuRevealSeconds: 1.75
   studioVideoBackground: {r: 1, g: 0.9647059, b: 0.9764706, a: 1}
   introImpactCue: 5
   introLogoImpactVolume: 0.34
@@ -2872,6 +2876,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GS2LeaderboardView
   status: {fileID: 2044750481}
   rowTemplate: {fileID: 9901000071}
+  resultsPanel: {fileID: 0}
   rowGap: 8
   visibleHeight: 165
 --- !u!1 &1109483034

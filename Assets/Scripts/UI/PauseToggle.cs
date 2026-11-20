@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 // Controla a pausa e anima os elementos montados na cena, mantendo sua hierarquia.
@@ -45,6 +46,8 @@ public sealed class PauseToggle : MonoBehaviour
     private Image backdrop;
     private Color backdropColor;
     private TopBarAutoHide topBar;
+    private DayCycle dayCycle;
+    private DayTimeline timeline;
     private Sequence motion;
 
     // Preserva o estado exato das animacoes da gameplay durante a pausa.
@@ -77,6 +80,8 @@ public sealed class PauseToggle : MonoBehaviour
             return;
         }
 
+        dayCycle = FindFirstObjectByType<DayCycle>();
+        timeline = FindFirstObjectByType<DayTimeline>();
         if (settingsButton.targetGraphic is Image settingsImage && settingsImage.sprite != null &&
             settingsImage.sprite.texture.isReadable)
             settingsImage.alphaHitTestMinimumThreshold = 0.1f;
@@ -98,6 +103,19 @@ public sealed class PauseToggle : MonoBehaviour
         optionsPage.gameObject.SetActive(false);
         pauseOverlay.gameObject.SetActive(false);
         UpdateGameplayButtons();
+    }
+
+    private void Update()
+    {
+        if (Keyboard.current?.escapeKey.wasPressedThisFrame != true) return;
+        if (!paused)
+        {
+            if (Time.timeScale <= 0f || GS2SceneFade.IsEnteringGameplay) return;
+            if (timeline != null && timeline.TryCloseInspection()) return;
+            if (SertaoCoinToss.IsOpen || (dayCycle != null && !dayCycle.CanAcceptActions) ||
+                (button != null && (!button.isActiveAndEnabled || !button.IsInteractable()))) return;
+        }
+        Toggle();
     }
 
     private void OnDestroy()

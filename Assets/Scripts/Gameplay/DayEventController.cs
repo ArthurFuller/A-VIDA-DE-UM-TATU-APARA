@@ -324,6 +324,9 @@ public sealed class DayEventController : MonoBehaviour
         foreach (SertaoEventKind kind in new[] { SertaoEventKind.Drought, SertaoEventKind.Pests,
                      SertaoEventKind.Rain })
         {
+            if (kind == SertaoEventKind.Pests && (plots == null ||
+                !System.Array.Exists(plots, plot => plot != null && plot.Crop != CropType.None)))
+                continue;
             if (kind == lastAnnounced || IsActive(kind) ||
                 (kind == SertaoEventKind.Drought && IsActive(SertaoEventKind.Rain)) ||
                 (kind == SertaoEventKind.Rain && IsActive(SertaoEventKind.Drought)))

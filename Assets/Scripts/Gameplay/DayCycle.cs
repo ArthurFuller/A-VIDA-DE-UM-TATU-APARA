@@ -82,18 +82,21 @@ public sealed class DayCycle : MonoBehaviour
         Array.Find(workers, worker => worker != null && worker.isActiveAndEnabled && !worker.UsedToday);
     internal bool FirstDayPreparationFinished { get; private set; }
 
-    public bool TryFeedAnimal(Plot plot, out int milk, out int eggs)
+    public bool TryFeedAnimal(Plot plot, out int milk, out int eggs) =>
+        TryFeedAnimals(plot != null ? plot.ConnectedPlotsFor(ActivityKind.FeedAnimals, currentDay, seedCatalog) : null,
+            null, out milk, out eggs);
+
+    internal bool TryFeedAnimals(IReadOnlyList<Plot> targets, WorkerAssignment reservationOwner,
+        out int milk, out int eggs)
     {
         milk = 0;
         eggs = 0;
-        if (plot == null || resources == null || !plot.CanUse(ActivityKind.FeedAnimals, currentDay, seedCatalog))
-            return false;
+        if (targets == null || resources == null) return false;
 
-        // Usa o mesmo grupo de cercados unidos das outras ações em slots conectados.
-        // Cercados isolados têm apenas o próprio plot; grupos nunca atravessam áreas desconectadas.
-        List<Plot> targets = plot.ConnectedPlotsFor(ActivityKind.FeedAnimals, currentDay, seedCatalog);
         foreach (Plot target in targets)
         {
+            if (target == null || !target.CanUse(ActivityKind.FeedAnimals, currentDay, seedCatalog, reservationOwner))
+                continue;
             if (target.Animal == AnimalKind.Cow) milk++;
             else if (target.Animal == AnimalKind.Chicken) eggs++;
         }
@@ -109,7 +112,8 @@ public sealed class DayCycle : MonoBehaviour
         float appearanceDelay = 0f;
         foreach (Plot target in targets)
         {
-            if (target == null || target.Animal == AnimalKind.None) continue;
+            if (target == null || !target.CanUse(ActivityKind.FeedAnimals, currentDay, seedCatalog, reservationOwner))
+                continue;
             Plot sourcePlot = target;
             if (resourceHud != null)
             {

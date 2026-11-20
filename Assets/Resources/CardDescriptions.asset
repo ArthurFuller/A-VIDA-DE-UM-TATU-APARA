@@ -103,7 +103,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 0
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.121568635, g: 0.1137255, b: 0.09019608, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:Harvest
     title: Harvest
     art: {fileID: 21300000, guid: af8d81a027bd9fe4ebddb6b7a1bc314c, type: 3}
@@ -117,12 +117,12 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:PrepareFood
     title: PrepareFood
     art: {fileID: 21300000, guid: aee19f07feebf9d4eb91a871e1e2cb09, type: 3}
-    text: "Use 2 ou 3 ingredientes para cozinhar. Tr\xEAs ingredientes de dois tipos
-      rendem 2 por\xE7\xF5es. As outras combina\xE7\xF5es rendem 1."
+    text: "Use 2 ou 3 ingredientes de at\xE9 2 tipos. Dois iguais rendem 1 por\xE7\xE3o.
+      Tr\xEAs de dois tipos rendem 3. As outras combina\xE7\xF5es rendem 2."
     boxSize: {x: 240, y: 140}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
@@ -132,7 +132,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:Gamble
     title: Jogo do Bicho
     art: {fileID: 21300000, guid: e73bccdfad0ea434daabdb763a4efb40, type: 3}
@@ -147,7 +147,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:Rest
     title: Descansar
     art: {fileID: 21300000, guid: 6f27f67ec9e2fcb498ee6552dd222269, type: 3}
@@ -162,7 +162,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:Coffee
     title: "Caf\xE9zinho"
     art: {fileID: 21300000, guid: c7d6793ff7a9f07489ad432087820efe, type: 3}
@@ -177,7 +177,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:Replay
     title: Replay
     art: {fileID: 21300000, guid: 5521e6861c7f94e4db1cdcd6eba1bcf7, type: 3}
@@ -192,7 +192,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:FishPlus
     title: Pescaria+
     art: {fileID: 21300000, guid: 20dfe1570210a9b4a80a17232c1c09ad, type: 3}
@@ -206,7 +206,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:WoodPlus
     title: Madeira+
     art: {fileID: 21300000, guid: ff98509903b1cb64582e500d9ebc20c7, type: 3}
@@ -220,11 +220,12 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:FoodPlus
     title: Comida+
     art: {fileID: 21300000, guid: 4b66664cd7add734186fdff7ce38e2d0, type: 3}
-    text: Prepare mais comida com a mesma quantidade de ingredientes.
+    text: "Rende 1 por\xE7\xE3o extra. Com 3 ingredientes de 2 tipos, rende 5 por\xE7\xF5es
+      no total."
     boxSize: {x: 244.2, y: 137.3}
     choiceOffset: {x: 0, y: 0}
     choiceBoxSize: {x: 186.4, y: 140}
@@ -234,7 +235,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:WateringCan
     title: Regador
     art: {fileID: 21300000, guid: 0e15f64c19208c4428b484072b3cf5ef, type: 3}
@@ -248,7 +249,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:Fertilizer
     title: Adubo
     art: {fileID: 21300000, guid: 57582edae713d1d439866339ce37cb9e, type: 3}
@@ -262,7 +263,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:BuildHouse
     title: Construir Casa
     art: {fileID: 21300000, guid: 6fd42d970364d5c44b9aae27cae5b459, type: 3}
@@ -276,7 +277,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:BuildFence
     title: Construir Cerca
     art: {fileID: 21300000, guid: 06b2e014012eb5d49b157a77f0ed8bb3, type: 3}
@@ -290,7 +291,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:PlantJerimum
     title: Plantar Jerimum
     art: {fileID: 21300000, guid: 42e3ac39a1266e944be8cd384e8cecf3, type: 3}
@@ -305,7 +306,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 0
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:PlaceCow
     title: Colocar Vaca
     art: {fileID: 21300000, guid: 27b7a0d62caa657418ab4b8905e7805f, type: 3}
@@ -322,7 +323,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 0
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:PlaceChicken
     title: Colocar Galinha
     art: {fileID: 21300000, guid: e143afdec3040024ebbf7ee7ba860c0b, type: 3}
@@ -338,7 +339,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: A:FeedAnimals
     title: "Ra\xE7\xE3o"
     art: {fileID: 21300000, guid: d8cfdc7ff4ef112429df8fed28d52c78, type: 3}
@@ -353,7 +354,7 @@ MonoBehaviour:
     fontSize: 18
     alignment: 3
     textColor: {r: 1, g: 1, b: 1, a: 1}
-    backgroundColor: {r: 0.1, g: 0.09, b: 0.07, a: 0.92}
+    backgroundColor: {r: 0.101960786, g: 0.09019608, b: 0.07058824, a: 0.92156863}
   - key: E:Drought
     title: Seca
     art: {fileID: 0}

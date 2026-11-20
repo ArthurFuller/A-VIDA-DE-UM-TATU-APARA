@@ -136,15 +136,18 @@ public sealed class HouseSite : MonoBehaviour, IPointerClickHandler, IPointerEnt
     public static void ShowAvailable()
     {
         foreach (HouseSite site in allSites)
-            if (site != null) site.SetHighlight(!site.IsBuilt);
+            if (site != null) site.SetHighlight(site.CanSelectForConstruction);
     }
 
     public static bool HasAvailable()
     {
         foreach (HouseSite site in allSites)
-            if (site != null && !site.IsBuilt) return true;
+            if (site != null && site.CanSelectForConstruction) return true;
         return false;
     }
+
+    private bool CanSelectForConstruction => !IsBuilt &&
+        (actions == null || !actions.IsTargetReserved(this));
 
     public static void ClearHighlights()
     {

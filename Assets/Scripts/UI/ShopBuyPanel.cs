@@ -29,6 +29,7 @@ public sealed class ShopBuyPanel : MonoBehaviour
     private void OnEnable()
     {
         if (resources != null) resources.Changed += Refresh;
+        if (merchant != null) merchant.AvailabilityChanged += Refresh;
         foreach (ShopQuantityRow row in rows)
             if (row != null) row.Changed += Refresh;
         Refresh();
@@ -37,6 +38,7 @@ public sealed class ShopBuyPanel : MonoBehaviour
     private void OnDisable()
     {
         if (resources != null) resources.Changed -= Refresh;
+        if (merchant != null) merchant.AvailabilityChanged -= Refresh;
         foreach (ShopQuantityRow row in rows)
             if (row != null) row.Changed -= Refresh;
     }

@@ -197,6 +197,9 @@ public sealed class ShopTabs : MonoBehaviour
         SetPage(buyPage, page == buyPage);
         SetPage(sellPage, page == sellPage);
         SetPage(ordersPage, page == ordersPage);
+        if (page != null && page == buyPage && page.TryGetComponent(out ShopBuyPanel buyPanel) &&
+            buyPanel.isActiveAndEnabled)
+            buyPanel.Refresh();
         UpdateTabHighlight();
         if (shopOpen && playSound) AnimatePage(page, 0f);
     }

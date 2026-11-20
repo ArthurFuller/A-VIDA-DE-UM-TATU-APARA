@@ -67,8 +67,9 @@ MonoBehaviour:
   eggsPerChicken: 1
   woodReward: 1
   fertilizerHarvestBonus: 1
-  maxPreparedFoodPerAction: 2
+  maxPreparedFoodPerAction: 3
   foodPlusBonus: 1
+  foodPlusMixedTripleBonus: 1
   gambleStake: 10
   cropGrowthNearCorn: 1
   cropYieldNearCorn: 1

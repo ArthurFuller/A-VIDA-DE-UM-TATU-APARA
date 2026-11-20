@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
@@ -234,11 +233,15 @@ public sealed class DayTimeline : MonoBehaviour
     private void Update()
     {
         if (Time.timeScale == 0f) return;
-        if (inspectionCard != null && Keyboard.current != null &&
-            Keyboard.current.escapeKey.wasPressedThisFrame)
-            CloseInspection(false);
         if (Application.isPlaying && open && days != null && !days.CanAcceptActions)
             Close();
+    }
+
+    internal bool TryCloseInspection()
+    {
+        if (!isActiveAndEnabled || inspectionCard == null) return false;
+        CloseInspection(false);
+        return true;
     }
 
     private void EnsureUI()

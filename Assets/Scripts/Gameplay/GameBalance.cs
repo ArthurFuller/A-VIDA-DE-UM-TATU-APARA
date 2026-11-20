@@ -29,8 +29,9 @@ public sealed class GameBalance : ScriptableObject
     [Min(1)] public int totalDays = 12, milkPerCow = 1, eggsPerChicken = 1;
     [Min(0)] public int woodReward = 1;
     [Min(0)] public int fertilizerHarvestBonus = 1;
-    [Range(1, 2)] public int maxPreparedFoodPerAction = 2;
+    [Range(1, 3)] public int maxPreparedFoodPerAction = 3;
     [Min(0)] public int foodPlusBonus = 1;
+    [Min(0)] public int foodPlusMixedTripleBonus = 1;
     [Min(1)] public int gambleStake = 10;
 
     [Header("Mandala")]

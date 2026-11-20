@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -83,7 +84,8 @@ public sealed class ActionResolver : MonoBehaviour
     private ActivityCardDrag pendingReplayDisposable;
     private ActivityKind pendingPlotAction;
     private bool plotHighlightsDirty;
-    private readonly System.Collections.Generic.HashSet<Plot> plotsBeingPlowed = new();
+    private readonly Dictionary<WorkerAssignment, (ActivityKind Activity, IReadOnlyList<Component> Targets)>
+        targetReservations = new();
     private int busyWorkers;
     private bool housePreviewBusy;
     private int replayAnimations;
@@ -105,7 +107,8 @@ public sealed class ActionResolver : MonoBehaviour
     private readonly System.Collections.Generic.Dictionary<WorkerAssignment, float> workTravelSpeeds = new();
     [SerializeField] private Button cancelSelectionButton;
 
-    public bool IsBusy => housePreviewBusy || busyWorkers > 0 || replayAnimations > 0 || pendingFoodWorker != null ||
+    public bool IsBusy => housePreviewBusy || busyWorkers > 0 || targetReservations.Count > 0 ||
+        replayAnimations > 0 || pendingFoodWorker != null ||
         pendingPlotWorker != null || servingPreparedFood ||
         HasGatheringWorker(forestTasks) || HasGatheringWorker(fishingTasks);
     public bool HasPendingSelection => pendingPlotWorker != null;
@@ -185,6 +188,8 @@ public sealed class ActionResolver : MonoBehaviour
 
     private void OnDestroy()
     {
+        targetReservations.Clear();
+        DOTween.Kill(this);
         if (coinToss != null) Destroy(coinToss.gameObject);
         if (forestVisitButton != null)
             forestVisitButton.onClick.RemoveListener(VisitForestWorker);
@@ -202,18 +207,34 @@ public sealed class ActionResolver : MonoBehaviour
 
     internal void InvalidatePlotHighlights()
     {
-        if (pendingPlotWorker != null && pendingPlotAction != ActivityKind.BuildHouse)
-            plotHighlightsDirty = true;
+        if (pendingPlotWorker != null) plotHighlightsDirty = true;
     }
 
-    internal bool IsPlowing(Plot plot) => plotsBeingPlowed.Contains(plot);
+    internal bool IsTargetReserved(Component target, WorkerAssignment owner = null)
+    {
+        foreach (var reservation in targetReservations)
+        {
+            if (reservation.Key == owner) continue;
+            foreach (Component reserved in reservation.Value.Targets)
+                if (reserved == target) return true;
+        }
+        return false;
+    }
+
+    private bool HasPlowingInProgress()
+    {
+        foreach (var reservation in targetReservations.Values)
+            if (reservation.Activity == ActivityKind.Plow) return true;
+        return false;
+    }
 
     private void LateUpdate()
     {
         if (!plotHighlightsDirty) return;
         plotHighlightsDirty = false;
-        if (pendingPlotWorker != null && pendingPlotAction != ActivityKind.BuildHouse && dayCycle != null)
-            Plot.ShowAvailable(pendingPlotAction, dayCycle.CurrentDay, seedCatalog);
+        if (pendingPlotWorker == null || dayCycle == null) return;
+        if (pendingPlotAction == ActivityKind.BuildHouse) HouseSite.ShowAvailable();
+        else Plot.ShowAvailable(pendingPlotAction, dayCycle.CurrentDay, seedCatalog);
     }
 
     private static GatheringTask[] CreateGatheringPositions(ActivityKind activity, Transform destination,
@@ -282,7 +303,7 @@ public sealed class ActionResolver : MonoBehaviour
             RejectAction("Esse trabalhador está ausente hoje.");
             return;
         }
-        if (working.Contains(worker) || busyMovements.Contains(worker) ||
+        if (targetReservations.ContainsKey(worker) || working.Contains(worker) || busyMovements.Contains(worker) ||
             HasAssignedWorker(forestTasks, worker) || HasAssignedWorker(fishingTasks, worker))
         {
             RejectAction("Aguarde esse trabalhador concluir a ação atual.");
@@ -521,7 +542,7 @@ public sealed class ActionResolver : MonoBehaviour
     {
         bool available = activity == ActivityKind.BuildHouse ? HouseSite.HasAvailable() :
             Plot.HasAvailable(activity, dayCycle.CurrentDay, seedCatalog);
-        bool canWaitForPlowing = IsPlanting(activity) && plotsBeingPlowed.Count > 0;
+        bool canWaitForPlowing = IsPlanting(activity) && HasPlowingInProgress();
         if (!available && !canWaitForPlowing)
         {
             RejectAction("Não há alvo disponível para essa carta.");
@@ -643,6 +664,11 @@ public sealed class ActionResolver : MonoBehaviour
             feedback.ShowMessage("Atribua primeiro um card de terreno a um trabalhador.");
             return;
         }
+        if (IsTargetReserved(plot))
+        {
+            RejectAction("Outro trabalhador já está usando esse terreno.");
+            return;
+        }
 
         switch (pendingPlotAction)
         {
@@ -667,17 +693,18 @@ public sealed class ActionResolver : MonoBehaviour
             RejectAction("Escolha um cercado com animal.");
             return;
         }
+        var targets = plot.ConnectedPlotsFor(ActivityKind.FeedAnimals, dayCycle.CurrentDay, seedCatalog);
         SoundCue feedingCue = plot.Animal == AnimalKind.Chicken ? SoundCue.FeedChicken : SoundCue.FeedAnimals;
         ActivityCardDrag card = pendingPlotCard;
-        WorkerAssignment worker = TakePendingWorker();
+        WorkerAssignment worker = TakePendingWorker(targets);
         CommitAction(worker, ActivityKind.FeedAnimals, "distribuindo ração", card);
         MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
-            if (dayCycle.TryFeedAnimal(plot, out int milk, out int eggs))
+            if (dayCycle.TryFeedAnimals(targets, worker, out int milk, out int eggs))
                 feedback.ShowMessage(milk > 0 ? $"Ração: +{milk} leite{(milk == 1 ? "" : "s")}." :
                     $"Ração: +{eggs} ovo{(eggs == 1 ? "" : "s")}.");
             AudioManager.Play(feedingCue);
-            SendWorkerHome(worker);
+            FinishTargetAction(worker);
         });
     }
 
@@ -689,7 +716,7 @@ public sealed class ActionResolver : MonoBehaviour
             return;
         }
         ActivityCardDrag card = pendingPlotCard;
-        WorkerAssignment worker = TakePendingWorker();
+        WorkerAssignment worker = TakePendingWorker(new[] { plot });
         CommitAction(worker, animal == AnimalKind.Cow ? ActivityKind.PlaceCow :
             ActivityKind.PlaceChicken, "levando animal ao cercado", card);
         MoveAndWork(worker, plot, plowWorkDuration, () =>
@@ -700,7 +727,7 @@ public sealed class ActionResolver : MonoBehaviour
                 feedback.ShowMessage(animal == AnimalKind.Cow ? "Vaca no cercado." : "Galinha no cercado.");
             }
             else RejectAction("O cercado já está ocupado ou indisponível.");
-            SendWorkerHome(worker);
+            FinishTargetAction(worker);
         });
     }
 
@@ -713,15 +740,21 @@ public sealed class ActionResolver : MonoBehaviour
         }
         ActivityCardDrag card = pendingPlotCard;
         if (!ConsumeReplayConstructionCard(card)) return;
-        WorkerAssignment worker = TakePendingWorker();
+        WorkerAssignment worker = TakePendingWorker(new[] { plot });
         CommitAction(worker, ActivityKind.BuildFence, "construindo cerca", card);
         MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
-            plot.BuildFence();
-            worker.SetStatus("cerca construída");
-            feedback.ShowMessage("Terreno cercado.");
-            SendWorkerHome(worker);
-        }, () => ConstructionSmoke.Play(plot.transform, plot.PlowedGroundBounds, plowWorkDuration));
+            if (plot != null && plot.CanUse(ActivityKind.BuildFence, dayCycle.CurrentDay, seedCatalog, worker))
+            {
+                plot.BuildFence();
+                worker.SetStatus("cerca construída");
+                feedback.ShowMessage("Terreno cercado.");
+            }
+            FinishTargetAction(worker);
+        }, () =>
+        {
+            if (plot != null) ConstructionSmoke.Play(plot.transform, plot.PlowedGroundBounds, plowWorkDuration);
+        });
     }
 
     public void TryBuildHouse(HouseSite site)
@@ -729,21 +762,26 @@ public sealed class ActionResolver : MonoBehaviour
         if (site == null || site.IsBuilt || pendingPlotWorker == null ||
             pendingPlotAction != ActivityKind.BuildHouse || dayCycle == null ||
             !dayCycle.CanAcceptActions) return;
+        if (IsTargetReserved(site))
+        {
+            RejectAction("Outro trabalhador já está construindo nesse lote.");
+            return;
+        }
         ActivityCardDrag card = pendingPlotCard;
         if (!ConsumeReplayConstructionCard(card)) return;
-        WorkerAssignment builder = TakePendingWorker();
+        WorkerAssignment builder = TakePendingWorker(new[] { site });
         CommitAction(builder, ActivityKind.BuildHouse, "construindo casa", card);
         MoveAndWork(builder, site.ConstructionPosition, site.ConstructionFacingPosition,
             site.GetConstructionWaypoints(builder.OriginHouseNumber), site.ConstructionTravelSpeed,
             plowWorkDuration, false, () =>
         {
-            if (site.Build(dayCycle.CurrentDay))
+            if (site != null && site.Build(dayCycle.CurrentDay))
             {
                 AudioManager.Play(SoundCue.HouseBuilt);
                 feedback.ShowMessage("Casa construída. O novo trabalhador chegará amanhã.");
             }
-            SendWorkerHome(builder);
-        }, () => site.PlayConstructionSmoke(plowWorkDuration));
+            FinishTargetAction(builder);
+        }, () => { if (site != null) site.PlayConstructionSmoke(plowWorkDuration); });
     }
 
     private bool ConsumeReplayConstructionCard(ActivityCardDrag card)
@@ -777,9 +815,9 @@ public sealed class ActionResolver : MonoBehaviour
                 "Escolha uma plantação ainda em crescimento.");
             return;
         }
-        ActivityCardDrag card = pendingPlotCard;
-        WorkerAssignment worker = TakePendingWorker();
         var targets = plot.ConnectedPlotsFor(activity, dayCycle.CurrentDay, seedCatalog);
+        ActivityCardDrag card = pendingPlotCard;
+        WorkerAssignment worker = TakePendingWorker(targets);
         CommitAction(worker, activity, activity.ToString(), card);
         ImproveNext(0);
 
@@ -791,24 +829,32 @@ public sealed class ActionResolver : MonoBehaviour
                     "crescimento acelerado");
                 feedback.ShowMessage(activity == ActivityKind.Fertilizer ?
                     "Adubo: aumenta a produção na colheita." : "Plantação avançou um dia.");
-                SendWorkerHome(worker);
+                FinishTargetAction(worker);
                 return;
             }
             Plot target = targets[index];
+            if (target == null)
+            {
+                ImproveNext(index + 1);
+                return;
+            }
             MoveAndWork(worker, target, plowWorkDuration, () =>
             {
-                if (activity == ActivityKind.Fertilizer)
+                if (target != null)
                 {
-                    target.Fertilize();
-                    AudioManager.Play(SoundCue.Fertilize);
-                }
-                else
-                {
-                    AudioManager.Play(SoundCue.Water);
-                    target.AdvanceGrowth(1);
-                    target.RefreshGrowth(dayCycle.CurrentDay, seedCatalog);
-                    if (MandalaSynergy.Instance != null)
-                        MandalaSynergy.Instance.ApplyGrowthBonuses(dayCycle.CurrentDay, seedCatalog);
+                    if (activity == ActivityKind.Fertilizer)
+                    {
+                        target.Fertilize();
+                        AudioManager.Play(SoundCue.Fertilize);
+                    }
+                    else
+                    {
+                        AudioManager.Play(SoundCue.Water);
+                        target.AdvanceGrowth(1);
+                        target.RefreshGrowth(dayCycle.CurrentDay, seedCatalog);
+                        if (MandalaSynergy.Instance != null)
+                            MandalaSynergy.Instance.ApplyGrowthBonuses(dayCycle.CurrentDay, seedCatalog);
+                    }
                 }
                 ImproveNext(index + 1);
             });
@@ -817,35 +863,25 @@ public sealed class ActionResolver : MonoBehaviour
 
     private void PlowPlot(Plot plot)
     {
-        if (IsPlowing(plot))
-        {
-            RejectAction("Esse terreno já está sendo arado.");
-            return;
-        }
         if (!plot.CanUse(ActivityKind.Plow, dayCycle.CurrentDay, seedCatalog))
         {
             RejectAction("Escolha um terreno livre para arar.");
             return;
         }
         ActivityCardDrag card = pendingPlotCard;
-        WorkerAssignment worker = TakePendingWorker();
-        plotsBeingPlowed.Add(plot);
+        WorkerAssignment worker = TakePendingWorker(new[] { plot });
         CommitAction(worker, ActivityKind.Plow, "arando", card);
         MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
-            plotsBeingPlowed.Remove(plot);
-            if (plot == null)
+            if (plot != null && plot.CanUse(ActivityKind.Plow, dayCycle.CurrentDay, seedCatalog, worker))
             {
-                SendWorkerHome(worker);
-                return;
+                plot.Plow();
+                AudioManager.Play(SoundCue.Plow);
+                PlotsPlowedToday++;
+                worker.SetStatus("terreno arado");
+                feedback.ShowMessage("Terreno preparado para plantio.");
             }
-            plot.Plow();
-            InvalidatePlotHighlights();
-            AudioManager.Play(SoundCue.Plow);
-            PlotsPlowedToday++;
-            worker.SetStatus("terreno arado");
-            feedback.ShowMessage("Terreno preparado para plantio.");
-            SendWorkerHome(worker);
+            FinishTargetAction(worker);
         });
     }
 
@@ -861,16 +897,20 @@ public sealed class ActionResolver : MonoBehaviour
             feedback.ShowMessage("Culturas não configuradas.");
             return;
         }
+        ActivityKind activity = pendingPlotAction;
         ActivityCardDrag card = pendingPlotCard;
-        WorkerAssignment worker = TakePendingWorker();
-        CommitAction(worker, pendingPlotAction, "plantando", card);
+        WorkerAssignment worker = TakePendingWorker(new[] { plot });
+        CommitAction(worker, activity, "plantando", card);
         MoveAndWork(worker, plot, plowWorkDuration, () =>
         {
-            plot.Plant(crop, dayCycle.CurrentDay, seedCatalog);
-            AudioManager.Play(SoundCue.Plant);
-            worker.SetStatus("plantio concluído");
-            feedback.ShowMessage(seedCatalog.Get(crop).displayName + " plantado.");
-            SendWorkerHome(worker);
+            if (plot != null && plot.CanUse(activity, dayCycle.CurrentDay, seedCatalog, worker))
+            {
+                plot.Plant(crop, dayCycle.CurrentDay, seedCatalog);
+                AudioManager.Play(SoundCue.Plant);
+                worker.SetStatus("plantio concluído");
+                feedback.ShowMessage(seedCatalog.Get(crop).displayName + " plantado.");
+            }
+            FinishTargetAction(worker);
         });
     }
 
@@ -882,9 +922,9 @@ public sealed class ActionResolver : MonoBehaviour
             RejectAction("A plantação ainda não está pronta.");
             return;
         }
-        ActivityCardDrag card = pendingPlotCard;
-        WorkerAssignment worker = TakePendingWorker();
         var targets = plot.ReadyConnectedPlots(dayCycle.CurrentDay, seedCatalog);
+        ActivityCardDrag card = pendingPlotCard;
+        WorkerAssignment worker = TakePendingWorker(targets);
         CommitAction(worker, ActivityKind.Harvest, "colhendo", card);
         HarvestNext(0);
 
@@ -893,17 +933,22 @@ public sealed class ActionResolver : MonoBehaviour
             if (index >= targets.Count)
             {
                 worker.SetStatus("colheita concluída");
-                SendWorkerHome(worker);
+                FinishTargetAction(worker);
                 return;
             }
             Plot target = targets[index];
-            if (target == null || !target.CanUse(ActivityKind.Harvest, dayCycle.CurrentDay, seedCatalog))
+            if (target == null || !target.CanUse(ActivityKind.Harvest, dayCycle.CurrentDay, seedCatalog, worker))
             {
                 HarvestNext(index + 1);
                 return;
             }
             MoveAndWork(worker, target, plowWorkDuration, () =>
             {
+                if (target == null || !target.CanUse(ActivityKind.Harvest, dayCycle.CurrentDay, seedCatalog, worker))
+                {
+                    HarvestNext(index + 1);
+                    return;
+                }
                 int harvestYield = target.HarvestYield(dayCycle.CurrentDay, seedCatalog);
                 int pestLoss = dayEvents != null ? dayEvents.HarvestReductionFor(target) : 0;
                 CropType crop = target.Harvest();
@@ -981,9 +1026,11 @@ public sealed class ActionResolver : MonoBehaviour
         pendingFoodReady = false;
     }
 
-    private WorkerAssignment TakePendingWorker()
+    private WorkerAssignment TakePendingWorker(IReadOnlyList<Component> targets)
     {
         WorkerAssignment worker = pendingPlotWorker;
+        // A ordem guarda os alvos antes de liberar a seleção para outro trabalhador.
+        targetReservations.Add(worker, (pendingPlotAction, targets));
         pendingPlotWorker = null;
         pendingPlotCard = null;
         plotHighlightsDirty = false;
@@ -992,6 +1039,25 @@ public sealed class ActionResolver : MonoBehaviour
         Plot.ClearHighlights();
         HouseSite.ClearHighlights();
         return worker;
+    }
+
+    private void ReleaseTargets(WorkerAssignment worker)
+    {
+        if (targetReservations.Remove(worker)) InvalidatePlotHighlights();
+    }
+
+    private void FinishTargetAction(WorkerAssignment worker)
+    {
+        ReleaseTargets(worker);
+        SendWorkerHome(worker);
+    }
+
+    private void InterruptTargetAction(WorkerAssignment worker)
+    {
+        ReleaseTargets(worker);
+        workRoutes.Remove(worker);
+        workOriginRoutes.Remove(worker);
+        workTravelSpeeds.Remove(worker);
     }
 
     public void ReturnWorkersHome()
@@ -1008,7 +1074,6 @@ public sealed class ActionResolver : MonoBehaviour
 
     public void BeginNextDay()
     {
-        plotsBeingPlowed.Clear();
         if (forestTrees != null) forestTrees.ResetTrees();
         ClearPendingPlot();
         CancelFoodPreparation();
@@ -1025,10 +1090,13 @@ public sealed class ActionResolver : MonoBehaviour
     private void StopMovement(WorkerAssignment worker)
     {
         if (movements.TryGetValue(worker, out Tween previous))
-        {
             previous.Kill();
-            movements.Remove(worker);
-        }
+        EndMovement(worker);
+    }
+
+    private void EndMovement(WorkerAssignment worker)
+    {
+        movements.Remove(worker);
         if (busyMovements.Remove(worker)) busyWorkers--;
         returningHome.Remove(worker);
     }
@@ -1131,7 +1199,8 @@ public sealed class ActionResolver : MonoBehaviour
             return;
         }
         worker.SetStatus("caminhando");
-        MoveAlongRoute(worker, route, BeginWork, true, travelSpeed);
+        MoveAlongRoute(worker, route, BeginWork, true, travelSpeed,
+            onInterrupted: () => InterruptTargetAction(worker));
     }
 
     private void WorkAtStation(WorkerAssignment worker, float workDuration, System.Action onFinished)
@@ -1160,6 +1229,15 @@ public sealed class ActionResolver : MonoBehaviour
         };
         float nextStrike = 0.16f;
         float progress = 0;
+        bool finished = false;
+        void EndWork()
+        {
+            busyWorkers--;
+            working.Remove(worker);
+            if (worker == null) return;
+            if (worker.Progress != null) worker.Progress.Hide();
+            worker.SetWorking(false);
+        }
         DOTween.To(() => progress, value =>
         {
             progress = value;
@@ -1170,13 +1248,16 @@ public sealed class ActionResolver : MonoBehaviour
                 AudioManager.Play(workSound.Value);
                 nextStrike = elapsed + (workSound == SoundCue.HammerWork ? 0.57f : 0.75f);
             }
-        }, 1f, workDuration).SetEase(Ease.Linear).OnComplete(() =>
+        }, 1f, workDuration).SetEase(Ease.Linear).SetTarget(this).SetLink(worker.gameObject).OnComplete(() =>
         {
-            if (worker.Progress != null) worker.Progress.Hide();
-            busyWorkers--;
-            working.Remove(worker);
-            worker.SetWorking(false);
+            finished = true;
+            EndWork();
             onFinished?.Invoke();
+        }).OnKill(() =>
+        {
+            if (finished) return;
+            EndWork();
+            InterruptTargetAction(worker);
         });
     }
 
@@ -1441,7 +1522,8 @@ public sealed class ActionResolver : MonoBehaviour
     }
 
     private void MoveAlongRoute(WorkerAssignment worker, Vector3[] points, System.Action onArrived,
-        bool countAsBusy = true, float speedOverride = 0f, bool isReturn = false)
+        bool countAsBusy = true, float speedOverride = 0f, bool isReturn = false,
+        System.Action onInterrupted = null)
     {
         bool redirecting = countAsBusy && !isReturn && returningHome.Contains(worker);
         StopMovement(worker);
@@ -1469,11 +1551,16 @@ public sealed class ActionResolver : MonoBehaviour
         route.SetEase(Ease.InOutSine);
         if (redirecting) route = DOTween.Sequence().AppendInterval(0.1f).Append(route);
         movements[worker] = route;
+        if (onInterrupted != null)
+            route.SetId(this).SetLink(worker.gameObject).OnKill(() =>
+            {
+                if (!movements.TryGetValue(worker, out Tween active) || active != route) return;
+                EndMovement(worker);
+                onInterrupted();
+            });
         route.OnComplete(() =>
         {
-            movements.Remove(worker);
-            if (busyMovements.Remove(worker)) busyWorkers--;
-            returningHome.Remove(worker);
+            EndMovement(worker);
             onArrived?.Invoke();
         });
     }

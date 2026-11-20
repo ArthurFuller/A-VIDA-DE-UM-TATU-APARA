@@ -44,7 +44,8 @@ public sealed class GameBalanceEditor : EditorWindow
             "jerimumPrice", "foodPrice", "milkPrice", "eggPrice", "cornSeedPrice",
             "pumpkinSeedPrice", "jerimumSeedPrice");
         Section(data, "Produção e coleta", "totalDays", "milkPerCow", "eggsPerChicken",
-            "woodReward", "fertilizerHarvestBonus", "maxPreparedFoodPerAction", "foodPlusBonus", "gambleStake");
+            "woodReward", "fertilizerHarvestBonus", "maxPreparedFoodPerAction", "foodPlusBonus",
+            "foodPlusMixedTripleBonus", "gambleStake");
         Section(data, "Mandala", "cropGrowthNearCorn", "cropYieldNearCorn",
             "animalProductionNearCorn", "cropSalePriceNearWaterCow");
         Section(data, "Mercearia", "fenceWoodCost", "fenceCoinCost", "foodCoinCost", "marketDays");
@@ -124,7 +125,7 @@ public sealed class GameBalanceEditor : EditorWindow
 
     private static int Maximum(string name) => name switch
     {
-        "maxPreparedFoodPerAction" => 2,
+        "maxPreparedFoodPerAction" => 3,
         "houseRewardLimit" or "returningOffersPerMarket" => 3,
         "minimumOffers" or "maximumOffers" => 5,
         "headOfCuiaChancePercent" or "headOfCuiaTheftPercent" => 100,
@@ -153,6 +154,7 @@ public sealed class GameBalanceEditor : EditorWindow
         "fertilizerHarvestBonus" => "Unidades extras recebidas ao colher um terreno adubado.",
         "maxPreparedFoodPerAction" => "Limite de porções por preparo comum.",
         "foodPlusBonus" => "Porções adicionais com a carta Comida+.",
+        "foodPlusMixedTripleBonus" => "Porções além do bônus normal de Comida+ ao usar três ingredientes de dois tipos.",
         "dailyMissionOffers" => "Abre a aba de encomendas todos os dias. Comprar e vender seguem o calendário da mercearia.",
         "gambleStake" => "Moedas ganhas ao vencer ou perdidas ao perder no Jogo do Bicho.",
         "cropGrowthNearCorn" => "Etapas de crescimento antecipadas por dia para macaxeira ou jerimum ao lado de milho já pronto, até a planta ficar madura.",
@@ -214,8 +216,9 @@ public sealed class GameBalanceEditor : EditorWindow
         "eggsPerChicken" => "Ovos por galinha", "woodReward" => "Madeira base por coleta",
         "gambleStake" => "Aposta",
         "fertilizerHarvestBonus" => "Unidades extras com adubo",
-        "maxPreparedFoodPerAction" => "Porções por preparo comum",
+        "maxPreparedFoodPerAction" => "Máximo de porções por preparo comum",
         "foodPlusBonus" => "Porções extras com Comida+",
+        "foodPlusMixedTripleBonus" => "Bônus extra de Comida+ com 3 ingredientes de 2 tipos",
         "dailyMissionOffers" => "Ofertas todos os dias",
         "cropGrowthNearCorn" => "Crescimento junto ao milho",
         "cropYieldNearCorn" => "Colheita junto ao milho",

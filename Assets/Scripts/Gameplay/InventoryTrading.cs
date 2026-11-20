@@ -118,13 +118,14 @@ public sealed class InventoryTrading : MonoBehaviour
         recipeName = types == 1 ? "Alimentos iguais" : "Alimentos diferentes";
         int baseOutput = types == 1 ? amount - 1 : amount;
         GameBalance balance = GameBalance.Current;
-        if (balance == null)
-            output = baseOutput + (plus ? amount - 1 : 0);
-        else
+        int preparationLimit = balance != null ? Mathf.Max(1, balance.maxPreparedFoodPerAction) : 3;
+        output = Mathf.Min(baseOutput, preparationLimit);
+        if (plus)
         {
-            int portions = types == 1 ? 1 : amount - 1;
-            output = Mathf.Min(portions, Mathf.Max(1, balance.maxPreparedFoodPerAction)) +
-                (plus ? Mathf.Max(0, balance.foodPlusBonus) : 0);
+            long bonus = balance != null ? Mathf.Max(0, balance.foodPlusBonus) : 1;
+            if (amount == 3 && types == 2)
+                bonus += balance != null ? Mathf.Max(0, balance.foodPlusMixedTripleBonus) : 1;
+            output = (int)System.Math.Min(int.MaxValue, output + bonus);
         }
         return true;
     }
